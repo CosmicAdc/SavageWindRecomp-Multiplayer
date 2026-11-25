@@ -56,3 +56,6 @@ Consecuencia: tarea nueva **T465** (F4, invitación a santuario), que depende de
 | 15 | Alcance de la invitación | **Solo santuarios normales** (`CDungeon/DungeonNNN`); Bestias Divinas y otros interiores, después |
 | 16 | ¿A se entera de que B viene o rechazó? | **No**: sin mensaje nuevo (T465e cerrada; sin T409) |
 | 17 | ¿Se invita si el compañero ya estaba dentro al unirnos? | No (valor por defecto de T540, no preguntado) |
+| 18 | Dormir (T449): si el anfitrión no duerme, ¿qué pasa con el invitado que espera? | **Espera indefinida**: sigue durmiendo hasta que el anfitrión elija la hora o hasta que él mismo cancele |
+| 19 | Luna de Sangre (T450): invitado en santuario, escena o menú cuando la tiene el anfitrión | **Se le aplica al salir**: queda pendiente y la ve en cuanto vuelve al campo y puede |
+| 20 | Ataque giratorio (T466): ¿con qué criterio golpea al compañero? | **Solo con PvP activo**, como los demás golpes |
