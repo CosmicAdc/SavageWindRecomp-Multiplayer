@@ -3,6 +3,10 @@
 // gear put away, then 4 s standing, sword drawn, swinging it (the player's own AS: Move, WaitAttention, CutS1, ...).
 // Says hello in the chat. BOT_SWAP=1: its upper piece off and on, its sword another, every 5 s (2: once);
 // BOT_BOOM=1: a Remote Bomb bomb of its going off where it stands every 10 s.
+// Hostile modes (malformed messages, to reproduce the fixes of the runtime; each once, 5 s after it has its slot):
+// BOT_NAN=1: its STATE carries a position that is not finite (pos[0] = NAN) from then on;
+// BOT_LOOT=<actor>: a LOOT_ADD of that actor's name, at its position;
+// BOT_SHIELD=1: an ESTATE with one enemy whose shield is 40 'A' with no terminator.
 //
 //   cc -O2 -o build/online_bot tools/online_bot.c [-lws2_32]
 //   build/online_bot [host] [port] [name] [radius] [head upper lower] [weapon shield bow sheath quiver]
@@ -75,8 +79,19 @@ typedef struct {
     struct { char name[32]; uint8_t mode; float m[12]; } held[5];  // (the materials it holds: none)
 } WireState;
 typedef struct { uint32_t magic; uint16_t version; char name[24], pass[24]; } WireHello;
+// (the wire layouts of the host's OnlineEnemy and OnlineLoot, runtime/online.h)
+typedef struct {
+    uint32_t id; char name[40]; float m[12]; char as[32]; char weapon[40]; float wm[12]; int32_t life;
+    char shield[40]; float sm[12];
+    uint8_t wbone, sbone;
+    uint8_t owner;
+    uint32_t hash;
+} WireEnemy;
+typedef struct { uint32_t gid, lid; uint8_t origin; char name[40]; float pos[3]; float rot[9]; } WireLoot;
 #pragma pack(pop)
-enum { M_HELLO = 1, M_WELCOME, M_REJECT, M_STATE, M_JOIN, M_LEAVE, M_CHAT, M_PING, M_PONG, M_EQUIP };
+// (the list of runtime/online.c, in its order)
+enum { M_HELLO = 1, M_WELCOME, M_REJECT, M_STATE, M_JOIN, M_LEAVE, M_CHAT, M_PING, M_PONG, M_EQUIP, M_SKEL, M_TIME, M_ENEMIES,
+       M_HIT, M_ESTATE, M_LOOT_ADD };
 
 static void msg(sock_t s, uint8_t type, const void *p, int n) {
     uint8_t b[3 + 16384];  // (the runtime's own limit, runtime/online.c send_msg: a STATE is 2969 bytes now)
@@ -243,6 +258,29 @@ int main(int argc, char **argv) {
                     memcpy(ws.stop.name, gn, sizeof gn), memcpy(ws.stop.from, f, 12), memcpy(ws.stop.m, m, 48);
                 }
             }
+            // BOT_LOOT=<actor>: a LOOT_ADD of that name at its position, once, 5 s in
+            static int loot_sent, shield_sent;
+            if (getenv("BOT_LOOT") && t > 5 && !loot_sent++) {
+                WireLoot l = {.gid = 0, .lid = 1};
+                snprintf(l.name, sizeof l.name, "%s", getenv("BOT_LOOT"));
+                memcpy(l.pos, ws.pos, sizeof l.pos);
+                msg(s, M_LOOT_ADD, &l, sizeof l);
+                fprintf(stderr, "bot: loot %s\n", l.name);
+            }
+            // BOT_SHIELD=1: an ESTATE (a count, then the enemies) of one whose shield has no terminator, once, 5 s in
+            if (getenv("BOT_SHIELD") && t > 5 && !shield_sent++) {
+                uint8_t eb[1 + sizeof(WireEnemy)];
+                WireEnemy e = {.id = 1, .life = 100, .owner = (uint8_t)id};
+                snprintf(e.name, sizeof e.name, "Enemy_Bokoblin_Junior");
+                snprintf(e.as, sizeof e.as, "Wait");
+                memset(e.shield, 'A', sizeof e.shield);
+                e.m[0] = e.m[5] = e.m[10] = 1, e.m[3] = ws.pos[0], e.m[7] = ws.pos[1], e.m[11] = ws.pos[2];
+                eb[0] = 1, memcpy(eb + 1, &e, sizeof e);
+                msg(s, M_ESTATE, eb, sizeof eb);
+                fprintf(stderr, "bot: shield without terminator\n");
+            }
+            // BOT_NAN=1: its position is not finite from 5 s on
+            if (getenv("BOT_NAN") && t > 5) ws.pos[0] = NAN;
             msg(s, M_STATE, &ws, sizeof ws);
             if (have && !said) {
                 said = 1;
