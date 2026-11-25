@@ -4,9 +4,9 @@ name: Tests
 
 on:
   push:
-    branches: [test, main]
+    branches: [test, main, coop/main]
   pull_request:
-    branches: [test, main]
+    branches: [test, main, coop/main]
   workflow_dispatch:
 
 permissions:
