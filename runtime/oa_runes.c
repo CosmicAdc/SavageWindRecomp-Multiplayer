@@ -4,6 +4,83 @@
 
 #define MAGNET_TIP 0.8f  // (the magnet over the hands, from them to its tips, toward what is held: in metres)
 
+// A remote player's runes here (his Link and its pieces: oa_puppet's g_pup)
+static struct {
+    uint64_t grab;                 // what he holds with the Magnesis rune, here (0: none)
+    uint64_t released; uint64_t released_t;  // (what he let go of - Magnesis, Stasis - and when: his moves of it his)
+    Watch grab_w;
+    char grab_name[ONLINE_GRAB_NAME];
+    float grab_from[3];
+    int grab_wait;                 // (frames before looking for it again: not found)
+    struct { uint64_t p; uint32_t id, pad; } magne;  // the rune's glow on it (its handle)
+    struct { uint64_t p; uint32_t id, pad; } beam[MAGNE_BEAM];  // the rune's beam from his hand to it (MagneConnect)
+    Piece slate;                   // the slate in his hand while he uses a rune (OnlineSlate: Item_Conductor's ELink)
+    bool slate_shown;              // (its model drawn: while he holds)
+    Piece rune_fx;                 // what plays his runes' beam and chains here (OnlineRuneFx: ReactionHit's ELink)
+    Piece stop_fx;                 // (and his Stasis chains, on what he stopped)
+    Piece magnet_fx;               // the magnet over his hands while he holds (OnlineMagnetFx: Item_Magnetglove's ELink)
+    struct { uint64_t p; uint32_t id, pad; } magnet;  // (its effect: the key "Hand", the particles MagneHand)
+    uint8_t holder[0x140];         // (the beam's holder, as the rune's: +0x48 its handle, +0x50 its id, +0x13c 0)
+    uint64_t stop;                 // what he stopped with the Stasis rune, here (0: none)
+    Watch stop_w;
+    char stop_name[ONLINE_GRAB_NAME];
+    int stop_wait;
+    struct { uint64_t p; uint32_t id, pad; } chains;  // its chains (BitaLocked_Start)
+    bool chained;                  // (played once for what he stopped: the rune plays them as it stops it)
+} g_rune[ONLINE_MAX];
+
+// A remote player's Cryonis pillars here
+static struct {
+    struct { Piece p; float m[12]; bool used, rose; } ice[3];  // his Cryonis pillars, here (OnlineIce)
+} g_ice[ONLINE_MAX];
+
+// what player i holds with Magnesis here (0: none)
+uint64_t oa_rune_grab(int i) { return g_rune[i].grab; }
+
+// what player i let go of last (Magnesis, Stasis; 0: nothing yet), and when (plat_now_ns)
+uint64_t oa_rune_released(int i) { return g_rune[i].released; }
+uint64_t oa_rune_released_t(int i) { return g_rune[i].released_t; }
+
+// a player holds the actor a with Magnesis or stopped it with Stasis, here
+bool oa_rune_holds(uint64_t a) {
+    bool his = false;
+    for (int k = 0; k < ONLINE_MAX && !his; k++) his = g_rune[k].grab == a || g_rune[k].stop == a;
+    return his;
+}
+
+// a player stopped the actor a with Stasis, here
+bool oa_rune_stopped(uint64_t a) {
+    bool theirs = false;
+    for (int i = 0; i < ONLINE_MAX && !theirs; i++) theirs = g_rune[i].stop == a;
+    return theirs;
+}
+
+// the actor a is one of the Cryonis pillars made here for a player
+bool oa_rune_ice(uint64_t a) {
+    bool theirs = false;
+    for (int i = 0; i < ONLINE_MAX && !theirs; i++)
+        for (int q = 0; q < 3 && !theirs; q++) theirs = g_ice[i].ice[q].p.actor == a;
+    return theirs;
+}
+
+// player i's rune pieces, each to each(c, i, piece), in this order (oa_drop, forget_all: after his puppet's)
+void oa_runes_pieces(Cpu *c, int i, void (*each)(Cpu *c, int i, Piece *p)) {
+    each(c, i, &g_rune[i].slate), each(c, i, &g_rune[i].rune_fx), each(c, i, &g_rune[i].stop_fx);
+    each(c, i, &g_rune[i].magnet_fx);
+}
+
+// player i gone (oa_drop): his runes forgotten (his pieces already handed on with oa_runes_pieces)
+void oa_runes_drop(int i) {
+    memset(&g_rune[i], 0, sizeof g_rune[i]);
+    memset(&g_ice[i], 0, sizeof g_ice[i]);
+}
+
+// a load (forget_all): every player's runes forgotten (their pieces already handed on with oa_runes_pieces)
+void oa_runes_forget(void) {
+    memset(g_rune, 0, sizeof g_rune);
+    memset(g_ice, 0, sizeof g_ice);
+}
+
 // what the local Link holds with Magnesis (0: none). 1.9.0: the rune's object at P_MAGNE, its +0x318 the magnetic part
 // of the actor held, 0x7000b993e8 checks it so; that part on while its +0x10 bit 0; its actor at +8
 uint64_t oa_magne_held(void) {
@@ -72,20 +149,20 @@ void oa_stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
     for (int i = 0; i < ONLINE_MAX; i++) {
         const OnlineGrab *g = i != me && pl[i].used && pl[i].pose.valid ? &pl[i].pose.stop : NULL;
         bool want = g && g->name[0];
-        if (oa_g_act[i].stop && (!want || strcmp(g->name, oa_g_act[i].stop_name) || !oa_alive(oa_g_act[i].stop, oa_g_act[i].stop_w))) {
-            if (oa_alive(oa_g_act[i].stop, oa_g_act[i].stop_w)) stasis_look(c, oa_g_act[i].stop, false);
-            fx_end(c, &oa_g_act[i].chains);
-            LOG("[online] %s's Stasis on %s: over\n", pl[i].name, oa_g_act[i].stop_name);
-            oa_g_act[i].released = oa_g_act[i].stop, oa_g_act[i].released_t = plat_now_ns();
-            oa_g_act[i].stop = 0, oa_g_act[i].chained = false;
+        if (g_rune[i].stop && (!want || strcmp(g->name, g_rune[i].stop_name) || !oa_alive(g_rune[i].stop, g_rune[i].stop_w))) {
+            if (oa_alive(g_rune[i].stop, g_rune[i].stop_w)) stasis_look(c, g_rune[i].stop, false);
+            fx_end(c, &g_rune[i].chains);
+            LOG("[online] %s's Stasis on %s: over\n", pl[i].name, g_rune[i].stop_name);
+            g_rune[i].released = g_rune[i].stop, g_rune[i].released_t = plat_now_ns();
+            g_rune[i].stop = 0, g_rune[i].chained = false;
         }
         if (!want) {
-            oa_g_act[i].stop_name[0] = 0, oa_g_act[i].stop_wait = 0;
+            g_rune[i].stop_name[0] = 0, g_rune[i].stop_wait = 0;
             continue;
         }
-        if (!oa_g_act[i].stop && (strcmp(g->name, oa_g_act[i].stop_name) || oa_g_act[i].stop_wait-- <= 0)) {
-            snprintf(oa_g_act[i].stop_name, sizeof oa_g_act[i].stop_name, "%s", g->name);
-            oa_g_act[i].stop_wait = 30;
+        if (!g_rune[i].stop && (strcmp(g->name, g_rune[i].stop_name) || g_rune[i].stop_wait-- <= 0)) {
+            snprintf(g_rune[i].stop_name, sizeof g_rune[i].stop_name, "%s", g->name);
+            g_rune[i].stop_wait = 30;
             int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
             // (the one of that name nearest where he stopped it or where it is in his game, 15 m: the two worlds' may
             // have parted, a trunk fallen its own way in each; 4 m and his trunk was "not here")
@@ -100,28 +177,28 @@ void oa_stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
                 float dn = (m[3] - g->m[3]) * (m[3] - g->m[3]) + (m[7] - g->m[7]) * (m[7] - g->m[7]) +
                            (m[11] - g->m[11]) * (m[11] - g->m[11]);
                 if (dn < d) d = dn;
-                if (d < best) best = d, oa_g_act[i].stop = oa_g_actors[k];
+                if (d < best) best = d, g_rune[i].stop = oa_g_actors[k];
             }
-            if (oa_g_act[i].stop) oa_g_act[i].stop_w = oa_watch(oa_g_act[i].stop);
-            LOG("[online] %s stopped %s with Stasis: %s\n", pl[i].name, g->name, oa_g_act[i].stop ? "here too" : "not here");
+            if (g_rune[i].stop) g_rune[i].stop_w = oa_watch(g_rune[i].stop);
+            LOG("[online] %s stopped %s with Stasis: %s\n", pl[i].name, g->name, g_rune[i].stop ? "here too" : "not here");
         }
-        if (!oa_g_act[i].stop) continue;
-        uint64_t body = *(uint64_t *)(uintptr_t)(oa_g_act[i].stop + 0x190);
+        if (!g_rune[i].stop) continue;
+        uint64_t body = *(uint64_t *)(uintptr_t)(g_rune[i].stop + 0x190);
         if (VALID(body)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)g->m, 0, 0, 0, 0);
-        stasis_look(c, oa_g_act[i].stop, true);
+        stasis_look(c, g_rune[i].stop, true);
         // its chains, the game's own, where it is
         if (!oa_link_live(i)) continue;
-        rune_keep(c, i, &oa_g_act[i].stop_fx, "OnlineRuneFx", pl[i].name);
-        uint64_t fxa = oa_g_act[i].stop_fx.actor;
+        rune_keep(c, i, &g_rune[i].stop_fx, "OnlineRuneFx", pl[i].name);
+        uint64_t fxa = g_rune[i].stop_fx.actor;
         if (!fxa) continue;
-        oa_call(c, FN_SET_MTX, fxa, oa_g_act[i].stop + 0x398, 0, 0, 0, 0);
-        if (oa_running(fxa) && !oa_g_act[i].chained) {
-            oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].chains, fxa, (uint64_t)(uintptr_t)"BitaLocked_Start");
-            oa_g_act[i].chained = fx_on(&oa_g_act[i].chains);
+        oa_call(c, FN_SET_MTX, fxa, g_rune[i].stop + 0x398, 0, 0, 0, 0);
+        if (oa_running(fxa) && !g_rune[i].chained) {
+            oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&g_rune[i].chains, fxa, (uint64_t)(uintptr_t)"BitaLocked_Start");
+            g_rune[i].chained = fx_on(&g_rune[i].chains);
             static int told;
-            if (told++ < 4) LOG("[online] %s's Stasis chains: BitaLocked_Start %s\n", pl[i].name, fx_on(&oa_g_act[i].chains) ? "on" : "not made");
+            if (told++ < 4) LOG("[online] %s's Stasis chains: BitaLocked_Start %s\n", pl[i].name, fx_on(&g_rune[i].chains) ? "on" : "not made");
         }
-        if (fx_on(&oa_g_act[i].chains)) chains_place(c, oa_g_act[i].chains.p, oa_g_act[i].stop);
+        if (fx_on(&g_rune[i].chains)) chains_place(c, g_rune[i].chains.p, g_rune[i].stop);
     }
 }
 
@@ -135,32 +212,32 @@ void oa_ice_update(Cpu *c, const OnlinePlayer *pl, int me) {
             const float *m = pl[i].pose.ice[k];
             int found = -1;
             for (int q = 0; q < 3 && found < 0; q++) {
-                if (!oa_g_act[i].ice[q].used) continue;
-                float dx = oa_g_act[i].ice[q].m[3] - m[3], dy = oa_g_act[i].ice[q].m[7] - m[7], dz = oa_g_act[i].ice[q].m[11] - m[11];
+                if (!g_ice[i].ice[q].used) continue;
+                float dx = g_ice[i].ice[q].m[3] - m[3], dy = g_ice[i].ice[q].m[7] - m[7], dz = g_ice[i].ice[q].m[11] - m[11];
                 if (dx * dx + dy * dy + dz * dz < 0.5f * 0.5f) found = q;
             }
             for (int q = 0; q < 3 && found < 0; q++)
-                if (!oa_g_act[i].ice[q].used && !keep[q]) {
-                    oa_g_act[i].ice[q].used = true, oa_g_act[i].ice[q].rose = false, found = q;
-                    memcpy(oa_g_act[i].ice[q].m, m, sizeof oa_g_act[i].ice[q].m);
+                if (!g_ice[i].ice[q].used && !keep[q]) {
+                    g_ice[i].ice[q].used = true, g_ice[i].ice[q].rose = false, found = q;
+                    memcpy(g_ice[i].ice[q].m, m, sizeof g_ice[i].ice[q].m);
                     LOG("[online] %s's ice pillar at %.1f %.1f %.1f\n", pl[i].name, m[3], m[7], m[11]);
                 }
             if (found >= 0) keep[found] = true;
         }
         for (int q = 0; q < 3; q++) {
-            if (!keep[q]) oa_g_act[i].ice[q].used = false;
-            Piece *p = &oa_g_act[i].ice[q].p;
-            if (!oa_g_act[i].ice[q].used && (p->actor || p->pending)) {
+            if (!keep[q]) g_ice[i].ice[q].used = false;
+            Piece *p = &g_ice[i].ice[q].p;
+            if (!g_ice[i].ice[q].used && (p->actor || p->pending)) {
                 oa_delete_piece(c, p);
                 LOG("[online] an ice pillar of another player: gone\n");
                 continue;
             }
-            if (!oa_g_act[i].ice[q].used) continue;
+            if (!g_ice[i].ice[q].used) continue;
             oa_piece_update(c, i, p, "OnlineIce", pl[i].name);
             if (!p->actor) continue;
-            oa_call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)oa_g_act[i].ice[q].m, 0, 0, 0, 0);
-            if (!oa_g_act[i].ice[q].rose && oa_running(p->actor) && oa_play_as(c, p->actor, "Appear_Linear", 0, 0, -1, true))
-                oa_g_act[i].ice[q].rose = true;
+            oa_call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)g_ice[i].ice[q].m, 0, 0, 0, 0);
+            if (!g_ice[i].ice[q].rose && oa_running(p->actor) && oa_play_as(c, p->actor, "Appear_Linear", 0, 0, -1, true))
+                g_ice[i].ice[q].rose = true;
         }
     }
 }
@@ -189,23 +266,23 @@ static void rune_keep(Cpu *c, int i, Piece *p, const char *name, const char *who
 }
 
 static void rune_pieces(Cpu *c, int i, bool holding, const char *who) {
-    bool made = oa_piece_update(c, i, &oa_g_act[i].slate, "OnlineSlate", who);
-    if (oa_g_act[i].slate.actor && (made || oa_g_act[i].slate_shown != holding)) {
-        oa_model_visible(c, oa_g_act[i].slate.actor, holding);
-        oa_g_act[i].slate_shown = holding;
+    bool made = oa_piece_update(c, i, &g_rune[i].slate, "OnlineSlate", who);
+    if (g_rune[i].slate.actor && (made || g_rune[i].slate_shown != holding)) {
+        oa_model_visible(c, g_rune[i].slate.actor, holding);
+        g_rune[i].slate_shown = holding;
     }
-    rune_keep(c, i, &oa_g_act[i].rune_fx, "OnlineRuneFx", who);
-    rune_keep(c, i, &oa_g_act[i].magnet_fx, "OnlineMagnetFx", who);
-    if (!oa_g_act[i].stop) rune_keep(c, i, &oa_g_act[i].stop_fx, "OnlineRuneFx", who);
+    rune_keep(c, i, &g_rune[i].rune_fx, "OnlineRuneFx", who);
+    rune_keep(c, i, &g_rune[i].magnet_fx, "OnlineMagnetFx", who);
+    if (!g_rune[i].stop) rune_keep(c, i, &g_rune[i].stop_fx, "OnlineRuneFx", who);
     float hand[12];
     uint64_t lk = oa_link_live(i);
-    if (oa_g_act[i].slate.actor && lk) {
+    if (g_rune[i].slate.actor && lk) {
         if (holding && oa_bone_mtx(c, lk, "Weapon_R", hand))
-            oa_call(c, FN_SET_MTX, oa_g_act[i].slate.actor, (uint64_t)(uintptr_t)hand, 0, 0, 0, 0);
+            oa_call(c, FN_SET_MTX, g_rune[i].slate.actor, (uint64_t)(uintptr_t)hand, 0, 0, 0, 0);
         else if (!holding) {
             const float *lm = (const float *)(uintptr_t)(lk + 0x398);
             float at[12] = {1, 0, 0, lm[3], 0, 1, 0, lm[7] + 1, 0, 0, 1, lm[11]};
-            oa_call(c, FN_SET_MTX, oa_g_act[i].slate.actor, (uint64_t)(uintptr_t)at, 0, 0, 0, 0);
+            oa_call(c, FN_SET_MTX, g_rune[i].slate.actor, (uint64_t)(uintptr_t)at, 0, 0, 0, 0);
         }
     }
 }
@@ -215,34 +292,34 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
         const OnlineGrab *g = i != me && pl[i].used && pl[i].pose.valid ? &pl[i].pose.grab : NULL;
         uint64_t lk = oa_link_live(i);
         bool want = g && g->name[0] && lk;
-        if (oa_g_act[i].grab) {
-            float dx = want ? g->from[0] - oa_g_act[i].grab_from[0] : 0, dz = want ? g->from[2] - oa_g_act[i].grab_from[2] : 0;
-            if (!want || strcmp(g->name, oa_g_act[i].grab_name) || dx * dx + dz * dz > 0.25f ||
-                !oa_alive(oa_g_act[i].grab, oa_g_act[i].grab_w)) {
-                LOG("[online] %s lets go of %s\n", pl[i].name[0] ? pl[i].name : oa_g_act[i].name, oa_g_act[i].grab_name);
-                if (oa_alive(oa_g_act[i].grab, oa_g_act[i].grab_w)) {
-                    uint64_t model = *(uint64_t *)(uintptr_t)(oa_g_act[i].grab + 0x4e0);
+        if (g_rune[i].grab) {
+            float dx = want ? g->from[0] - g_rune[i].grab_from[0] : 0, dz = want ? g->from[2] - g_rune[i].grab_from[2] : 0;
+            if (!want || strcmp(g->name, g_rune[i].grab_name) || dx * dx + dz * dz > 0.25f ||
+                !oa_alive(g_rune[i].grab, g_rune[i].grab_w)) {
+                LOG("[online] %s lets go of %s\n", pl[i].name[0] ? pl[i].name : oa_puppet_name(i), g_rune[i].grab_name);
+                if (oa_alive(g_rune[i].grab, g_rune[i].grab_w)) {
+                    uint64_t model = *(uint64_t *)(uintptr_t)(g_rune[i].grab + 0x4e0);
                     if (VALID(model)) oa_call_f(c, FN_SPECIAL_FX_B, 0, model, 0, 0, 0, 0, 0, 0.0f);
-                    oa_call(c, FN_ACTOR_LOOK_OFF, oa_g_act[i].grab, 2, 0, 0, 0, 0);
+                    oa_call(c, FN_ACTOR_LOOK_OFF, g_rune[i].grab, 2, 0, 0, 0, 0);
                 }
-                oa_g_act[i].released = oa_g_act[i].grab, oa_g_act[i].released_t = plat_now_ns();
-                oa_g_act[i].grab = 0;
+                g_rune[i].released = g_rune[i].grab, g_rune[i].released_t = plat_now_ns();
+                g_rune[i].grab = 0;
             }
         }
         if (!want) {  // (the rune's effects end as he lets go)
-            fx_end(c, &oa_g_act[i].magne);
-            fx_end(c, &oa_g_act[i].magnet);
-            for (int q = 0; q < MAGNE_BEAM; q++) fx_end(c, &oa_g_act[i].beam[q]);
+            fx_end(c, &g_rune[i].magne);
+            fx_end(c, &g_rune[i].magnet);
+            for (int q = 0; q < MAGNE_BEAM; q++) fx_end(c, &g_rune[i].beam[q]);
         }
         if (!want) {
-            oa_g_act[i].grab_name[0] = 0, oa_g_act[i].grab_wait = 0;
+            g_rune[i].grab_name[0] = 0, g_rune[i].grab_wait = 0;
             if (lk && i != me && pl[i].used) rune_pieces(c, i, false, pl[i].name);
             continue;
         }
-        if (!oa_g_act[i].grab && (strcmp(g->name, oa_g_act[i].grab_name) || oa_g_act[i].grab_wait-- <= 0)) {
-            snprintf(oa_g_act[i].grab_name, sizeof oa_g_act[i].grab_name, "%s", g->name);
-            memcpy(oa_g_act[i].grab_from, g->from, sizeof oa_g_act[i].grab_from);
-            oa_g_act[i].grab_wait = 30;
+        if (!g_rune[i].grab && (strcmp(g->name, g_rune[i].grab_name) || g_rune[i].grab_wait-- <= 0)) {
+            snprintf(g_rune[i].grab_name, sizeof g_rune[i].grab_name, "%s", g->name);
+            memcpy(g_rune[i].grab_from, g->from, sizeof g_rune[i].grab_from);
+            g_rune[i].grab_wait = 30;
             // his loot first (a weapon he dropped or threw: its copy here, wherever it went), then the world's: the
             // one of that name nearest where he caught it or where it is now in his game (the two worlds' may have
             // parted: let go, it fell its own way in each)
@@ -258,9 +335,9 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
                 float dn = (m[3] - g->m[3]) * (m[3] - g->m[3]) + (m[7] - g->m[7]) * (m[7] - g->m[7]) +
                            (m[11] - g->m[11]) * (m[11] - g->m[11]);
                 if (dn < d) d = dn;
-                if (d < best) best = d, oa_g_act[i].grab = lp->actor;
+                if (d < best) best = d, g_rune[i].grab = lp->actor;
             }
-            int na = oa_g_act[i].grab ? 0 : oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
+            int na = g_rune[i].grab ? 0 : oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
             best = 15 * 15;
             for (int k = 0; k < na; k++) {
                 char n[48];
@@ -272,33 +349,33 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
                 float dn = (m[3] - g->m[3]) * (m[3] - g->m[3]) + (m[7] - g->m[7]) * (m[7] - g->m[7]) +
                            (m[11] - g->m[11]) * (m[11] - g->m[11]);
                 if (dn < d) d = dn;
-                if (d < best) best = d, oa_g_act[i].grab = oa_g_actors[k];
+                if (d < best) best = d, g_rune[i].grab = oa_g_actors[k];
             }
-            if (oa_g_act[i].grab) {
-                oa_g_act[i].grab_w = oa_watch(oa_g_act[i].grab);
-                oa_call(c, FN_ACTOR_LOOK_ON, oa_g_act[i].grab, 2, 0, 0, 0, 0);  // (held by Magnesis: its golden glow)
+            if (g_rune[i].grab) {
+                g_rune[i].grab_w = oa_watch(g_rune[i].grab);
+                oa_call(c, FN_ACTOR_LOOK_ON, g_rune[i].grab, 2, 0, 0, 0, 0);  // (held by Magnesis: its golden glow)
             }
-            LOG("[online] %s holds %s with Magnesis: %s\n", pl[i].name, g->name, oa_g_act[i].grab ? "here too" : "not here");
+            LOG("[online] %s holds %s with Magnesis: %s\n", pl[i].name, g->name, g_rune[i].grab ? "here too" : "not here");
         }
         rune_pieces(c, i, true, pl[i].name);  // (his slate up while he holds)
-        if (oa_g_act[i].grab) {
+        if (g_rune[i].grab) {
             // (its body moved there: the velocities that take it there in a step, 0x70012d4e18; its actor +0x190 the body)
-            uint64_t body = *(uint64_t *)(uintptr_t)(oa_g_act[i].grab + 0x190);
+            uint64_t body = *(uint64_t *)(uintptr_t)(g_rune[i].grab + 0x190);
             if (VALID(body)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)g->m, 0, 0, 0, 0);
-            else oa_call(c, FN_SET_MTX, oa_g_act[i].grab, (uint64_t)(uintptr_t)g->m, 0, 0, 0, 0);
+            else oa_call(c, FN_SET_MTX, g_rune[i].grab, (uint64_t)(uintptr_t)g->m, 0, 0, 0, 0);
             // its golden glow: the materials' uk_special_effect_B at 1 (the rune keeps it so while it holds; 0 on letting go)
-            uint64_t model = *(uint64_t *)(uintptr_t)(oa_g_act[i].grab + 0x4e0);
+            uint64_t model = *(uint64_t *)(uintptr_t)(g_rune[i].grab + 0x4e0);
             if (VALID(model)) oa_call_f(c, FN_SPECIAL_FX_B, 0, model, 0, 0, 0, 0, 0, 1.0f);
             {   // the rune's sparkles where it is, on the actor the game plays them on (P_MAGNE_FX's +0x30: ReactionHit)
                 uint64_t fxo = *(uint64_t *)(uintptr_t)P_MAGNE_FX;
                 fxo = VALID(fxo) ? *(uint64_t *)(uintptr_t)fxo : 0;
                 uint64_t rh = VALID(fxo) ? *(uint64_t *)(uintptr_t)(fxo + 0x30) : 0;
-                if (!fx_on(&oa_g_act[i].magne) && VALID(rh)) {
+                if (!fx_on(&g_rune[i].magne) && VALID(rh)) {
                     static const char *const kn = "MagneCatchMoving";
-                    oa_call_sret(c, FN_XLINK_EFFECT, (uint64_t)(uintptr_t)&oa_g_act[i].magne, rh, (uint64_t)(uintptr_t)kn);
+                    oa_call_sret(c, FN_XLINK_EFFECT, (uint64_t)(uintptr_t)&g_rune[i].magne, rh, (uint64_t)(uintptr_t)kn);
                 }
-                uint64_t mp = oa_g_act[i].magne.p;
-                if (fx_on(&oa_g_act[i].magne)) {
+                uint64_t mp = g_rune[i].magne.p;
+                if (fx_on(&g_rune[i].magne)) {
                     *(uint16_t *)(uintptr_t)(mp + 0x98) |= 0x100;
                     *(float *)(uintptr_t)(mp + 0xbc) = g->m[3];
                     *(float *)(uintptr_t)(mp + 0xc0) = g->m[7];
@@ -313,13 +390,13 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
         // gives it to the beam's particles, +0x190 +0x18). Its matrix is the world's: at the slate (between his hands:
         // the blue magnet is drawn there), its z toward what is held (the yellow end), its y as near up as it can be,
         // its x = y x z
-        uint64_t fxa = oa_g_act[i].rune_fx.actor;
+        uint64_t fxa = g_rune[i].rune_fx.actor;
         float hand[12], left[12];
         if (!fxa || !oa_bone_mtx(c, lk, "Weapon_R", hand)) continue;
         float o[3] = {hand[3], hand[7], hand[11]};
         if (oa_bone_mtx(c, lk, "Weapon_L", left))
             o[0] = (o[0] + left[3]) / 2, o[1] = (o[1] + left[7]) / 2, o[2] = (o[2] + left[11]) / 2;
-        const float *gm = oa_g_act[i].grab ? (const float *)(uintptr_t)(oa_g_act[i].grab + 0x398) : g->m;  // (as it's drawn)
+        const float *gm = g_rune[i].grab ? (const float *)(uintptr_t)(g_rune[i].grab + 0x398) : g->m;  // (as it's drawn)
         float z[3] = {gm[3] - o[0], gm[7] - o[1], gm[11] - o[2]};
         float len = sqrtf(z[0] * z[0] + z[1] * z[1] + z[2] * z[2]);
         if (len < 0.05f) continue;
@@ -339,7 +416,7 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
         // the magnet over his hands, the game's own: Item_Magnetglove's key "Hand" (the particles MagneHand; the rune
         // plays it from its action, not by name), drawn about its actor with the U opening along its y: its y toward
         // what he holds, its x level
-        uint64_t mf = oa_g_act[i].magnet_fx.actor;
+        uint64_t mf = g_rune[i].magnet_fx.actor;
         if (mf) {
             float hx[3] = {z[2], 0, -z[0]};  // (level, across: y x up)
             float hl = sqrtf(hx[0] * hx[0] + hx[2] * hx[2]);
@@ -348,17 +425,17 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
             float hz[3] = {hx[1] * z[2] - hx[2] * z[1], hx[2] * z[0] - hx[0] * z[2], hx[0] * z[1] - hx[1] * z[0]};  // (x x y)
             float hm[12] = {hx[0], z[0], hz[0], o[0], hx[1], z[1], hz[1], o[1], hx[2], z[2], hz[2], o[2]};
             oa_call(c, FN_SET_MTX, mf, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
-            if (oa_running(mf) && !fx_on(&oa_g_act[i].magnet)) {
-                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].magnet, mf, (uint64_t)(uintptr_t)"Hand");
+            if (oa_running(mf) && !fx_on(&g_rune[i].magnet)) {
+                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&g_rune[i].magnet, mf, (uint64_t)(uintptr_t)"Hand");
                 static int told;
-                if (told++ < 4) LOG("[online] %s's magnet: Hand %s\n", pl[i].name, fx_on(&oa_g_act[i].magnet) ? "on" : "not made");
+                if (told++ < 4) LOG("[online] %s's magnet: Hand %s\n", pl[i].name, fx_on(&g_rune[i].magnet) ? "on" : "not made");
             }
         }
-        if (oa_running(fxa) && !fx_on(&oa_g_act[i].beam[0])) {
-            oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].beam[0], fxa, (uint64_t)(uintptr_t)"MagneConnect");
-            LOG("[online] %s's Magnesis beam: MagneConnect %s\n", pl[i].name, fx_on(&oa_g_act[i].beam[0]) ? "on" : "not made");
+        if (oa_running(fxa) && !fx_on(&g_rune[i].beam[0])) {
+            oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&g_rune[i].beam[0], fxa, (uint64_t)(uintptr_t)"MagneConnect");
+            LOG("[online] %s's Magnesis beam: MagneConnect %s\n", pl[i].name, fx_on(&g_rune[i].beam[0]) ? "on" : "not made");
         }
-        if (fx_on(&oa_g_act[i].beam[0])) {
+        if (fx_on(&g_rune[i].beam[0])) {
             // the beam's strands leave along the rune's aim and bend to what is held (two Vector3f the game keeps,
             // zero until the local Link first raises the rune: before that every MagneConnect, ours too, is made and
             // never drawn; after, they bent along his last aim). His beam's own way, each frame, unless the local Link
@@ -368,10 +445,10 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
                 float *aim = (float *)(uintptr_t)(ab + MAGNE_AIM_OFF);
                 for (int k = 0; k < 6; k++) aim[k] = z[k % 3];
             }
-            uint8_t *hd = oa_g_act[i].holder;
-            memset(hd, 0, sizeof oa_g_act[i].holder);
-            *(uint64_t *)(hd + 0x48) = oa_g_act[i].beam[0].p;
-            *(uint32_t *)(hd + 0x50) = oa_g_act[i].beam[0].id;
+            uint8_t *hd = g_rune[i].holder;
+            memset(hd, 0, sizeof g_rune[i].holder);
+            *(uint64_t *)(hd + 0x48) = g_rune[i].beam[0].p;
+            *(uint32_t *)(hd + 0x50) = g_rune[i].beam[0].id;
             *(float *)(hd + 0x13c) = 0.0f;
             oa_call_f(c, FN_MAGNE_BEAM_SET, (uint64_t)(uintptr_t)hd, (uint64_t)(uintptr_t)mtx, 0, 0, 0, 0, 0, bl);
         }

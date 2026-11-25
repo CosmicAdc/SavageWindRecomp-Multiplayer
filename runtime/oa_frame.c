@@ -5,26 +5,26 @@
 static float g_last_link[3];
 static int g_settle;  // frames to wait after a load before creating anything
 
+// (oa_puppet_pieces / oa_runes_pieces hand each piece to this: c and i unused)
+static void orphan_piece(Cpu *c, int i, Piece *p) {
+    (void)c, (void)i;
+    oa_orphan(p);
+}
+
 static void forget_all(void) {
     for (int i = 0; i < ONLINE_MAX; i++) {
-        for (int k = 0; k < ARMOR; k++) oa_orphan(&oa_g_act[i].armor[k]);
-        for (int k = 0; k < ONLINE_GEAR; k++) oa_orphan(&oa_g_act[i].gear[k]);
-        oa_orphan(&oa_g_act[i].horse);
-        oa_orphan(&oa_g_act[i].tack[0]), oa_orphan(&oa_g_act[i].tack[1]);
-        for (int k = 0; k < ONLINE_SHOTS; k++) oa_orphan(&oa_g_act[i].shot[k]);
-        for (int k = 0; k < ONLINE_HELD; k++) oa_orphan(&oa_g_act[i].held[k]);
-        oa_orphan(&oa_g_act[i].nock);
-        oa_orphan(&oa_g_act[i].slate), oa_orphan(&oa_g_act[i].rune_fx), oa_orphan(&oa_g_act[i].stop_fx), oa_orphan(&oa_g_act[i].magnet_fx);
+        oa_puppet_pieces(NULL, i, orphan_piece);
+        oa_runes_pieces(NULL, i, orphan_piece);
         for (int k = 0; k < POOL; k++) oa_orphan(&oa_g_pool[i][k]);
     }
-    memset(oa_g_act, 0, sizeof oa_g_act);
+    oa_puppet_forget();  // (and each Link's anim and covered to -1: none yet; nothing below reads them)
+    oa_runes_forget();
     oa_puppets_forget();
     oa_owns_forget();
     oa_loot_forget();
     oa_booms_forget();
     oa_movers_forget();
     memset(oa_g_pool, 0, sizeof oa_g_pool);
-    for (int i = 0; i < ONLINE_MAX; i++) oa_g_act[i].anim = -1, oa_g_act[i].covered = -1;
 }
 
 void rt_online_frame(Cpu *c) {
@@ -42,7 +42,7 @@ void rt_online_frame(Cpu *c) {
     if (in_world && me < 0) {
         bool any = false;
         for (int i = 0; i < ONLINE_MAX; i++) {
-            bool has = oa_g_act[i].link != 0;
+            bool has = oa_pup(i)->link != 0;
             for (int k = 0; k < POOL; k++) has |= oa_g_pool[i][k].actor || oa_g_pool[i][k].pending;
             if (has) any = true, oa_drop(c, i, true);
         }
@@ -59,7 +59,7 @@ void rt_online_frame(Cpu *c) {
         // (a long jump that loaded nothing - a teleport within the loaded map - leaves them: their puppets still
         // alive, kept as they are; forgotten, they stayed in the world and were made again beside them, two of him)
         bool any = false, kept = false;
-        for (int i = 0; i < ONLINE_MAX; i++) any |= oa_g_act[i].link != 0, kept |= world && oa_alive(oa_g_act[i].link, oa_g_act[i].link_w);
+        for (int i = 0; i < ONLINE_MAX; i++) any |= oa_pup(i)->link != 0, kept |= world && oa_alive(oa_pup(i)->link, oa_pup(i)->link_w);
         if (kept) {
             LOG("[online] a long jump: the players' actors still here, kept\n");
         } else {
@@ -69,7 +69,7 @@ void rt_online_frame(Cpu *c) {
         }
     }
     memcpy(g_last_link, link, sizeof link);
-    for (int i = 0; i < ONLINE_MAX; i++) oa_g_online_actor[i] = world && oa_running(oa_g_act[i].link);
+    for (int i = 0; i < ONLINE_MAX; i++) oa_g_online_actor[i] = world && oa_running(oa_pup(i)->link);
     if (!world) return;
     // (sampled with a menu up too while the world goes on for it: the others see him as he is)
     if (!framepace_paused() || oa_g_nopause_now) oa_sample_pose(c, pinfo), oa_sample_skeleton(c, pinfo);
@@ -328,42 +328,42 @@ void rt_online_frame(Cpu *c) {
             oa_g_dist = sqrtf(ex * ex + ez * ez);
         }
         if (!want) {
-            if (oa_g_act[i].link && !framepace_paused()) oa_drop(c, i, !pl[i].used);
+            if (oa_pup(i)->link && !framepace_paused()) oa_drop(c, i, !pl[i].used);
             else if (!pl[i].used)  // (left: his pool goes)
                 for (int k = 0; k < POOL; k++)
                     if (oa_g_pool[i][k].actor || oa_g_pool[i][k].pending) oa_delete_piece(c, &oa_g_pool[i][k]);
             continue;
         }
         // another player in his slot (one left and another came before it was seen): the first one's actors go
-        if (oa_g_act[i].link && strcmp(oa_g_act[i].name, pl[i].name)) {
-            LOG("[online] slot %d is %s now, not %s\n", i, pl[i].name, oa_g_act[i].name);
+        if (oa_pup(i)->link && strcmp(oa_pup(i)->name, pl[i].name)) {
+            LOG("[online] slot %d is %s now, not %s\n", i, pl[i].name, oa_pup(i)->name);
             oa_drop(c, i, true);
             continue;
         }
         // his Link gone, deleted by the game: the world's actors are going (the local Link died: game over; a load
         // not seen by where he is): all forgotten, made again two seconds later
-        if (oa_g_act[i].link && !oa_alive(oa_g_act[i].link, oa_g_act[i].link_w)) {
+        if (oa_pup(i)->link && !oa_alive(oa_pup(i)->link, oa_pup(i)->link_w)) {
             LOG("[online] the game removed %s's Link: the world's actors are going, made again later (%.0f m away)\n", pl[i].name, oa_g_dist);
             forget_all();
             g_settle = 180;
             return;
         }
-        if (!oa_g_act[i].link) {
-            if (oa_g_act[i].link_fails > 10) continue;
-            oa_g_act[i].link = oa_create(c, oa_actor_name());
-            if (!oa_g_act[i].link) {
-                if (oa_g_act[i].link_fails++ == 0) LOG("[online] can't create a %s for %s (not loaded?)\n", oa_actor_name(), pl[i].name);
+        if (!oa_pup(i)->link) {
+            if (oa_pup(i)->link_fails > 10) continue;
+            oa_pup(i)->link = oa_create(c, oa_actor_name());
+            if (!oa_pup(i)->link) {
+                if (oa_pup(i)->link_fails++ == 0) LOG("[online] can't create a %s for %s (not loaded?)\n", oa_actor_name(), pl[i].name);
                 continue;
             }
-            oa_g_act[i].link_w = oa_watch(oa_g_act[i].link);
-            memcpy(oa_g_act[i].name, pl[i].name, sizeof oa_g_act[i].name);
-            LOG("[online] %s: %s (actor %llx)\n", pl[i].name, oa_actor_name(), (unsigned long long)oa_g_act[i].link);
+            oa_pup(i)->link_w = oa_watch(oa_pup(i)->link);
+            memcpy(oa_pup(i)->name, pl[i].name, sizeof oa_pup(i)->name);
+            LOG("[online] %s: %s (actor %llx)\n", pl[i].name, oa_actor_name(), (unsigned long long)oa_pup(i)->link);
         }
         // the matrix: turned about y by the heading (forward is +z), at the player's feet
         float s = sinf(pl[i].yaw), co = cosf(pl[i].yaw);
         float m[12] = {co, 0, s, pl[i].pos[0], 0, 1, 0, pl[i].pos[1], -s, 0, co, pl[i].pos[2]};
-        oa_call(c, FN_SET_MTX, oa_g_act[i].link, (uint64_t)(uintptr_t)m, 0, 0, 0, 0);
-        if (!oa_is_online_player() || !oa_running(oa_g_act[i].link)) continue;
+        oa_call(c, FN_SET_MTX, oa_pup(i)->link, (uint64_t)(uintptr_t)m, 0, 0, 0, 0);
+        if (!oa_is_online_player() || !oa_running(oa_pup(i)->link)) continue;
         oa_pose_link(c, i, &pl[i]);
 
         // his armour: an actor per piece of its model alone (OnlineArmor_*, tools/online_mod.py) on his Link's matrix,
@@ -373,22 +373,22 @@ void rt_online_frame(Cpu *c) {
             // (none: what the game puts on his Link then: his hair, his shorts; shirtless is his own body)
             const char *w = pl[i].armor[k][0] ? pl[i].armor[k] : k == 0 ? "Armor_Default_Head" : k == 2 ? "Armor_Default_Lower" : "";
             const char *oa = w[0] ? oa_armor_actor(w) : NULL;
-            Piece *p = &oa_g_act[i].armor[k];
+            Piece *p = &oa_pup(i)->armor[k];
             bool had = p->actor != 0;
             static InstParams dp;  // (his dye on it, as the player's armour code makes his: ArmorDyeColor)
             memset(&dp, 0, sizeof dp);
             int8_t dye = pl[i].pose.valid ? pl[i].pose.dye[k] : -1;
-            if (p->actor && dye != oa_g_act[i].dye[k]) oa_delete_piece(c, p);  // (another dye: made again with it)
+            if (p->actor && dye != oa_pup(i)->dye[k]) oa_delete_piece(c, p);  // (another dye: made again with it)
             if (pl[i].pose.valid && pl[i].pose.dye[k] >= 0) oa_inst_params_s32(&dp, "ArmorDyeColor", pl[i].pose.dye[k]);
             oa_g_piece_params = dp.n ? &dp : NULL;
             bool made = oa_piece_update(c, i, p, oa ? oa : "", pl[i].name);
             oa_g_piece_params = NULL;
-            if (made) oa_g_act[i].dye[k] = dye;
+            if (made) oa_pup(i)->dye[k] = dye;
             if (made) {
                 oa_model_visible(c, p->actor, true);
-                oa_g_act[i].covered = -1;
+                oa_pup(i)->covered = -1;
             }
-            if (had != (p->actor != 0)) oa_g_act[i].covered = -1;
+            if (had != (p->actor != 0)) oa_pup(i)->covered = -1;
             if (p->actor) {
                 oa_call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)m, 0, 0, 0, 0);
                 oa_pose_armor(c, p);
@@ -397,10 +397,10 @@ void rt_online_frame(Cpu *c) {
         int pieces = 0;
         bool all_running = true;
         for (int k = 0; k < ARMOR; k++) {
-            pieces |= (oa_g_act[i].armor[k].actor != 0) << k;
-            if (oa_g_act[i].armor[k].actor) all_running &= oa_running(oa_g_act[i].armor[k].actor);
+            pieces |= (oa_pup(i)->armor[k].actor != 0) << k;
+            if (oa_pup(i)->armor[k].actor) all_running &= oa_running(oa_pup(i)->armor[k].actor);
         }
-        if (all_running && pieces != oa_g_act[i].covered) oa_cover(c, i), oa_g_act[i].covered = pieces;
+        if (all_running && pieces != oa_pup(i)->covered) oa_cover(c, i), oa_pup(i)->covered = pieces;
 
         // Daruk's Protection: the player's own effects on his Link while they are on in his game, "Kago_Shield" (a hit
         // taken) and "Kago_ShieldCount_0<n>" (its ring while he guards) (0x7001100bd0: x8 the handle out, x0 the actor,
@@ -409,42 +409,42 @@ void rt_online_frame(Cpu *c) {
             int e = pl[i].pose.valid ? pl[i].pose.effects : 0;
             int n = (e & ONLINE_E_KAGO_COUNT) >> ONLINE_E_KAGO_COUNT_SHIFT;
             bool want_k = k == 0 ? (e & ONLINE_E_KAGO) != 0 : n != 0;
-            uint64_t kp = oa_g_act[i].kago[k].p;
-            bool on = VALID(kp) && *(uint32_t *)(uintptr_t)(kp + 0x20) == oa_g_act[i].kago[k].id;
-            if (on && (!want_k || (k == 1 && n != oa_g_act[i].kago_n))) {
-                oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_g_act[i].kago[k], 0, 0, 0, 0, 0);
-                memset(&oa_g_act[i].kago[k], 0, sizeof oa_g_act[i].kago[k]);
+            uint64_t kp = oa_pup(i)->kago[k].p;
+            bool on = VALID(kp) && *(uint32_t *)(uintptr_t)(kp + 0x20) == oa_pup(i)->kago[k].id;
+            if (on && (!want_k || (k == 1 && n != oa_pup(i)->kago_n))) {
+                oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->kago[k], 0, 0, 0, 0, 0);
+                memset(&oa_pup(i)->kago[k], 0, sizeof oa_pup(i)->kago[k]);
                 on = false;
             }
             if (want_k && !on) {
                 static char name[24];
                 if (k == 0) snprintf(name, sizeof name, "Kago_Shield");
-                else snprintf(name, sizeof name, "Kago_ShieldCount_0%d", n), oa_g_act[i].kago_n = n;
-                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].kago[k], oa_g_act[i].link, (uint64_t)(uintptr_t)name);
-                LOG("[online] %s: %s (%llx)\n", pl[i].name, name, (unsigned long long)oa_g_act[i].kago[k].p);
+                else snprintf(name, sizeof name, "Kago_ShieldCount_0%d", n), oa_pup(i)->kago_n = n;
+                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_pup(i)->kago[k], oa_pup(i)->link, (uint64_t)(uintptr_t)name);
+                LOG("[online] %s: %s (%llx)\n", pl[i].name, name, (unsigned long long)oa_pup(i)->kago[k].p);
             }
         }
         {   // his weapon's swing trail ("Blur_Default", the weapon's own ELink's: its OnlineGear has it) on the weapon in
             // his hand while his game plays it; a new one for each swing
-            uint64_t tp = oa_g_act[i].trail.p;
-            bool on = VALID(tp) && *(uint32_t *)(uintptr_t)(tp + 0x20) == oa_g_act[i].trail.id;
+            uint64_t tp = oa_pup(i)->trail.p;
+            bool on = VALID(tp) && *(uint32_t *)(uintptr_t)(tp + 0x20) == oa_pup(i)->trail.id;
             const char *want = pl[i].pose.fx;
-            uint64_t w = oa_g_act[i].gear[0].actor;
+            uint64_t w = oa_pup(i)->gear[0].actor;
             bool held = VALID(w) && pl[i].pose.gear_bone[0] && pl[i].pose.gear_bone[0] != ONLINE_GEAR_WORLD;
-            if (on && (!want[0] || !held || strcmp(want, oa_g_act[i].trail_name))) {
-                oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_g_act[i].trail, 0, 0, 0, 0, 0);
-                memset(&oa_g_act[i].trail, 0, sizeof oa_g_act[i].trail);
-                oa_g_act[i].trail_name[0] = 0;
+            if (on && (!want[0] || !held || strcmp(want, oa_pup(i)->trail_name))) {
+                oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->trail, 0, 0, 0, 0, 0);
+                memset(&oa_pup(i)->trail, 0, sizeof oa_pup(i)->trail);
+                oa_pup(i)->trail_name[0] = 0;
                 on = false;
             }
-            if (!on && want[0] && held && strcmp(want, oa_g_act[i].trail_name)) {
-                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].trail, w, (uint64_t)(uintptr_t)want);
-                snprintf(oa_g_act[i].trail_name, sizeof oa_g_act[i].trail_name, "%s", want);
+            if (!on && want[0] && held && strcmp(want, oa_pup(i)->trail_name)) {
+                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_pup(i)->trail, w, (uint64_t)(uintptr_t)want);
+                snprintf(oa_pup(i)->trail_name, sizeof oa_pup(i)->trail_name, "%s", want);
                 // the sword trail (SwordBlur) draws from its actor's AnimInfo (+0x570 +0x148, its +0x2c0 the trail data:
                 // 1.9.0 0x700152ff4c), the player's own in his game: the effect's user data (+0x190) has the weapon as
                 // its actor (+8), whose AnimInfo is the empty Dummy; his Link here has the player's (online_mod)
-                uint64_t ep = oa_g_act[i].trail.p, ud = VALID(ep) ? *(uint64_t *)(uintptr_t)(ep + 0x190) : 0;
-                uint64_t lk = oa_g_act[i].link;
+                uint64_t ep = oa_pup(i)->trail.p, ud = VALID(ep) ? *(uint64_t *)(uintptr_t)(ep + 0x190) : 0;
+                uint64_t lk = oa_pup(i)->link;
                 if (VALID(ud) && VALID(lk) && *(uint64_t *)(uintptr_t)(ud + 8) == w) *(uint64_t *)(uintptr_t)(ud + 8) = lk;
                 if (getenv("SAVAGEWIND_ONLINE_FX_LOG")) {
                     uint64_t r = VALID(lk) ? *(uint64_t *)(uintptr_t)(lk + 0x570) : 0;
@@ -455,10 +455,10 @@ void rt_online_frame(Cpu *c) {
                         (unsigned long long)(VALID(ai) ? *(uint64_t *)(uintptr_t)(ai + 0x2c0) : 0));
                 }
             }
-            if (!want[0]) oa_g_act[i].trail_name[0] = 0;
+            if (!want[0]) oa_pup(i)->trail_name[0] = 0;
             // his Link's ELink property values on his puppet's (the same ELink: its effects play as his do)
             {
-                uint64_t ui = oa_elink_ui(oa_g_act[i].link), pv = VALID(ui) ? *(uint64_t *)(uintptr_t)(ui + 0x70) : 0;
+                uint64_t ui = oa_elink_ui(oa_pup(i)->link), pv = VALID(ui) ? *(uint64_t *)(uintptr_t)(ui + 0x70) : 0;
                 bool any = false;
                 for (int k = 0; k < ONLINE_FX_PROPS; k++) any |= pl[i].pose.fx_props[k] != 0;
                 if (VALID(pv) && any) memcpy((void *)(uintptr_t)pv, pl[i].pose.fx_props, sizeof pl[i].pose.fx_props);
@@ -466,11 +466,11 @@ void rt_online_frame(Cpu *c) {
             // his other effects, each once by its number, on his puppet or the weapon in its hand; ended after a while
             uint64_t now = plat_now_ns();
             for (int q = 0; q < ONLINE_FX_EVENTS; q++) {
-                uint64_t ep = oa_g_act[i].fxev[q].p;
-                if (ep && now - oa_g_act[i].fxev[q].t > FX_EVENT_NS) {
-                    if (VALID(ep) && *(uint32_t *)(uintptr_t)(ep + 0x20) == oa_g_act[i].fxev[q].id)
-                        oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_g_act[i].fxev[q], 0, 0, 0, 0, 0);
-                    memset(&oa_g_act[i].fxev[q], 0, sizeof oa_g_act[i].fxev[q]);
+                uint64_t ep = oa_pup(i)->fxev[q].p;
+                if (ep && now - oa_pup(i)->fxev[q].t > FX_EVENT_NS) {
+                    if (VALID(ep) && *(uint32_t *)(uintptr_t)(ep + 0x20) == oa_pup(i)->fxev[q].id)
+                        oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], 0, 0, 0, 0, 0);
+                    memset(&oa_pup(i)->fxev[q], 0, sizeof oa_pup(i)->fxev[q]);
                 }
             }
             {   // (the newest: the first time, those before are from before he was here; after a gap, the last few)
@@ -479,24 +479,24 @@ void rt_online_frame(Cpu *c) {
                     uint16_t s = pl[i].pose.fxev[q].seq;
                     if (s && (!newest || (uint16_t)(s - newest) < 0x8000u)) newest = s;
                 }
-                if (newest && (!oa_g_act[i].fxev_seen || oa_g_act[i].frames < 60)) oa_g_act[i].fxev_seen = newest;
-                else if (newest && (uint16_t)(newest - oa_g_act[i].fxev_seen) > ONLINE_FX_EVENTS &&
-                         (uint16_t)(newest - oa_g_act[i].fxev_seen) < 0x8000u)
-                    oa_g_act[i].fxev_seen = (uint16_t)(newest - ONLINE_FX_EVENTS);
+                if (newest && (!oa_pup(i)->fxev_seen || oa_pup(i)->frames < 60)) oa_pup(i)->fxev_seen = newest;
+                else if (newest && (uint16_t)(newest - oa_pup(i)->fxev_seen) > ONLINE_FX_EVENTS &&
+                         (uint16_t)(newest - oa_pup(i)->fxev_seen) < 0x8000u)
+                    oa_pup(i)->fxev_seen = (uint16_t)(newest - ONLINE_FX_EVENTS);
             }
             for (int pass = 0; pass < ONLINE_FX_EVENTS; pass++) {  // (the oldest new one first)
                 const OnlineFxEvent *best = NULL;
                 for (int q = 0; q < ONLINE_FX_EVENTS; q++) {
                     const OnlineFxEvent *e = &pl[i].pose.fxev[q];
-                    uint16_t d = (uint16_t)(e->seq - oa_g_act[i].fxev_seen);
+                    uint16_t d = (uint16_t)(e->seq - oa_pup(i)->fxev_seen);
                     if (!e->seq || !e->name[0] || !d || d > ONLINE_FX_EVENTS) continue;
                     if (!best || (uint16_t)(e->seq - best->seq) > 0x8000u) best = e;
                 }
                 if (!best) break;
-                oa_g_act[i].fxev_seen = best->seq;
+                oa_pup(i)->fxev_seen = best->seq;
                 if (best->who == 4) {  // (the ground's, on this game's ReactionField where his puppet is, left to end)
                     uint64_t rf = oa_g_rf;
-                    if (!VALID(rf) || !oa_alive(rf, oa_g_rf_watch) || !VALID(oa_g_act[i].link) || !oa_running(oa_g_act[i].link)) continue;
+                    if (!VALID(rf) || !oa_alive(rf, oa_g_rf_watch) || !VALID(oa_pup(i)->link) || !oa_running(oa_pup(i)->link)) continue;
                     uint64_t rui = oa_elink_ui(rf), rpv = VALID(rui) ? *(uint64_t *)(uintptr_t)(rui + 0x70) : 0;
                     if (VALID(rpv)) memcpy((void *)(uintptr_t)rpv, pl[i].pose.ground_props, sizeof pl[i].pose.ground_props);
                     struct { uint64_t p; uint32_t id, pad; } hh[2], h;
@@ -507,7 +507,7 @@ void rt_online_frame(Cpu *c) {
                     if (VALID(h.p) && *(uint32_t *)(uintptr_t)(h.p + 0x20) == h.id) {
                         // (as the game places them: a footprint by its matrix at +0xc0 (+0x180 bit 3), its scale at
                         // +0xb4; the rest at a point, +0xa8, with the ground's normal at +0xb4 (+0x180 bit 2))
-                        const float *lm = (const float *)(uintptr_t)(oa_g_act[i].link + 0x398);
+                        const float *lm = (const float *)(uintptr_t)(oa_pup(i)->link + 0x398);
                         if (!strcmp(best->name, "Footprint")) {
                             float one[3] = {1, 1, 1};
                             memcpy((void *)(uintptr_t)(h.p + 0xc0), lm, 48);
@@ -525,7 +525,7 @@ void rt_online_frame(Cpu *c) {
                             sqrtf((pl[i].pos[0] - link[0]) * (pl[i].pos[0] - link[0]) + (pl[i].pos[2] - link[2]) * (pl[i].pos[2] - link[2])));
                     continue;
                 }
-                uint64_t on = best->who & 1 ? (held ? w : 0) : oa_g_act[i].link;
+                uint64_t on = best->who & 1 ? (held ? w : 0) : oa_pup(i)->link;
                 if (!VALID(on)) continue;
                 // (a sound: on its SLink, the player's / the weapon's: 0x700159f00c, the game's own keyword emit, w2 1 its
                 // SLink alone, x3 the two handles: the SLink's at +0x10)
@@ -533,33 +533,33 @@ void rt_online_frame(Cpu *c) {
                 // (the same one still playing - sent again, a Champion's ability used again and again - ended first:
                 // they piled up, one over the other)
                 for (int o = 0; o < ONLINE_FX_EVENTS; o++) {
-                    uint64_t op = oa_g_act[i].fxev[o].p;
-                    if (!op || strcmp(oa_g_act[i].fxev[o].name, best->name)) continue;
-                    if (VALID(op) && *(uint32_t *)(uintptr_t)(op + 0x20) == oa_g_act[i].fxev[o].id)
-                        oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_g_act[i].fxev[o], 0, 0, 0, 0, 0);
-                    memset(&oa_g_act[i].fxev[o], 0, sizeof oa_g_act[i].fxev[o]);
+                    uint64_t op = oa_pup(i)->fxev[o].p;
+                    if (!op || strcmp(oa_pup(i)->fxev[o].name, best->name)) continue;
+                    if (VALID(op) && *(uint32_t *)(uintptr_t)(op + 0x20) == oa_pup(i)->fxev[o].id)
+                        oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[o], 0, 0, 0, 0, 0);
+                    memset(&oa_pup(i)->fxev[o], 0, sizeof oa_pup(i)->fxev[o]);
                 }
                 int q = 0;
-                while (q < ONLINE_FX_EVENTS - 1 && oa_g_act[i].fxev[q].p) q++;
-                if (oa_g_act[i].fxev[q].p) {
-                    uint64_t ep = oa_g_act[i].fxev[q].p;
-                    if (VALID(ep) && *(uint32_t *)(uintptr_t)(ep + 0x20) == oa_g_act[i].fxev[q].id)
-                        oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_g_act[i].fxev[q], 0, 0, 0, 0, 0);
+                while (q < ONLINE_FX_EVENTS - 1 && oa_pup(i)->fxev[q].p) q++;
+                if (oa_pup(i)->fxev[q].p) {
+                    uint64_t ep = oa_pup(i)->fxev[q].p;
+                    if (VALID(ep) && *(uint32_t *)(uintptr_t)(ep + 0x20) == oa_pup(i)->fxev[q].id)
+                        oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], 0, 0, 0, 0, 0);
                 }
-                memset(&oa_g_act[i].fxev[q], 0, sizeof oa_g_act[i].fxev[q]);
+                memset(&oa_pup(i)->fxev[q], 0, sizeof oa_pup(i)->fxev[q]);
                 if (best->who >= 2) {
                     struct { uint64_t p; uint32_t id, pad; } hh[2];
                     memset(hh, 0, sizeof hh);
                     oa_call(c, FN_XLINK_EMIT, on, (uint64_t)(uintptr_t)best->name, 1, (uint64_t)(uintptr_t)hh, 0, 0);
-                    oa_g_act[i].fxev[q].p = hh[1].p, oa_g_act[i].fxev[q].id = hh[1].id;
+                    oa_pup(i)->fxev[q].p = hh[1].p, oa_pup(i)->fxev[q].id = hh[1].id;
                 } else
-                    oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].fxev[q], on, (uint64_t)(uintptr_t)best->name);
-                oa_g_act[i].fxev[q].t = now;
-                snprintf(oa_g_act[i].fxev[q].name, sizeof oa_g_act[i].fxev[q].name, "%s", best->name);
+                    oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], on, (uint64_t)(uintptr_t)best->name);
+                oa_pup(i)->fxev[q].t = now;
+                snprintf(oa_pup(i)->fxev[q].name, sizeof oa_pup(i)->fxev[q].name, "%s", best->name);
                 if (getenv("SAVAGEWIND_ONLINE_FX_LOG")) {
                     static const char *const kinds[4] = {"Link", "weapon", "Link (sound)", "weapon (sound)"};
                     LOG("[online] %s: %s on his %s (%llx)\n", pl[i].name, best->name, kinds[best->who & 3],
-                        (unsigned long long)oa_g_act[i].fxev[q].p);
+                        (unsigned long long)oa_pup(i)->fxev[q].p);
                 }
             }
             // the attack it is the trail of, for SwordBlur to find on his puppet (rt_blur_anim / rt_blur_frame)
@@ -567,18 +567,18 @@ void rt_online_frame(Cpu *c) {
                 oa_g_blur[i].anim[k] = want[0] && held ? pl[i].pose.fx_anim[k] : -1;
                 oa_g_blur[i].frame[k] = pl[i].pose.fx_frame[k];
             }
-            oa_g_blur[i].actor = oa_g_act[i].link;
+            oa_g_blur[i].actor = oa_pup(i)->link;
         }
         {   // Revali's Gale: its charge on his Link while he charges it ("Kago_Wind", the player's own effect, as Daruk's)
             int e = pl[i].pose.valid ? pl[i].pose.effects : 0;
-            uint64_t gp = oa_g_act[i].gale.p;
-            bool on = VALID(gp) && *(uint32_t *)(uintptr_t)(gp + 0x20) == oa_g_act[i].gale.id;
+            uint64_t gp = oa_pup(i)->gale.p;
+            bool on = VALID(gp) && *(uint32_t *)(uintptr_t)(gp + 0x20) == oa_pup(i)->gale.id;
             if (on && !(e & ONLINE_E_GALE)) {
-                oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_g_act[i].gale, 0, 0, 0, 0, 0);
-                memset(&oa_g_act[i].gale, 0, sizeof oa_g_act[i].gale);
+                oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->gale, 0, 0, 0, 0, 0);
+                memset(&oa_pup(i)->gale, 0, sizeof oa_pup(i)->gale);
             } else if (!on && (e & ONLINE_E_GALE)) {
-                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_g_act[i].gale, oa_g_act[i].link, (uint64_t)(uintptr_t)"Kago_Wind");
-                LOG("[online] %s: Kago_Wind (%llx)\n", pl[i].name, (unsigned long long)oa_g_act[i].gale.p);
+                oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_pup(i)->gale, oa_pup(i)->link, (uint64_t)(uintptr_t)"Kago_Wind");
+                LOG("[online] %s: Kago_Wind (%llx)\n", pl[i].name, (unsigned long long)oa_pup(i)->gale.p);
             }
         }
         // his gear, on his Link's bones as in his game (not there: under the world, out of sight)
@@ -586,13 +586,13 @@ void rt_online_frame(Cpu *c) {
         int have = 0;  // (bones read: a bit each)
         for (int k = 0; k < ONLINE_GEAR; k++) {
             const char *ga = pl[i].gear[k][0] ? oa_gear_actor(pl[i].gear[k]) : NULL;
-            Piece *p = &oa_g_act[i].gear[k];
+            Piece *p = &oa_pup(i)->gear[k];
             oa_piece_update(c, i, p, ga ? ga : "", pl[i].name);
             if (!p->actor) continue;
             int b = pl[i].pose.valid ? pl[i].pose.gear_bone[k] - 1 : -1;
             float gm[12] = {1, 0, 0, pl[i].pos[0], 0, 1, 0, pl[i].pos[1] - 5000, 0, 0, 1, pl[i].pos[2]};
             if (b >= 0 && b < BONES) {
-                if (!(have >> b & 1) && oa_bone_mtx(c, oa_g_act[i].link, oa_k_bones[b], bm[b])) have |= 1 << b;
+                if (!(have >> b & 1) && oa_bone_mtx(c, oa_pup(i)->link, oa_k_bones[b], bm[b])) have |= 1 << b;
                 if (have >> b & 1) oa_mtx_mul(bm[b], pl[i].pose.gear_rel[k], gm);
             } else if (pl[i].pose.valid && pl[i].pose.gear_bone[k] == ONLINE_GEAR_WORLD) {
                 bool finite = true;  // (where it is in his world: thrown, in flight or fallen)
@@ -605,7 +605,7 @@ void rt_online_frame(Cpu *c) {
                     Piece *lp = &oa_g_theirs[t].p;
                     if (!oa_g_theirs[t].gid || oa_g_theirs[t].gone || oa_g_theirs[t].origin != i || !lp->actor ||
                         strcmp(lp->name, pl[i].gear[k]) || !oa_alive(lp->actor, lp->w) || oa_carries(oa_g_carried_now, lp->actor) ||
-                        lp->actor == oa_g_act[i].grab)
+                        lp->actor == oa_rune_grab(i))
                         continue;
                     if (best < 0 || oa_g_theirs[t].gid > oa_g_theirs[best].gid) best = t;
                 }
@@ -626,21 +626,21 @@ void rt_online_frame(Cpu *c) {
         }
         {   // the horse he rides, where his is, playing the AS his plays
             const char *ha = pl[i].pose.valid && pl[i].pose.horse[0] ? oa_gear_actor(pl[i].pose.horse) : NULL;
-            Piece *hp = &oa_g_act[i].horse;
-            if (oa_piece_update(c, i, hp, ha ? ha : "", pl[i].name)) oa_g_act[i].horse_as[0] = 0;
+            Piece *hp = &oa_pup(i)->horse;
+            if (oa_piece_update(c, i, hp, ha ? ha : "", pl[i].name)) oa_pup(i)->horse_as[0] = 0;
             if (hp->actor) {
                 bool finite = true;
                 for (int q = 0; q < 12; q++) finite &= isfinite(pl[i].pose.horse_m[q]);
                 if (finite) oa_call(c, FN_SET_MTX, hp->actor, (uint64_t)(uintptr_t)pl[i].pose.horse_m, 0, 0, 0, 0);
                 const char *want = pl[i].pose.horse_as;
-                if (want[0] && strcmp(want, oa_g_act[i].horse_as) && oa_running(hp->actor)) {
+                if (want[0] && strcmp(want, oa_pup(i)->horse_as) && oa_running(hp->actor)) {
                     oa_play_as(c, hp->actor, want, 0, 0, -1.0f, true);
-                    snprintf(oa_g_act[i].horse_as, sizeof oa_g_act[i].horse_as, "%s", want);
+                    snprintf(oa_pup(i)->horse_as, sizeof oa_pup(i)->horse_as, "%s", want);
                 }
             }
             for (int k = 0; k < 2; k++) {  // (its saddle and reins, where his are)
                 const char *ta = pl[i].pose.valid && pl[i].pose.horse[0] && pl[i].pose.tack[k][0] ? oa_gear_actor(pl[i].pose.tack[k]) : NULL;
-                Piece *tp = &oa_g_act[i].tack[k];
+                Piece *tp = &oa_pup(i)->tack[k];
                 oa_piece_update(c, i, tp, ta ? ta : "", pl[i].name);
                 bool finite = true;
                 for (int q = 0; q < 12; q++) finite &= isfinite(pl[i].pose.tack_m[k][q]);
@@ -654,7 +654,7 @@ void rt_online_frame(Cpu *c) {
             const OnlineHeld *h = &pl[i].pose.held[k];
             bool on = pl[i].pose.valid && h->mode && h->name[0];
             const char *ga = on ? oa_gear_actor(h->name) : NULL;
-            Piece *p = &oa_g_act[i].held[k];
+            Piece *p = &oa_pup(i)->held[k];
             oa_piece_update(c, i, p, ga ? ga : "", pl[i].name);
             if (!p->actor) continue;
             float gm[12] = {1, 0, 0, pl[i].pos[0], 0, 1, 0, pl[i].pos[1] - 5000, 0, 0, 1, pl[i].pos[2]};
@@ -667,7 +667,7 @@ void rt_online_frame(Cpu *c) {
                 if (finite) memcpy(gm, h->m, sizeof gm);
             } else if (h->mode == ONLINE_HELD_HANDS) {
                 for (int b = 0; b < 2; b++)
-                    if (!(have >> b & 1) && oa_bone_mtx(c, oa_g_act[i].link, oa_k_bones[b], bm[b])) have |= 1 << b;
+                    if (!(have >> b & 1) && oa_bone_mtx(c, oa_pup(i)->link, oa_k_bones[b], bm[b])) have |= 1 << b;
                 if ((have & 3) == 3) {
                     // (a heap on his hands, as his game heaps them: three side by side, two over them, apart as far as
                     // they are big - 12 cm for apples: closer, they went into each other, a red lump)
@@ -689,19 +689,19 @@ void rt_online_frame(Cpu *c) {
         for (int k = 0; pl[i].pose.valid && k < sh->n; k++) {
             int slot = -1;
             for (int j2 = 0; j2 < ONLINE_SHOTS && slot < 0; j2++)
-                if (oa_g_act[i].shot_id[j2] == sh->shot[k].id) slot = j2;
+                if (oa_pup(i)->shot_id[j2] == sh->shot[k].id) slot = j2;
             for (int j2 = 0; j2 < ONLINE_SHOTS && slot < 0; j2++) {
                 bool in_use = false;
-                for (int q = 0; q < sh->n; q++) in_use |= oa_g_act[i].shot_id[j2] == sh->shot[q].id;
+                for (int q = 0; q < sh->n; q++) in_use |= oa_pup(i)->shot_id[j2] == sh->shot[q].id;
                 if (!in_use) slot = j2;
             }
             if (slot < 0 || sh->shot[k].kind >= ONLINE_K_COUNT) continue;
             used[slot] = true;
-            if (oa_g_act[i].shot_id[slot] != sh->shot[k].id)
+            if (oa_pup(i)->shot_id[slot] != sh->shot[k].id)
                 LOG("[online] %s's shot %d (%s) in slot %d\n", pl[i].name, sh->shot[k].id, oa_k_shot_names[sh->shot[k].kind], slot);
-            oa_g_act[i].shot_id[slot] = sh->shot[k].id;
+            oa_pup(i)->shot_id[slot] = sh->shot[k].id;
             const char *sa = oa_gear_actor(oa_k_shot_names[sh->shot[k].kind]);
-            Piece *p = &oa_g_act[i].shot[slot];
+            Piece *p = &oa_pup(i)->shot[slot];
             if (oa_piece_update(c, i, p, sa ? sa : "", pl[i].name)) oa_model_visible(c, p->actor, true);
             if (p->actor) oa_call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)sh->shot[k].m, 0, 0, 0, 0);
             if (getenv("SAVAGEWIND_ONLINE_SHOT_LOG"))
@@ -710,19 +710,19 @@ void rt_online_frame(Cpu *c) {
         }
         for (int k = 0; k < ONLINE_SHOTS; k++) {
             if (used[k]) continue;
-            if (oa_g_act[i].shot_id[k])
-                LOG("[online] %s's shot %d out of sight (slot %d, actor %llx)\n", pl[i].name, oa_g_act[i].shot_id[k], k,
-                    (unsigned long long)oa_g_act[i].shot[k].actor);
-            oa_g_act[i].shot_id[k] = 0;
-            if (oa_g_act[i].shot[k].actor) {
+            if (oa_pup(i)->shot_id[k])
+                LOG("[online] %s's shot %d out of sight (slot %d, actor %llx)\n", pl[i].name, oa_pup(i)->shot_id[k], k,
+                    (unsigned long long)oa_pup(i)->shot[k].actor);
+            oa_pup(i)->shot_id[k] = 0;
+            if (oa_pup(i)->shot[k].actor) {
                 float hm[12] = {1, 0, 0, pl[i].pos[0], 0, 1, 0, pl[i].pos[1] - 5000, 0, 0, 1, pl[i].pos[2]};
-                oa_call(c, FN_SET_MTX, oa_g_act[i].shot[k].actor, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
+                oa_call(c, FN_SET_MTX, oa_pup(i)->shot[k].actor, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
             }
         }
         // an arrow on his string, in his right hand, while he nocks and draws his bow (the upper body's AS: BowReload,
         // BowCharge...; his bow in a hand), its point (+z) past the bow in his left; out of sight the rest of the time
         {
-            Piece *ar = &oa_g_act[i].nock;
+            Piece *ar = &oa_pup(i)->nock;
             const char *an = pl[i].gear[2][0] ? oa_gear_actor("NormalArrow") : NULL;
             if (oa_piece_update(c, i, ar, an ? an : "", pl[i].name)) oa_model_visible(c, ar->actor, true);
             if (ar->actor) {
@@ -730,8 +730,8 @@ void rt_online_frame(Cpu *c) {
                 bool drawn = pl[i].pose.valid && (pl[i].pose.gear_bone[2] == 1 || pl[i].pose.gear_bone[2] == 2) &&
                              (!strncmp(up, "BowCharge", 9) || !strncmp(up, "BowReload", 9));
                 float am[12] = {1, 0, 0, pl[i].pos[0], 0, 1, 0, pl[i].pos[1] - 5000, 0, 0, 1, pl[i].pos[2]};
-                if (drawn && !(have & 1) && oa_bone_mtx(c, oa_g_act[i].link, oa_k_bones[0], bm[0])) have |= 1;
-                if (drawn && !(have & 2) && oa_bone_mtx(c, oa_g_act[i].link, oa_k_bones[1], bm[1])) have |= 2;
+                if (drawn && !(have & 1) && oa_bone_mtx(c, oa_pup(i)->link, oa_k_bones[0], bm[0])) have |= 1;
+                if (drawn && !(have & 2) && oa_bone_mtx(c, oa_pup(i)->link, oa_k_bones[1], bm[1])) have |= 2;
                 if (drawn && (have & 3) == 3) {
                     float z[3] = {bm[1][3] - bm[0][3], bm[1][7] - bm[0][7], bm[1][11] - bm[0][11]}, l = 0;
                     for (int k = 0; k < 3; k++) l += z[k] * z[k];
@@ -751,14 +751,14 @@ void rt_online_frame(Cpu *c) {
         // without what hurts (OnlineBoom_*, tools/online_mod.py) is made there and set off as the rune sets his off
         for (int k = ONLINE_BOOMS - 1; pl[i].pose.valid && k >= 0; k--) {
             uint16_t seq = sh->boom[k].seq;
-            if (!seq || (uint16_t)(seq - oa_g_act[i].boom_seen) > 0x8000u || seq == oa_g_act[i].boom_seen) continue;
-            oa_g_act[i].boom_seen = seq;
-            if (oa_g_act[i].frames < 60 || sh->boom[k].kind >= ONLINE_K_COUNT) continue;  // (from before he was here)
+            if (!seq || (uint16_t)(seq - oa_pup(i)->boom_seen) > 0x8000u || seq == oa_pup(i)->boom_seen) continue;
+            oa_pup(i)->boom_seen = seq;
+            if (oa_pup(i)->frames < 60 || sh->boom[k].kind >= ONLINE_K_COUNT) continue;  // (from before he was here)
             const char *ba = oa_gear_actor(oa_k_shot_names[sh->boom[k].kind]);
             for (int q = 0; ba && q < ONLINE_SHOTS; q++)
-                if (!used[q] && oa_g_act[i].shot[q].actor && !strcmp(oa_g_act[i].shot[q].name, ba)) {
+                if (!used[q] && oa_pup(i)->shot[q].actor && !strcmp(oa_pup(i)->shot[q].name, ba)) {
                     float hm[12] = {1, 0, 0, pl[i].pos[0], 0, 1, 0, pl[i].pos[1] - 5000, 0, 0, 1, pl[i].pos[2]};
-                    oa_call(c, FN_SET_MTX, oa_g_act[i].shot[q].actor, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
+                    oa_call(c, FN_SET_MTX, oa_pup(i)->shot[q].actor, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
                 }
             char key[48];
             snprintf(key, sizeof key, "Boom_%s", oa_k_shot_names[sh->boom[k].kind]);

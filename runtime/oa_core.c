@@ -48,8 +48,6 @@ Handle *oa_new_handle(void) {
     return h;
 }
 
-// A remote player in the world: his Link, his armour and his gear
-OaAct oa_g_act[ONLINE_MAX];
 bool oa_g_local_dead;  // the local Link is dead (his body's AS: Dead...): game over is coming
 uint32_t oa_g_aggro_id;   // the host's enemy we hit last (not ours: shown here), and that hit's number
 uint16_t oa_g_aggro_seq;  // (OnlinePose.aggro_*: the host's game hands it to us, so it turns on us)
@@ -254,21 +252,12 @@ void oa_pool_update(Cpu *c) {
 
 // his Link goes (out of reach, his Link removed by the game...): his pieces to his pool; left: they go too
 void oa_drop(Cpu *c, int i, bool left) {
-    for (int k = 0; k < ARMOR; k++) pool_piece(c, i, &oa_g_act[i].armor[k]);
-    for (int k = 0; k < ONLINE_GEAR; k++) pool_piece(c, i, &oa_g_act[i].gear[k]);
-    pool_piece(c, i, &oa_g_act[i].horse);
-    pool_piece(c, i, &oa_g_act[i].tack[0]), pool_piece(c, i, &oa_g_act[i].tack[1]);
-    for (int k = 0; k < ONLINE_SHOTS; k++) pool_piece(c, i, &oa_g_act[i].shot[k]);
-    for (int k = 0; k < ONLINE_HELD; k++) pool_piece(c, i, &oa_g_act[i].held[k]);
-    pool_piece(c, i, &oa_g_act[i].nock);
-    pool_piece(c, i, &oa_g_act[i].slate), pool_piece(c, i, &oa_g_act[i].rune_fx), pool_piece(c, i, &oa_g_act[i].stop_fx);
-    pool_piece(c, i, &oa_g_act[i].magnet_fx);
+    oa_puppet_pieces(c, i, pool_piece);
+    oa_runes_pieces(c, i, pool_piece);
     if (left)
         for (int k = 0; k < POOL; k++) oa_delete_piece(c, &oa_g_pool[i][k]);
-    if (oa_alive(oa_g_act[i].link, oa_g_act[i].link_w)) oa_call(c, FN_DELETE, oa_g_act[i].link, 0, 0, 0, 0, 0);
-    LOG("[online] removed %s's Link\n", oa_g_act[i].name);
-    memset(&oa_g_act[i], 0, sizeof oa_g_act[i]);
-    oa_g_act[i].anim = -1, oa_g_act[i].covered = -1;
+    oa_puppet_drop(c, i);  // (his Link deleted, then all his puppet's state forgotten)
+    oa_runes_drop(i);
 }
 
 // online_mod/gear.txt (tools/online_mod.py): each weapon, shield, bow, sheath and quiver's online actor, "actor=its
