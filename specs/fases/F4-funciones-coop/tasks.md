@@ -990,7 +990,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no cambies el formato de red sin pasar por T409.
   modelo sugerido: alto
 
-- [ ] T455 [herramientas] La orden de control `bloodmoon` está duplicada (HE-09).
+- [~] T455 [herramientas] La orden de control `bloodmoon` está duplicada (HE-09).
+  reclamada: agente Sonnet ag-t455 (integrada) — bloodmoonflags en oa_control.c, CONTROL.md y ONLINE.md; FALTA ver en el log que ya no sale `duplicate command`
   files: `runtime/oa_control.c`, `docs/CONTROL.md`
   verify: el log ya no dice `duplicate command: bloodmoon`; `swctl bloodmoonflags` responde
   depende de: —

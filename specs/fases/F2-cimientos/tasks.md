@@ -287,7 +287,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## CARRILES (en paralelo; cada uno toca solo sus ficheros)
 
-- [ ] T215 [P] [mundo] `has_body` en troncos y guarda en `break_here`.
+- [~] T215 [P] [mundo] `has_body` en troncos y guarda en `break_here`.
+  reclamada: agente Opus ag-t215 (integrada) — has_body antes de las 4 llamadas FN_BODY_TO y vida plausible en break_here; compila; FALTA prueba en el juego (bitácora 2026-11-25-T215) y firma
   files: `runtime/oa_world.c`
   verify: `make -j8` compila; en juego: A tala un árbol y mueve el tronco, B lo ve; A rompe una caja, en B desaparece; revisión: toda llamada a `FN_BODY_TO` de `oa_world.c` está tras `has_body`; `firma_log.py --comparar` sin tipos de línea nuevos salvo los de rechazo
   depende de: T214
@@ -300,7 +301,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies la lista de prefijos "rompible"; no toques otros módulos ni la cabecera interna.
   modelo sugerido: alto
 
-- [ ] T216 [P] [enemigos] Pool propio para marionetas de enemigo y botín.
+- [~] T216 [P] [enemigos] Pool propio para marionetas de enemigo y botín.
+  reclamada: agente Opus ag-t216 (integrada) — fila OA_POOL_WORLD en oa_g_pool para marionetas de enemigo y botín (con el cambio del coordinador en oa_core/oa_frame/oa_control, autorizado por el orquestador); compila; pruebas en 0; FALTA prueba en el juego (bitácora 2026-11-25-T216) y firma
   files: `runtime/oa_enemies.c`, `runtime/oa_loot.c`
   verify: `make -j8` compila; `grep -n "piece_update(c, 0," runtime/oa_enemies.c runtime/oa_loot.c` no devuelve nada; en juego: en el campamento del recorrido, cuando el jugador de la ranura 0 se aleja más de 400 m y vuelve, las marionetas de enemigo y el botín del otro juego siguen ahí; recorrido completo pasa
   depende de: T214
@@ -314,7 +316,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies `oa_core.c` ni la cabecera interna tú mismo; no cambies el tamaño del pool por jugador.
   modelo sugerido: alto
 
-- [ ] T217 [P] [runas] `has_body` en Magnesis sobre un objeto del botín.
+- [~] T217 [P] [runas] `has_body` en Magnesis sobre un objeto del botín.
+  reclamada: agente Sonnet ag-t217 (integrada) — has_body en Magnesis sobre el botín; compila; FALTA prueba en el juego
   files: `runtime/oa_runes.c`
   verify: `make -j8` compila; en juego: B coge con Magnesis un arma metálica del suelo y A la ve moverse; B coge una caja metálica y A la ve moverse; revisión: toda llamada a `FN_BODY_TO` de `oa_runes.c` está tras `has_body`
   depende de: T214
