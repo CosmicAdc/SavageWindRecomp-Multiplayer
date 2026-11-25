@@ -986,6 +986,7 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             Remote *r = &g.r[p[0]];
             bool was = r->used;
             memset(r, 0, sizeof *r);
+            memset(g.quest_of[p[0]], 0, ONLINE_QUEST_BYTES);  // (a new game in the slot: not the last one's quests)
             r->used = true;
             memcpy(r->name, p + 1, ONLINE_NAME_MAX);
             r->name[ONLINE_NAME_MAX - 1] = 0;
@@ -1327,9 +1328,25 @@ static void stop_all(void) {
         pthread_join(g_srv_thread, NULL);
         g_srv_running = false;
     }
+    // everything of the session, so the next one starts as in a fresh process: the players, chat and notices, the
+    // queues both ways, the host's enemies, loot, quests and hour (what stays: the lock, the thread, the status, the
+    // camera; the caller sets the status next)
     pthread_mutex_lock(&g.lock);
-    memset(g.r, 0, sizeof g.r);
-    g.id = -1, g.nchat = g.nout = 0, g.hosting = false, g.ping = 0;
+#define ZERO(f) memset(&g.f, 0, sizeof g.f)
+    ZERO(hosting), ZERO(r), ZERO(ping);
+    ZERO(chat), ZERO(nchat), ZERO(chat_t), ZERO(notice), ZERO(notice_fmt), ZERO(notice_t), ZERO(nnotice);
+    ZERO(outbox), ZERO(nout);
+    ZERO(en);
+    ZERO(hit_out), ZERO(hit_in), ZERO(nhit_out), ZERO(nhit_in);
+    ZERO(est_out), ZERO(est_in), ZERO(est_from), ZERO(nest_out), ZERO(nest_in), ZERO(est_new);
+    ZERO(la_out), ZERO(la_in), ZERO(loots), ZERO(lt_out), ZERO(lt_in);
+    ZERO(nla_out), ZERO(nla_in), ZERO(nlt_out), ZERO(nlt_in), ZERO(nloots), ZERO(loots_new);
+    ZERO(quest_out), ZERO(quest_in), ZERO(quests), ZERO(quest_of);
+    ZERO(quest_out_new), ZERO(quest_in_new), ZERO(quests_have), ZERO(quests_new);
+    ZERO(pick_out), ZERO(pick_in), ZERO(npick_out), ZERO(npick_in);
+    ZERO(host_hour), ZERO(host_hour_t);
+#undef ZERO
+    g.id = -1;
     pthread_mutex_unlock(&g.lock);
     g.stop = false;
 }

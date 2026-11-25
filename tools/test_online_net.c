@@ -98,10 +98,99 @@ static void test_slot_out_of_range_ignored(void) {
         if (i != 1) CHECK(!out[i].used);
 }
 
+// What one session left must not reach the next: after stop_all the quests, loot, enemies and every queue are gone
+static void test_stop_clears_session(void) {
+    static uint8_t buf[13 + ONLINE_LOOT * sizeof(OnlineLoot) + ONLINE_ENEMIES * sizeof(OnlineEnemy)];
+    uint8_t q[ONLINE_QUEST_BYTES];
+    OnlineLoot loots[ONLINE_LOOT];
+    static OnlineEnemy en[ONLINE_ENEMIES];
+    float centre[3] = {0};
+    uint64_t age;
+    char pn[16][40];
+    float pp[16][3];
+
+    // a guest's game: what the host sends
+    set_connected();
+    memset(buf, 0, sizeof buf);
+    buf[7] = 0x40;  // (a flag set)
+    CHECK(cl_message(M_QUESTS, buf, ONLINE_QUEST_BYTES));
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1;
+    snprintf((char *)buf + 1 + offsetof(OnlineLoot, name), 40, "%s", "Item_Test");
+    CHECK(cl_message(M_LOOTS, buf, 1 + (int)sizeof(OnlineLoot)));
+    memset(buf, 0, sizeof buf);
+    buf[12] = 1;
+    snprintf((char *)buf + 13 + offsetof(OnlineEnemy, name), 40, "%s", "Enemy_Test");
+    CHECK(cl_message(M_ENEMIES, buf, 13 + (int)sizeof(OnlineEnemy)));
+    memset(buf, 0, sizeof buf);
+    snprintf((char *)buf, 40, "%s", "Weapon_Test");
+    CHECK(cl_message(M_PICK, buf, 52));
+    memset(buf, 0, 4);
+    CHECK(cl_message(M_TIME, buf, 4));
+    CHECK(online_quests(q) && q[7] == 0x40);  // (they came)
+    CHECK(online_loots(loots) == 1);
+    CHECK(online_enemies(centre, en, &age) == 1);
+    CHECK(g.npick_in == 1);
+    stop_all();
+    memset(q, 0xff, sizeof q);
+    CHECK(!online_quests(q));
+    CHECK(q[7] == 0);
+    CHECK(online_loots(loots) == 0);
+    CHECK(online_enemies(centre, en, &age) == -1);  // (none at all, as in a fresh process)
+    CHECK(online_take_picks(pn, pp, 16) == 0);
+    float hour;
+    CHECK(!online_host_hour(&hour));
+
+    // the host's game: what the others send
+    set_connected();
+    pthread_mutex_lock(&g.lock);
+    g.hosting = true;
+    pthread_mutex_unlock(&g.lock);
+    CHECK(send_join(1, "Bot"));
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1, buf[1 + 7] = 0x40;
+    CHECK(cl_message(M_QUEST, buf, 1 + ONLINE_QUEST_BYTES));
+    CHECK(online_take_quests(q) && q[7] == 0x40);
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1, buf[1] = 1;
+    CHECK(cl_message(M_ESTATE, buf, 2 + (int)sizeof(OnlineEnemy)));
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1;
+    CHECK(cl_message(M_LOOT_ADD, buf, 1 + (int)sizeof(OnlineLoot)));
+    CHECK(cl_message(M_LOOT_TAKE, buf, 5));
+    CHECK(cl_message(M_HIT, buf, 9));
+    online_send_hit(1, 5, ONLINE_ELEM_NONE);  // (and what this game had queued to send)
+    online_send_pick("Weapon_Test", centre);
+    online_send_quests(q);
+    CHECK(g.nest_in == 1 && g.nla_in == 1 && g.nlt_in == 1 && g.nhit_in == 1);
+    stop_all();
+    CHECK(!g.hosting && g.id == -1);
+    CHECK(g.nest_in == 0 && g.nla_in == 0 && g.nlt_in == 0 && g.nhit_in == 0);
+    CHECK(g.nhit_out == 0 && g.npick_out == 0 && g.nest_out == 0 && g.nla_out == 0 && g.nlt_out == 0 && g.nout == 0);
+    CHECK(!g.quest_out_new && !g.quest_in_new && !g.quests_new && !g.est_new && !g.loots_new);
+    static const uint8_t none[ONLINE_QUEST_BYTES];
+    CHECK(!memcmp(g.quest_of[1], none, ONLINE_QUEST_BYTES));
+
+    // a new game in a slot does not inherit the quests the last one there sent
+    set_connected();
+    pthread_mutex_lock(&g.lock);
+    g.hosting = true;
+    pthread_mutex_unlock(&g.lock);
+    CHECK(send_join(1, "Bot"));
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1, buf[1 + 7] = 0x40;
+    CHECK(cl_message(M_QUEST, buf, 1 + ONLINE_QUEST_BYTES));
+    msg[0] = 1;
+    CHECK(cl_message(M_LEAVE, msg, 1));
+    CHECK(send_join(1, "Other"));
+    CHECK(!memcmp(g.quest_of[1], none, ONLINE_QUEST_BYTES));
+}
+
 int main(void) {
     test_state_reaches_players();
     test_state_without_join_ignored();
     test_slot_out_of_range_ignored();
+    test_stop_clears_session();
     stop_all();
     printf("test_online_net: %d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
