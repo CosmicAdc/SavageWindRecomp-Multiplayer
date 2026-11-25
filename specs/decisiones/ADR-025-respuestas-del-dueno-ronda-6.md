@@ -41,3 +41,14 @@
   `rt_link_life` (`god_mode` y `damage_taken`). Arregla N1.
 - **Q-EST-8** → tarea nueva pequeña: con sesión abierta, el lector de amiibo (`services/nfp.c`) no devuelve
   ninguna figura (y un aviso la primera vez).
+
+## Adenda (2026-11-25, tras T451)
+
+| # | Pregunta | Respuesta del dueño |
+|---|---|---|
+| 10 | Q-EST-6 bis · Si uno entra en Eventide o en la Prueba de la Espada y el compañero no quiere o no puede | **Pregunta y espera**: al compañero le sale un aviso aceptar/rechazar con tiempo límite (≈ 30 s). Si rechaza o no contesta, quien entró hace el reto solo y el compañero no puede ayudarle mientras dure (aislamiento de T451) |
+| 11 | Invitación a santuario: al aceptar, ¿a dónde va el compañero? | **A la puerta, entra andando**: teletransporte a la entrada exterior del santuario; entra él mismo por el ascensor (usa la entrada normal del juego) |
+| 12 | ¿Y si el compañero no ha descubierto ese santuario? | **Puede unirse igual**; al entrar queda descubierto en su partida, como si hubiera llegado andando |
+| 13 | ¿Cuándo sale la invitación? | **Siempre**, cada vez que uno entra a un santuario: aviso aceptar/rechazar (≈ 30 s), con opción en ajustes para apagarlo |
+
+Consecuencia: tarea nueva **T465** (F4, invitación a santuario), que depende de la investigación **T540** (F5, adelantada).

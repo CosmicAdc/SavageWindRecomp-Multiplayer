@@ -4,9 +4,10 @@
 // nothing waits on a clock. POSIX only (socketpair): the Makefile target only says so on Windows.
 //   make test-online-session
 //
-// Not tested here, because it lives in srv_loop (accept, select, and a function-local static `next_time` that cannot
-// be reset between cases) and online.c is not to be changed by this test: a full session (R_FULL) and the drop of a
-// client that says nothing for TIMEOUT_NS. They are listed as pending when the test runs; T218 unblocks them.
+// A full session (R_FULL) and the drop of a client that says nothing for TIMEOUT_NS live in srv_step (one round of
+// srv_loop: accept, select, the timeouts; T218). Those cases give it a listening socket of their own, a Unix one in a
+// directory of its own (no port), call it with no wait (or with a limit it never reaches: what it waits for is already
+// there), and move the test's clock instead of waiting.
 #ifdef _WIN32
 #include <stdio.h>
 int main(void) {
@@ -15,6 +16,7 @@ int main(void) {
 }
 #else
 #include "../runtime/online.c"
+#include <sys/un.h>
 
 // ---- stubs for what online.c takes from the rest of the runtime
 GameSites g_site;  // (all zero: no game)
@@ -309,15 +311,155 @@ static void test_state_relayed(void) {
     CHECK(seen);
 }
 
-static void pending(const char *what, const char *why) { printf("PENDIENTE: %s: %s\n", what, why); }
+// ---- srv_step (T218): a listening socket of the test's, a Unix one in a directory of its own (no port)
+static char ldir[64], lpath[96];
+
+static void open_listener(void) {
+    snprintf(ldir, sizeof ldir, "%s", "/tmp/swsessXXXXXX");
+    CHECK(mkdtemp(ldir) != NULL);
+    snprintf(lpath, sizeof lpath, "%s/s", ldir);
+    struct sockaddr_un a;
+    memset(&a, 0, sizeof a);
+    a.sun_family = AF_UNIX;
+    snprintf(a.sun_path, sizeof a.sun_path, "%s", lpath);
+    int l = socket(AF_UNIX, SOCK_STREAM, 0);
+    CHECK(l >= 0);
+    CHECK(bind(l, (struct sockaddr *)&a, sizeof a) == 0);
+    CHECK(listen(l, 8) == 0);
+    sv.listener = l;
+}
+
+static void close_listener(void) {
+    if (sv.listener != SOCK_BAD) sock_close(sv.listener);
+    sv.listener = SOCK_BAD;
+    unlink(lpath);
+    rmdir(ldir);
+}
+
+// a connection from outside to the listener, as a new player's (srv_step accepts it)
+static int dial(void) {
+    struct sockaddr_un a;
+    memset(&a, 0, sizeof a);
+    a.sun_family = AF_UNIX;
+    snprintf(a.sun_path, sizeof a.sun_path, "%s", lpath);
+    int s = socket(AF_UNIX, SOCK_STREAM, 0);
+    CHECK(s >= 0);
+    CHECK(connect(s, (struct sockaddr *)&a, sizeof a) == 0);
+    return s;
+}
+
+static void join_named(int n) {
+    for (int i = 0; i < n; i++) {
+        char name[8];
+        snprintf(name, sizeof name, "P%d", i);
+        connect_client(i);
+        CHECK(join_ok(i, name));
+    }
+    for (int i = 0; i < n; i++) drain(i), innb[i] = 0;  // (the joins are not what is looked at here)
+}
+
+// (10) a full session: with the eight slots taken, a ninth connection gets REJECT R_FULL and is closed, and the eight
+// stay, hearing nothing of it; once a slot is freed, the next connection takes it
+static void test_full(void) {
+    begin(10, "sesion llena -> REJECT R_FULL");
+    open_listener();
+    join_named(ONLINE_MAX);
+    int s = dial();
+    srv_step(&sv, 1000000);  // (the connection is already there: select returns at once)
+    uint8_t got[16];
+    int k = (int)recv(s, got, sizeof got, MSG_DONTWAIT);
+    CHECK(k == 4);  // (u16 length 2, the type, the reason)
+    CHECK(k == 4 && got[0] == 2 && got[1] == 0 && got[2] == M_REJECT && got[3] == R_FULL);
+    char c;
+    CHECK(recv(s, &c, 1, MSG_DONTWAIT) == 0);  // (and closed by the server)
+    close(s);
+    for (int i = 0; i < ONLINE_MAX; i++) CHECK(sv.c[i].used && sv.c[i].hello && silent(i));
+    srv_drop(&sv, 3);
+    for (int i = 0; i < ONLINE_MAX; i++)
+        if (i != 3) drain(i), innb[i] = 0;
+    s = dial();
+    srv_step(&sv, 1000000);
+    CHECK(sv.c[3].used && !sv.c[3].hello);  // (in, waiting for its HELLO)
+    CHECK(recv(s, got, sizeof got, MSG_DONTWAIT) < 0);  // (nothing said to it yet, not closed)
+    close(s);
+    close_listener();
+}
+
+// (11) a client that says nothing for TIMEOUT_NS is dropped (the others get its LEAVE); TIMEOUT_NS itself is not yet
+// too long, and any message resets the count
+static void test_silence(void) {
+    static uint8_t pay[4096];
+    uint8_t t = 0;
+    int len = 0;
+    begin(11, "expulsion por silencio (TIMEOUT_NS)");
+    open_listener();
+    join_named(3);
+    clock_ns += TIMEOUT_NS;  // (exactly the limit: all stay)
+    srv_step(&sv, 0);
+    for (int i = 0; i < 3; i++) CHECK(sv.c[i].used && silent(i));
+    uint8_t ping[3 + 8] = {9, 0, M_PING, 1, 2, 3, 4, 5, 6, 7, 8};  // (1 just spoke: a PING)
+    CHECK(send(peer[1], ping, sizeof ping, 0) == (ssize_t)sizeof ping);
+    clock_ns += 1;
+    srv_step(&sv, 1000000);  // (the PING is already there: select returns at once)
+    CHECK(!sv.c[0].used && !sv.c[2].used);
+    CHECK(sv.c[1].used && sv.c[1].hello && sv.c[1].heard == clock_ns);
+    CHECK(expect_slot_msg(1, M_LEAVE, NULL) == 0);
+    CHECK(take(1, &t, pay, &len));
+    CHECK(t == M_PONG && len == 8 && !memcmp(pay, ping + 3, 8));
+    CHECK(expect_slot_msg(1, M_LEAVE, NULL) == 2);
+    CHECK(silent(1));
+    CHECK(closed_by_server(0));
+    drain(2), innb[2] = 0;  // (the LEAVE of 0 it got before going)
+    CHECK(closed_by_server(2));
+    clock_ns += TIMEOUT_NS + 1;  // (and 1, silent from then on, goes too)
+    srv_step(&sv, 0);
+    CHECK(!sv.c[1].used);
+    CHECK(closed_by_server(1));
+    close_listener();
+}
+
+// TIME from the server to client i: the host's hour
+static void expect_time(int i, float hour) {
+    static uint8_t pay[64];
+    uint8_t t = 0;
+    int len = 0;
+    float h = -1;
+    CHECK(take(i, &t, pay, &len));
+    CHECK(t == M_TIME && len == 4);
+    memcpy(&h, pay, 4);
+    CHECK(h == hour);
+}
+
+// (12) each server keeps its own time for the next TIME: a second server in the same process sends the host's hour
+// at once, as the first did (before T218 it was a static of srv_loop: the second waited for the first's time)
+static void test_time_each_server(void) {
+    begin(12, "un servidor nuevo en el mismo proceso manda TIME enseguida");
+    online_set_local_hour(12.5f);
+    open_listener();
+    join_named(1);
+    srv_step(&sv, 0);
+    expect_time(0, 12.5f);
+    clock_ns += TIME_EVERY_NS / 2;
+    srv_step(&sv, 0);
+    CHECK(silent(0));  // (one each TIME_EVERY_NS)
+    close_listener();
+    reset();  // (a new server: srv_open clears it all, as reset does)
+    open_listener();
+    join_named(1);
+    srv_step(&sv, 0);
+    expect_time(0, 12.5f);  // (at once)
+    close_listener();
+    online_set_local_hour(-1);
+}
 
 int main(void) {
     for (int i = 0; i < ONLINE_MAX; i++) peer[i] = -1;
     memset(&sv, 0, sizeof sv);
+    sv.listener = SOCK_BAD;
     int cases = 0, bad = 0;
     void (*const t[])(void) = {test_hello_ok, test_reject_version, test_reject_password, test_reject_name,
                                test_first_not_hello, test_join_both_ways, test_drop_leave, test_slot_reused,
-                               test_state_relayed};
+                               test_state_relayed, test_full, test_silence, test_time_each_server};
     for (size_t k = 0; k < sizeof t / sizeof *t; k++) {
         int before = failures;
         t[k]();
@@ -326,10 +468,7 @@ int main(void) {
         printf("  %s\n", failures == before ? "ok" : "FALLA");
     }
     reset();
-    pending("sesion llena (R_FULL)", "la decide srv_loop tras accept(), que necesita un socket de escucha real; lo desbloquea T218");
-    pending("expulsion por silencio (TIMEOUT_NS)", "vive en srv_loop, con select y la estatica next_time; lo desbloquea T218");
-    printf("test_online_session: %d cases, %d failed, 2 pending, %d checks, %d check failures\n", cases, bad, checks,
-           failures);
+    printf("test_online_session: %d cases, %d failed, %d checks, %d check failures\n", cases, bad, checks, failures);
     return failures ? 1 : 0;
 }
 #endif

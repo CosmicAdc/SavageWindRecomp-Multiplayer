@@ -75,3 +75,15 @@ menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un a
 - `recorrido.py`: desde PowerShell `shutil.which("bash")` daba el de WSL; ahora prefiere Git Bash o MSYS2 (commit
   `557990f`). La pasada se lanza en un panel de Herdr para que el recortador de memoria de Claude Code no la corte.
 - Firma (`firma_log.py --comparar`): sin referencia todavía (T201 pendiente). T209 queda `[~]` hasta tenerla.
+
+## 2026-11-25 · Pasada con T210 + T222 (build con T222 integrada)
+
+- PASAN 1, 3, 4 (3 traspasos, como la línea base de F1), 5, 6, 7 y 9. Ningún `dropped a …` ni `cleared an entry` en
+  A.log ni B.log (lo que pedía T222). Sin cierres.
+- FALLAN por el teletransporte (HE-13): 2 ("Position not found"), y la repetición del 8 ("Position verification
+  failed"). El primer intento del 8 falló porque A no listó `OnlinePlayer` en 90 s aunque el log muestra la marioneta
+  rehecha justo después del salto (igual que con T209): queda **sin explicar**, repetir con reintentos.
+- FALLA 10 por la espera de 180 s (la pasada empezó antes de subirla a 420 s); B volvió a unirse.
+- B.log: 309 `made again` (HE-23, T453).
+- `recorrido.py`: el reintento de teletransporte (hasta 2, anotado como `aviso:`) cubre ahora todos los saltos
+  (`ir`, `llegar`, paso 4 y paso 8). Prueba sintética: 2 fallos → llega; 3 fallos → Falla.

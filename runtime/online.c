@@ -27,6 +27,7 @@ typedef int sock_t;
 #endif
 #include <math.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,7 +55,7 @@ OnlineSettings g_online = {.port = ONLINE_PORT, .show_names = true, .show_marker
 // ------------------------------------------------------------------ sockets
 static void net_init(void) {
 #ifdef _WIN32
-    static bool done;
+    static bool done;  // (kept: WSAStartup once per process, not state of a session)
     if (!done) {
         WSADATA w;
         WSAStartup(MAKEWORD(2, 2), &w);
@@ -165,6 +166,7 @@ typedef struct {
     SClient c[ONLINE_MAX];
     char password[ONLINE_NAME_MAX];
     volatile bool stop;
+    uint64_t next_time;  // (srv_step's: when TIME goes next; srv_open clears it with the rest, so each server starts anew)
 } Server;
 
 static void srv_broadcast(Server *sv, int except, uint8_t type, const void *a, int na, const void *b, int nb) {
@@ -296,65 +298,66 @@ static bool srv_open(Server *sv, int port) {
     return true;
 }
 
-// srv_loop's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
-static uint64_t next_time;
+// one round of the server: wait up to wait_us for a connection or a message, accept, read and pass on, drop who went
+// silent (srv_loop; the tests call it with a clock of their own and no wait)
+static void srv_step(Server *sv, long wait_us) {
+    fd_set rd;
+    FD_ZERO(&rd);
+    FD_SET(sv->listener, &rd);
+    sock_t mx = sv->listener;
+    for (int i = 0; i < ONLINE_MAX; i++)
+        if (sv->c[i].used) {
+            FD_SET(sv->c[i].s, &rd);
+            if (sv->c[i].s > mx) mx = sv->c[i].s;
+        }
+    struct timeval tv = {0, wait_us};
+    int n = select((int)mx + 1, &rd, NULL, NULL, &tv);
+    if (n < 0) return;
+    if (n == 0) FD_ZERO(&rd);
+    if (FD_ISSET(sv->listener, &rd)) {
+        sock_t s = accept(sv->listener, NULL, NULL);
+        if (s != SOCK_BAD) {
+            int i = 0;
+            while (i < ONLINE_MAX && sv->c[i].used) i++;
+            sock_nodelay(s);
+            sock_nosigpipe(s);
+            if (i == ONLINE_MAX) {
+                uint8_t why = R_FULL;
+                send_msg(s, M_REJECT, &why, 1, NULL, 0);
+                sock_close(s);
+            } else {
+                sv->c[i] = (SClient){.s = s, .used = true, .heard = plat_now_ns()};
+            }
+        }
+    }
+    uint64_t now = plat_now_ns();
+    if (now >= sv->next_time) {  // (the host's own game is the one this server runs in: its hour for everyone)
+        sv->next_time = now + TIME_EVERY_NS;
+        float hour = g_local_hour;
+        if (hour >= 0) srv_broadcast(sv, -1, M_TIME, &hour, 4, NULL, 0);
+    }
+    for (int i = 0; i < ONLINE_MAX; i++) {
+        SClient *c = &sv->c[i];
+        if (!c->used) continue;
+        if (!FD_ISSET(c->s, &rd)) {
+            if (now - c->heard > TIMEOUT_NS) srv_drop(sv, i);  // (gone without a word: a crash, the network)
+            continue;
+        }
+        if (!recv_some(c->s, &c->rb)) { srv_drop(sv, i); continue; }
+        c->heard = now;
+        int off = 0, len;
+        uint8_t type;
+        const uint8_t *p;
+        bool ok = true;
+        while (ok && next_msg(&c->rb, &off, &type, &p, &len)) ok = srv_message(sv, i, type, p, len);
+        if (!ok || (c->rb.n == (int)sizeof c->rb.data && off == 0)) { srv_drop(sv, i); continue; }
+        consumed(&c->rb, off);
+    }
+}
 
 // accept, read and pass on until sv->stop
 static void srv_loop(Server *sv) {
-    while (!sv->stop) {
-        fd_set rd;
-        FD_ZERO(&rd);
-        FD_SET(sv->listener, &rd);
-        sock_t mx = sv->listener;
-        for (int i = 0; i < ONLINE_MAX; i++)
-            if (sv->c[i].used) {
-                FD_SET(sv->c[i].s, &rd);
-                if (sv->c[i].s > mx) mx = sv->c[i].s;
-            }
-        struct timeval tv = {0, 100000};
-        int n = select((int)mx + 1, &rd, NULL, NULL, &tv);
-        if (n < 0) continue;
-        if (n == 0) FD_ZERO(&rd);
-        if (FD_ISSET(sv->listener, &rd)) {
-            sock_t s = accept(sv->listener, NULL, NULL);
-            if (s != SOCK_BAD) {
-                int i = 0;
-                while (i < ONLINE_MAX && sv->c[i].used) i++;
-                sock_nodelay(s);
-                sock_nosigpipe(s);
-                if (i == ONLINE_MAX) {
-                    uint8_t why = R_FULL;
-                    send_msg(s, M_REJECT, &why, 1, NULL, 0);
-                    sock_close(s);
-                } else {
-                    sv->c[i] = (SClient){.s = s, .used = true, .heard = plat_now_ns()};
-                }
-            }
-        }
-        uint64_t now = plat_now_ns();
-        if (now >= next_time) {  // (the host's own game is the one this server runs in: its hour for everyone)
-            next_time = now + TIME_EVERY_NS;
-            float hour = g_local_hour;
-            if (hour >= 0) srv_broadcast(sv, -1, M_TIME, &hour, 4, NULL, 0);
-        }
-        for (int i = 0; i < ONLINE_MAX; i++) {
-            SClient *c = &sv->c[i];
-            if (!c->used) continue;
-            if (!FD_ISSET(c->s, &rd)) {
-                if (now - c->heard > TIMEOUT_NS) srv_drop(sv, i);  // (gone without a word: a crash, the network)
-                continue;
-            }
-            if (!recv_some(c->s, &c->rb)) { srv_drop(sv, i); continue; }
-            c->heard = now;
-            int off = 0, len;
-            uint8_t type;
-            const uint8_t *p;
-            bool ok = true;
-            while (ok && next_msg(&c->rb, &off, &type, &p, &len)) ok = srv_message(sv, i, type, p, len);
-            if (!ok || (c->rb.n == (int)sizeof c->rb.data && off == 0)) { srv_drop(sv, i); continue; }
-            consumed(&c->rb, off);
-        }
-    }
+    while (!sv->stop) srv_step(sv, 100000);
     for (int i = 0; i < ONLINE_MAX; i++)
         if (sv->c[i].used) sock_close(sv->c[i].s);
     sock_close(sv->listener);
@@ -362,7 +365,7 @@ static void srv_loop(Server *sv) {
 
 static Server g_srv;
 static pthread_t g_srv_thread;
-static bool g_srv_running;
+static atomic_bool g_srv_running;  // (read without a lock by the frame loop: online_is_host)
 
 static void *srv_thread(void *arg) {
     srv_loop(arg);
@@ -404,9 +407,9 @@ static struct {
     pthread_t thread;
     bool thread_on;
     volatile bool stop;
-    int state;
-    bool hosting;
-    int id;
+    atomic_int state;  // (state, hosting and id are read without the lock by the frame loop and the UI)
+    atomic_bool hosting;
+    atomic_int id;
     const char *status_fmt;
     char status_arg[96];
     Remote r[ONLINE_MAX];
@@ -442,6 +445,23 @@ static struct {
     double vp[16];
     float ysign;
     uint64_t cam_t;
+    // the network thread's own, kept from one STATE or one round to the next. No lock: only cl_thread touches them,
+    // and start_client and stop_all clear them while it is not running, so each session starts as in a fresh process
+    struct {
+        float last[3], yaw;  // (where Link was at the last sample, and his heading)
+        bool have;
+        uint8_t anim;
+        uint8_t cur, cand;  // (motion_anim's: the animation sent, and the last one seen)
+    } smp;                  // (sample_local's)
+    struct {
+        uint8_t lb[1 + ONLINE_LOOT * sizeof(OnlineLoot)];  // (LOOTS, being sent)
+        uint64_t next_loots;
+        uint8_t sb[2 + ONLINE_ENEMIES * sizeof(OnlineEnemy)];  // (ESTATE, being sent)
+        uint64_t next_enemies;
+        uint8_t eb[13 + ONLINE_ENEMIES * sizeof(OnlineEnemy)];  // (ENEMIES, being sent)
+        WireEquip last;  // (EQUIP, as last sent)
+        uint64_t next_equip;
+    } snd;  // (cl_thread's)
 } g = {.lock = PTHREAD_MUTEX_INITIALIZER, .id = -1};
 
 // The status: an English text (tr() it) with at most one %s, and what goes there
@@ -468,9 +488,6 @@ static void add_notice(const char *fmt, const char *name) {  // (lock held)
     g.notice_t[g.nnotice++] = plat_now_ns();
 }
 
-// motion_anim's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
-static uint8_t cur, cand;
-
 // What Link is doing, from how he moves (20 samples a second): on the ground by his speed, in the air by how fast he
 // rises or falls, gliding when he falls slowly while going fast. A change needs two samples in a row.
 static uint8_t motion_anim(float dh, float dy) {
@@ -484,9 +501,9 @@ static uint8_t motion_anim(float dh, float dy) {
     else if (vh < 2.8f) a = ONLINE_A_WALK;
     else if (vh < 6.5f) a = ONLINE_A_RUN;
     else a = ONLINE_A_DASH;
-    if (a == cand) cur = a;
-    cand = a;
-    return cur;
+    if (a == g.smp.cand) g.smp.cur = a;
+    g.smp.cand = a;
+    return g.smp.cur;
 }
 
 // SKEL's bones
@@ -781,11 +798,6 @@ void online_set_local_pose(const OnlinePose *p) {
     pthread_mutex_unlock(&g_pose_lock);
 }
 
-// sample_local's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
-static float sample_local_last[3], yaw;
-static bool have;
-static uint8_t anim;
-
 // Link right now: false while there is no Link (loading, the title screen), with pos and yaw 0 (the STATE then sent with
 // ONLINE_F_LOADING passes online_validate_state: what was read there, not finite or beyond any world, would drop it)
 static bool sample_local(WireState *w) {
@@ -798,15 +810,15 @@ static bool sample_local(WireState *w) {
     for (int k = 0; k < 3; k++)
         if (!isfinite(w->pos[k]) || fabsf(w->pos[k]) > 100000) goto none;
     if (w->pos[0] == 0 && w->pos[1] == 0 && w->pos[2] == 0) goto none;  // (no Link placed yet)
-    if (have) {  // heading: where he has been going (kept while he stands)
-        float dx = w->pos[0] - sample_local_last[0], dy = w->pos[1] - sample_local_last[1], dz = w->pos[2] - sample_local_last[2];
-        if (dx * dx + dz * dz > 0.02f * 0.02f) yaw = atan2f(dx, dz);
-        if (dx * dx + dy * dy + dz * dz < 50 * 50) anim = motion_anim(sqrtf(dx * dx + dz * dz), dy);
+    if (g.smp.have) {  // heading: where he has been going (kept while he stands)
+        float dx = w->pos[0] - g.smp.last[0], dy = w->pos[1] - g.smp.last[1], dz = w->pos[2] - g.smp.last[2];
+        if (dx * dx + dz * dz > 0.02f * 0.02f) g.smp.yaw = atan2f(dx, dz);
+        if (dx * dx + dy * dy + dz * dz < 50 * 50) g.smp.anim = motion_anim(sqrtf(dx * dx + dz * dz), dy);
     }
-    memcpy(sample_local_last, w->pos, sizeof sample_local_last);
-    have = true;
-    w->yaw = yaw;
-    w->anim = anim;
+    memcpy(g.smp.last, w->pos, sizeof g.smp.last);
+    g.smp.have = true;
+    w->yaw = g.smp.yaw;
+    w->anim = g.smp.anim;
     pthread_mutex_lock(&g_pose_lock);  // (a pose of the last half second: the frame loop runs)
     if (g_pose.valid && plat_now_ns() - g_pose_t < 500000000ull) {
         memcpy(w->as, g_pose.as, sizeof w->as);
@@ -848,7 +860,7 @@ static bool sample_local(WireState *w) {
     pthread_mutex_unlock(&g_pose_lock);
     return true;
 none:
-    have = false;
+    g.smp.have = false;
     memset(w->pos, 0, sizeof w->pos), w->yaw = 0;
     return false;
 }
@@ -1212,12 +1224,6 @@ static sock_t cl_connect(const char *host, int port) {
     return s;
 }
 
-// cl_thread's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
-static uint64_t next_loots;
-static uint64_t next_enemies;
-static WireEquip cl_thread_last;
-static uint64_t next_equip;
-
 static void *cl_thread(void *arg) {
     (void)arg;
     char host[64];
@@ -1290,7 +1296,7 @@ static void *cl_thread(void *arg) {
             if (what && alive) alive = send_msg(s, what == 1 ? M_QUEST : M_QUESTS, qo, sizeof qo, NULL, 0);
         }
         {   // loot: ours for the host's game; the host's list for the others (when it changed, and every 2 s)
-            static uint8_t lb[1 + ONLINE_LOOT * sizeof(OnlineLoot)];
+            uint8_t *lb = g.snd.lb;
             OnlineLoot la[16];
             uint32_t lt[16];
             int nla, nlt, nl = -1;
@@ -1298,10 +1304,10 @@ static void *cl_thread(void *arg) {
             nla = g.nla_out, nlt = g.nlt_out;
             memcpy(la, g.la_out, nla * sizeof *la), memcpy(lt, g.lt_out, nlt * 4);
             g.nla_out = g.nlt_out = 0;
-            if (g.hosting && (g.loots_new || now >= next_loots)) {
+            if (g.hosting && (g.loots_new || now >= g.snd.next_loots)) {
                 nl = g.nloots, lb[0] = (uint8_t)nl;
                 memcpy(lb + 1, g.loots, nl * sizeof(OnlineLoot));
-                g.loots_new = false, next_loots = now + 2000000000ull;
+                g.loots_new = false, g.snd.next_loots = now + 2000000000ull;
             }
             pthread_mutex_unlock(&g.lock);
             for (int k = 0; k < nla && alive; k++) alive = send_msg(s, M_LOOT_ADD, &la[k], sizeof la[k], NULL, 0);
@@ -1309,7 +1315,7 @@ static void *cl_thread(void *arg) {
             if (nl >= 0 && alive) alive = send_msg(s, M_LOOTS, lb, 1 + nl * (int)sizeof(OnlineLoot), NULL, 0);
         }
         {   // the enemies we have for real, for the host's game
-            static uint8_t sb[2 + ONLINE_ENEMIES * sizeof(OnlineEnemy)];
+            uint8_t *sb = g.snd.sb;
             int ne = -1;
             pthread_mutex_lock(&g.lock);
             if (g.est_new) {
@@ -1321,9 +1327,9 @@ static void *cl_thread(void *arg) {
             pthread_mutex_unlock(&g.lock);
             if (ne > 0 && !g.hosting) alive = alive && send_msg(s, M_ESTATE, sb + 1, 1 + ne * (int)sizeof(OnlineEnemy), NULL, 0);
         }
-        if (g.hosting && now >= next_enemies) {  // (the host: his enemies, while his frame loop gives them)
-            next_enemies = now + ENEMIES_EVERY_NS;
-            static uint8_t eb[13 + ONLINE_ENEMIES * sizeof(OnlineEnemy)];
+        if (g.hosting && now >= g.snd.next_enemies) {  // (the host: his enemies, while his frame loop gives them)
+            g.snd.next_enemies = now + ENEMIES_EVERY_NS;
+            uint8_t *eb = g.snd.eb;
             int n = -1;
             pthread_mutex_lock(&g_pose_lock);
             if (g_local_en.t && now - g_local_en.t < 1000000000ull) {
@@ -1354,12 +1360,12 @@ static void *cl_thread(void *arg) {
         }
         {   // what he wears: when it changes, and every 5 s (for whoever came in meanwhile)
             WireEquip e;
-            if (sample_equip(&e) && (memcmp(&e, &cl_thread_last, sizeof e) || now >= next_equip)) {
-                next_equip = now + 5000000000ull;
-                if (memcmp(&e, &cl_thread_last, sizeof e))
+            if (sample_equip(&e) && (memcmp(&e, &g.snd.last, sizeof e) || now >= g.snd.next_equip)) {
+                g.snd.next_equip = now + 5000000000ull;
+                if (memcmp(&e, &g.snd.last, sizeof e))
                     LOG("[online] wearing %s|%s|%s carrying %s|%s|%s|%s|%s|%s\n", e.armor[0], e.armor[1], e.armor[2], e.gear[0],
                         e.gear[1], e.gear[2], e.gear[3], e.gear[4], e.gear[5]);
-                cl_thread_last = e;
+                g.snd.last = e;
                 send_msg(s, M_EQUIP, &e, sizeof e, NULL, 0);
             }
         }
@@ -1385,11 +1391,12 @@ static void stop_all(void) {
         g_srv_running = false;
     }
     // everything of the session, so the next one starts as in a fresh process: the players, chat and notices, the
-    // queues both ways, the host's enemies, loot, quests and hour (what stays: the lock, the thread, the status, the
-    // camera; the caller sets the status next)
+    // queues both ways, the host's enemies, loot, quests and hour, and the network thread's own (what stays: the lock,
+    // the thread, the status, the camera; the caller sets the status next)
     pthread_mutex_lock(&g.lock);
 #define ZERO(f) memset(&g.f, 0, sizeof g.f)
-    ZERO(hosting), ZERO(r), ZERO(ping);
+    g.hosting = false;
+    ZERO(r), ZERO(ping);
     ZERO(chat), ZERO(nchat), ZERO(chat_t), ZERO(notice), ZERO(notice_fmt), ZERO(notice_t), ZERO(nnotice);
     ZERO(outbox), ZERO(nout);
     ZERO(en);
@@ -1401,6 +1408,7 @@ static void stop_all(void) {
     ZERO(quest_out_new), ZERO(quest_in_new), ZERO(quests_have), ZERO(quests_new);
     ZERO(pick_out), ZERO(pick_in), ZERO(npick_out), ZERO(npick_in);
     ZERO(host_hour), ZERO(host_hour_t);
+    ZERO(smp), ZERO(snd);  // (the thread is stopped: nothing else touches them)
 #undef ZERO
     g.id = -1;
     pthread_mutex_unlock(&g.lock);
@@ -1412,6 +1420,7 @@ static bool start_client(bool hosting) {
     pthread_mutex_lock(&g.lock);
     g.hosting = hosting;
     g.state = ONLINE_CONNECTING;
+    memset(&g.smp, 0, sizeof g.smp), memset(&g.snd, 0, sizeof g.snd);  // (the network thread's own: not running yet)
     pthread_mutex_unlock(&g.lock);
     g.thread_on = pthread_create(&g.thread, NULL, cl_thread, NULL) == 0;
     return g.thread_on;
@@ -1653,15 +1662,18 @@ RT_ON_RESET(online_reset) {
         online_leave();  // (the server stopped and joined, the session's state cleared: stop_all; "Not connected")
     }
     // no network thread now: what stop_all leaves, and the rest of this file's state, as in a fresh process (not the
-    // locks, nor g_online: the player's settings stay)
+    // locks, nor g_online: the player's settings stay; state, hosting and id are atomics: stored, never memset)
     pthread_mutex_lock(&g.lock);
     g.state = ONLINE_OFF;
+    g.hosting = false;
+    g.id = -1;
     g.status_fmt = NULL;
     memset(g.status_arg, 0, sizeof g.status_arg);
-    g.id = -1;
     memset(g.vp, 0, sizeof g.vp);
     g.ysign = 0;
     g.cam_t = 0;
+    memset(&g.smp, 0, sizeof g.smp);
+    memset(&g.snd, 0, sizeof g.snd);
     memset(g_skel, 0, sizeof g_skel);
     g_skel_len = 0;
     g_skel_t = 0;
@@ -1674,17 +1686,9 @@ RT_ON_RESET(online_reset) {
     g_equip_t = 0;
     pthread_mutex_unlock(&g_pose_lock);
     g_local_hour = -1;
-    next_time = 0;
-    memset(&g_srv, 0, sizeof g_srv);
+    memset(&g_srv, 0, sizeof g_srv);  // (its next_time with it)
     memset(&g_srv_thread, 0, sizeof g_srv_thread);
     g_srv_running = false;
-    cur = cand = 0;
-    memset(sample_local_last, 0, sizeof sample_local_last);
-    yaw = 0;
-    have = false;
-    anim = 0;
     memset(g_drop_n, 0, sizeof g_drop_n);
     g_state_cleared_n = 0;
-    next_loots = next_enemies = next_equip = 0;
-    memset(&cl_thread_last, 0, sizeof cl_thread_last);
 }

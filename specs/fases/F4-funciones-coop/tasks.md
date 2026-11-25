@@ -910,7 +910,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no cambies cómo se elige el blanco ni el daño declarado (T434); no toques `rt_link_life`.
   modelo sugerido: medio
 
-- [ ] T449 [investigación] Dormir y esperar con el anfitrión como dueño de la hora (ADR-025 n.º 3 y 4; HE-07).
+- [x] T449 [investigación] Dormir y esperar con el anfitrión como dueño de la hora (ADR-025 n.º 3 y 4; HE-07).
+  hecha: agente Sonnet ag-t449 (integrada) — `specs/bitacora/F4-T449-dormir-y-hora.md`; propone T456 y T457 (ya) y T449-d/e tras medir PE-T449-1..6 en el juego
   files: `specs/bitacora/F4-T449-dormir-y-hora.md`
   verify: la bitácora responde las preguntas del paso 1 con `fichero:línea` y una propuesta de diseño y tareas; `git diff --check`
   depende de: —
@@ -923,7 +924,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no escribas código; no toques `tools/patches.py` ni `tools/game_sites.py`; nada de proyectos de descompilación.
   modelo sugerido: alto
 
-- [ ] T450 [investigación] Luna de Sangre del anfitrión: la escena también en el invitado (ADR-025 n.º 5; HE-08).
+- [x] T450 [investigación] Luna de Sangre del anfitrión: la escena también en el invitado (ADR-025 n.º 5; HE-08).
+  hecha: agente Sonnet ag-t450 (integrada) — `specs/bitacora/F4-T450-luna-de-sangre.md`; propone T450-a..f (a y f ya; f = T455) y pruebas PE-T450-1..5 en el juego
   files: `specs/bitacora/F4-T450-luna-de-sangre.md`
   verify: la bitácora responde el paso 1 con `fichero:línea` y propone diseño y tareas; `git diff --check`
   depende de: —
@@ -936,7 +938,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no escribas código; no toques parches ni sitios.
   modelo sugerido: alto
 
-- [ ] T451 [investigación] Eventide y Prueba de la Espada: entrar los dos juntos (ADR-025 n.º 7; HE-16).
+- [x] T451 [investigación] Eventide y Prueba de la Espada: entrar los dos juntos (ADR-025 n.º 7; HE-16).
+  hecha: agente Sonnet ag-t451 (integrada) — `specs/bitacora/F4-T451-retos-juntos.md`; viable si M5 y M7 salen bien; propone T458–T464 (numeración de la bitácora, pendiente de pasar a esta lista tras medir)
   files: `specs/bitacora/F4-T451-retos-juntos.md`
   verify: la bitácora responde el paso 1 y propone diseño y tareas, o dice "no viable" con el motivo; `git diff --check`
   depende de: —
@@ -950,7 +953,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   modelo sugerido: alto
 
 - [ ] T452 [reglas] amiibo bloqueados durante la sesión (ADR-025 n.º 9).
-  files: `services/nfp.c`, `runtime/online.h` (solo una consulta de "hay sesión"), textos en `runtime/ui/i18n/*.inc`
+  files: `runtime/services/nfp.c`, `runtime/online.h` (solo una consulta de "hay sesión"), textos en `runtime/ui/i18n/*.inc`
   verify: `make -j8` compila; `python3 tools/i18n_check.py` en 0; en juego con sesión: usar la runa amiibo no lee ninguna figura y sale el aviso una vez; sin sesión funciona como siempre
   depende de: —
   quién: agente
@@ -973,7 +976,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no cambies el reparto de dueños (T444).
   modelo sugerido: alto
 
-- [ ] T454 [efectos] El compañero no ve la animación del hada que revive (N2).
+- [~] T454 [efectos] El compañero no ve la animación del hada que revive (N2).
+  paso 1 hecho: agente Sonnet ag-t454 (integrado) — `specs/bitacora/F4-T454-hada.md`; FALTA PE-T454-1 en el juego (nombre del actor o efecto del hada) y después T454-b
   files: `specs/bitacora/F4-T454-hada.md` (investigación), después lo que proponga
   verify: en juego, A muere con un hada en el inventario y B ve la animación de la revivida (no solo la caída)
   depende de: —
@@ -995,3 +999,39 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     1. Renombrar la de `oa_control.c` a `bloodmoonflags` y documentarla.
   hecho cuando: `verify` cumplido.
   modelo sugerido: bajo
+
+- [ ] T456 [hora] No difundir la hora sin mundo (ADR-025 n.º 4; T449-a).
+  files: `runtime/oa_frame.c`, `runtime/online.c`
+  verify: `make -j8`; en juego, con A en el título o cargando, B.log no tiene líneas `[online] the host's time` nuevas y el reloj de B sigue
+  depende de: T212 (el reinicio de `g_local_hour` va en su `RT_ON_RESET`)
+  quién: agente
+  contexto: Bitácora de T449: sin mundo, el paso 7 de `rt_online_frame` no corre y `g_local_hour` se queda con el último valor, que `srv_loop` sigue emitiendo cada 2 s. El servidor ya omite el envío con `hour < 0`.
+  pasos:
+    1. `online_set_local_hour(-1)` cuando no hay mundo (y durante eventos del anfitrión que no son dormir, según la bitácora).
+  hecho cuando: `verify` cumplido.
+  modelo sugerido: medio
+
+- [ ] T457 [hora] El invitado no aplica la hora del anfitrión dentro de sus propios eventos que no son dormir (T449-b).
+  files: `runtime/oa_flags.c` (o donde se aplique la hora)
+  verify: `make -j8`; en juego (PE-T449-3), con B en una escena, la hora de A no salta a mitad de la escena
+  depende de: T456
+  quién: agente
+  contexto: Bitácora de T449, sección de propuestas.
+  pasos:
+    1. Aplazar la hora del anfitrión mientras el invitado está en un evento que no es dormir; aplicarla al acabar.
+  hecho cuando: `verify` cumplido.
+  modelo sugerido: medio
+
+- [ ] T465 [coop] Invitación a santuario (ADR-025 n.º 11-13).
+  files: los que proponga T540 (previsiblemente `runtime/coop_*.c` nuevo para la lógica pura, `runtime/oa_*.c`, mensajes de aviso en `runtime/ui/`, textos en `runtime/ui/i18n/*.inc`)
+  verify: prueba pura del estado de la invitación (entra → aviso → aceptar/rechazar/30 s); en juego: A entra a un santuario, a B le sale el aviso, B acepta, aparece en la puerta exterior, entra andando y los dos se ven dentro; con el aviso apagado en ajustes no sale; `i18n_check.py` en 0
+  depende de: T540 (investigación), HE-02 (filtro de mapa en el cliente)
+  quién: agente + orquestador prueba en el juego
+  contexto: Decisión del dueño: cada vez que uno entra a un santuario, al otro le sale "X entró al santuario Y. ¿Unirte?" (aceptar/rechazar, ≈ 30 s; se puede apagar en ajustes). Al aceptar se teletransporta a la entrada exterior y entra andando. Si no había descubierto el santuario, al entrar queda descubierto.
+  pasos:
+    1. Detectar la entrada a un santuario (cambio de mapa a `CDungeon/…`) y su nombre/puerta (de T540).
+    2. Mensaje de aviso al compañero (si hace falta un mensaje nuevo, por T409).
+    3. Al aceptar: teletransporte a la puerta exterior (coordenadas de la lista de santuarios de `places shrine`).
+  hecho cuando: `verify` cumplido.
+  no hagas: no cargues el mapa del santuario a mano (el dueño eligió entrar andando); no fuerces la entrada.
+  modelo sugerido: alto
