@@ -270,7 +270,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## Puerta de la fase 0
 
-- [ ] T214 [integración] Integrar las dos cadenas y pasar la puerta.
+- [~] T214 [integración] Integrar las dos cadenas y pasar la puerta.
+  parcial (2026-11-25): [C][P], oa_statics 0, Docker session; FALTA distro_build, firma y pasada con ventana (aplazado por el dueño; ver bitácora 2026-11-25-F2-cierre.md)
   files: `specs/bitacora/<fecha>-F2-fase0.md`; etiqueta local `f2-fase0`
   verify: en `coop/main`: `make -j8`; `make test-online-gate test-online-wire test-online-net test-online-validate`; en Docker `test-online-session` y `distro_build.sh debian:13`; `$PY tools/coop/oa_statics.py`; pruebas de la línea base de F0 — todo en 0 o igual que en F0; recorrido completo desatendido y con ventana; `firma_log.py --comparar` en 0 (con las diferencias admitidas de T210 y T212 anotadas)
   depende de: T205, T212, T213
@@ -378,7 +379,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## Cierre
 
-- [ ] T221 [integración] Integrar los carriles, verificación final y cierre de F2.
+- [x] T221 [integración] Integrar los carriles, verificación final y cierre de F2.
+  cerrada por decisión del dueño (2026-11-25) con verificaciones aplazadas: `specs/bitacora/2026-11-25-F2-cierre.md`
   files: `specs/bitacora/<fecha>-F2-cierre.md`, `specs/fases/F2-cimientos/verificacion.md`
   verify: los once criterios S1-S11 de `spec.md` con evidencia; todo `verify` de T214 repetido sobre `coop/main` con los carriles integrados; `$PY tools/i18n_check.py` en 0; recorrido completo desatendido y con ventana; el dueño aprueba
   depende de: T215, T216, T217, T218, T219, T220
