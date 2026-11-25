@@ -126,6 +126,17 @@ static void sock_nodelay(sock_t s) {
     setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (const char *)&one, sizeof one);
 }
 
+// a send to a peer that closed returns an error instead of raising SIGPIPE, which would end the process (macOS; Linux
+// has MSG_NOSIGNAL in send_all; Windows has no SIGPIPE)
+static void sock_nosigpipe(sock_t s) {
+#ifdef SO_NOSIGPIPE
+    int one = 1;
+    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (const char *)&one, sizeof one);
+#else
+    (void)s;
+#endif
+}
+
 static void sock_nonblock(sock_t s, bool on) {
 #ifdef _WIN32
     u_long m = on;
@@ -139,8 +150,12 @@ static void sock_nonblock(sock_t s, bool on) {
 // the whole buffer, blocking (false: the connection is gone)
 static bool send_all(sock_t s, const void *p, int n) {
     const char *c = p;
+    int flags = 0;
+#ifdef MSG_NOSIGNAL
+    flags = MSG_NOSIGNAL;  // (a peer that closed: an error, not SIGPIPE)
+#endif
     while (n > 0) {
-        int k = send(s, c, n, 0);
+        int k = send(s, c, n, flags);
         if (k <= 0) return false;
         c += k, n -= k;
     }
@@ -361,6 +376,7 @@ static void srv_loop(Server *sv) {
                 int i = 0;
                 while (i < ONLINE_MAX && sv->c[i].used) i++;
                 sock_nodelay(s);
+                sock_nosigpipe(s);
                 if (i == ONLINE_MAX) {
                     uint8_t why = R_FULL;
                     send_msg(s, M_REJECT, &why, 1, NULL, 0);
@@ -986,6 +1002,7 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             Remote *r = &g.r[p[0]];
             bool was = r->used;
             memset(r, 0, sizeof *r);
+            memset(g.quest_of[p[0]], 0, ONLINE_QUEST_BYTES);  // (a new game in the slot: not the last one's quests)
             r->used = true;
             memcpy(r->name, p + 1, ONLINE_NAME_MAX);
             r->name[ONLINE_NAME_MAX - 1] = 0;
@@ -1092,7 +1109,8 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             int n = p[1];
             for (int k = 0; k < n && 2 + (k + 1) * (int)sizeof(OnlineEnemy) <= len && g.nest_in < 64; k++) {
                 memcpy(&g.est_in[g.nest_in], p + 2 + k * sizeof(OnlineEnemy), sizeof(OnlineEnemy));
-                g.est_in[g.nest_in].name[39] = g.est_in[g.nest_in].as[31] = g.est_in[g.nest_in].weapon[39] = 0;
+                g.est_in[g.nest_in].name[39] = g.est_in[g.nest_in].as[31] = g.est_in[g.nest_in].weapon[39] =
+                    g.est_in[g.nest_in].shield[39] = 0;
                 g.est_from[g.nest_in++] = p[0];
             }
         }
@@ -1152,6 +1170,7 @@ static sock_t cl_connect(const char *host, int port) {
         }
         sock_nonblock(s, false);
         sock_nodelay(s);
+        sock_nosigpipe(s);
     }
     freeaddrinfo(res);
     return s;
@@ -1327,9 +1346,25 @@ static void stop_all(void) {
         pthread_join(g_srv_thread, NULL);
         g_srv_running = false;
     }
+    // everything of the session, so the next one starts as in a fresh process: the players, chat and notices, the
+    // queues both ways, the host's enemies, loot, quests and hour (what stays: the lock, the thread, the status, the
+    // camera; the caller sets the status next)
     pthread_mutex_lock(&g.lock);
-    memset(g.r, 0, sizeof g.r);
-    g.id = -1, g.nchat = g.nout = 0, g.hosting = false, g.ping = 0;
+#define ZERO(f) memset(&g.f, 0, sizeof g.f)
+    ZERO(hosting), ZERO(r), ZERO(ping);
+    ZERO(chat), ZERO(nchat), ZERO(chat_t), ZERO(notice), ZERO(notice_fmt), ZERO(notice_t), ZERO(nnotice);
+    ZERO(outbox), ZERO(nout);
+    ZERO(en);
+    ZERO(hit_out), ZERO(hit_in), ZERO(nhit_out), ZERO(nhit_in);
+    ZERO(est_out), ZERO(est_in), ZERO(est_from), ZERO(nest_out), ZERO(nest_in), ZERO(est_new);
+    ZERO(la_out), ZERO(la_in), ZERO(loots), ZERO(lt_out), ZERO(lt_in);
+    ZERO(nla_out), ZERO(nla_in), ZERO(nlt_out), ZERO(nlt_in), ZERO(nloots), ZERO(loots_new);
+    ZERO(quest_out), ZERO(quest_in), ZERO(quests), ZERO(quest_of);
+    ZERO(quest_out_new), ZERO(quest_in_new), ZERO(quests_have), ZERO(quests_new);
+    ZERO(pick_out), ZERO(pick_in), ZERO(npick_out), ZERO(npick_in);
+    ZERO(host_hour), ZERO(host_hour_t);
+#undef ZERO
+    g.id = -1;
     pthread_mutex_unlock(&g.lock);
     g.stop = false;
 }
