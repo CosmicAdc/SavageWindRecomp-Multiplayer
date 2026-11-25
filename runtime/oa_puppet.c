@@ -263,6 +263,11 @@ bool oa_puppets_validate(void) {
 
 // oa_puppet_frame's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
 static int n;
+// The fairy that revives him (his fxev who 5: oa_sample.c fairy_update): its effects, each in one of his puppet's
+// effect slots (a bit each, by player), live FAIRY_EVENT_NS, not FX_EVENT_NS (a hypothesis, the revival's length:
+// PE-T454-3 measures it)
+#define FAIRY_EVENT_NS 6000000000ull
+static uint8_t g_fairy_q[ONLINE_MAX];
 
 // rt_online_frame, step 18: each other player's Link here, made or dropped, placed and posed, with his armour, gear,
 // horse, effects, shots and bombs. True: a Link of theirs deleted by the game (logged): rt_online_frame forgets
@@ -417,7 +422,8 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
             uint64_t now = plat_now_ns();
             for (int q = 0; q < ONLINE_FX_EVENTS; q++) {
                 uint64_t ep = oa_pup(i)->fxev[q].p;
-                if (ep && now - oa_pup(i)->fxev[q].t > FX_EVENT_NS) {
+                uint64_t life = g_fairy_q[i] >> q & 1 ? FAIRY_EVENT_NS : FX_EVENT_NS;
+                if (ep && now - oa_pup(i)->fxev[q].t > life) {
                     if (VALID(ep) && *(uint32_t *)(uintptr_t)(ep + 0x20) == oa_pup(i)->fxev[q].id)
                         oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], 0, 0, 0, 0, 0);
                     memset(&oa_pup(i)->fxev[q], 0, sizeof oa_pup(i)->fxev[q]);
@@ -475,11 +481,14 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
                             sqrtf((pl[i].pos[0] - link[0]) * (pl[i].pos[0] - link[0]) + (pl[i].pos[2] - link[2]) * (pl[i].pos[2] - link[2])));
                     continue;
                 }
-                uint64_t on = best->who & 1 ? (held ? w : 0) : oa_pup(i)->link;
-                if (!VALID(on)) continue;
+                // (the fairy that revives him, who 5: an actor of its own in his game, with none here - on his puppet,
+                // where he lies, while it runs)
+                bool fairy = best->who == 5, sound = best->who == 2 || best->who == 3;
+                uint64_t on = fairy || !(best->who & 1) ? oa_pup(i)->link : held ? w : 0;
+                if (!VALID(on) || (fairy && !oa_running(on))) continue;
                 // (a sound: on its SLink, the player's / the weapon's: 0x700159f00c, the game's own keyword emit, w2 1 its
                 // SLink alone, x3 the two handles: the SLink's at +0x10)
-                if (best->who >= 2 && !VALID(oa_slink_ui(on))) continue;
+                if (sound && !VALID(oa_slink_ui(on))) continue;
                 // (the same one still playing - sent again, a Champion's ability used again and again - ended first:
                 // they piled up, one over the other)
                 for (int o = 0; o < ONLINE_FX_EVENTS; o++) {
@@ -497,7 +506,35 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
                         oa_call(c, FN_EFFECT_KILL, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], 0, 0, 0, 0, 0);
                 }
                 memset(&oa_pup(i)->fxev[q], 0, sizeof oa_pup(i)->fxev[q]);
-                if (best->who >= 2) {
+                g_fairy_q[i] = (uint8_t)((g_fairy_q[i] & ~(1u << q)) | (unsigned)fairy << q);
+                if (fairy) {
+                    // (by its keyword in his Link's ELink (w2 0, the handle at +0), else by its name there, else as a
+                    // sound by its keyword in his Link's SLink: which one his Link's xlink has, if any, isn't known
+                    // here - logged, PE-T454-3)
+                    struct { uint64_t p; uint32_t id, pad; } hh[2];
+                    const char *how = "ELink keyword";
+                    memset(hh, 0, sizeof hh);
+                    oa_call(c, FN_XLINK_EMIT, on, (uint64_t)(uintptr_t)best->name, 0, (uint64_t)(uintptr_t)hh, 0, 0);
+                    oa_pup(i)->fxev[q].p = hh[0].p, oa_pup(i)->fxev[q].id = hh[0].id;
+                    uint64_t fp = oa_pup(i)->fxev[q].p;
+                    if (!VALID(fp) || *(uint32_t *)(uintptr_t)(fp + 0x20) != oa_pup(i)->fxev[q].id) {
+                        memset(&oa_pup(i)->fxev[q], 0, sizeof oa_pup(i)->fxev[q]);
+                        oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], on, (uint64_t)(uintptr_t)best->name);
+                        how = "ELink name";
+                    }
+                    fp = oa_pup(i)->fxev[q].p;
+                    if ((!VALID(fp) || *(uint32_t *)(uintptr_t)(fp + 0x20) != oa_pup(i)->fxev[q].id) && VALID(oa_slink_ui(on))) {
+                        memset(hh, 0, sizeof hh);
+                        oa_call(c, FN_XLINK_EMIT, on, (uint64_t)(uintptr_t)best->name, 1, (uint64_t)(uintptr_t)hh, 0, 0);
+                        oa_pup(i)->fxev[q].p = hh[1].p, oa_pup(i)->fxev[q].id = hh[1].id;
+                        how = "SLink keyword";
+                    }
+                    fp = oa_pup(i)->fxev[q].p;
+                    bool played = VALID(fp) && *(uint32_t *)(uintptr_t)(fp + 0x20) == oa_pup(i)->fxev[q].id;
+                    if (!played) memset(&oa_pup(i)->fxev[q], 0, sizeof oa_pup(i)->fxev[q]);
+                    LOG("[online] %s: the fairy's %s on his Link: %s (%llx)\n", pl[i].name, best->name,
+                        played ? how : "nothing here plays it", (unsigned long long)fp);
+                } else if (sound) {
                     struct { uint64_t p; uint32_t id, pad; } hh[2];
                     memset(hh, 0, sizeof hh);
                     oa_call(c, FN_XLINK_EMIT, on, (uint64_t)(uintptr_t)best->name, 1, (uint64_t)(uintptr_t)hh, 0, 0);
@@ -506,7 +543,7 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
                     oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&oa_pup(i)->fxev[q], on, (uint64_t)(uintptr_t)best->name);
                 oa_pup(i)->fxev[q].t = now;
                 snprintf(oa_pup(i)->fxev[q].name, sizeof oa_pup(i)->fxev[q].name, "%s", best->name);
-                if (getenv("SAVAGEWIND_ONLINE_FX_LOG")) {
+                if (!fairy && getenv("SAVAGEWIND_ONLINE_FX_LOG")) {
                     static const char *const kinds[4] = {"Link", "weapon", "Link (sound)", "weapon (sound)"};
                     LOG("[online] %s: %s on his %s (%llx)\n", pl[i].name, best->name, kinds[best->who & 3],
                         (unsigned long long)oa_pup(i)->fxev[q].p);
@@ -740,4 +777,5 @@ RT_ON_RESET(oa_puppet_reset) {
     g_pose_n = 0;
     memset(last, 0, sizeof last);
     n = 0;
+    memset(g_fairy_q, 0, sizeof g_fairy_q);
 }

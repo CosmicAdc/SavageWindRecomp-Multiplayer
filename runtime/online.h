@@ -63,7 +63,8 @@ typedef struct { uint32_t hash; float m[12]; } OnlineObj;  // (its map HashId, 0
 typedef struct { uint32_t hash; float m[12]; char as[28]; } OnlineMover;  // (its map HashId, 0 none; where it is; the AS it
                                                                           // plays in slot 0, "" none)
 typedef struct { uint16_t seq; uint8_t who; char name[21]; } OnlineFxEvent;  // (who: 0 his Link, 1 his weapon;
-// 2 his Link's sound, 3 his weapon's)
+// 2 his Link's sound, 3 his weapon's; 4 his ground's (ReactionField's); 5 the fairy's that revives him, played on his
+// puppet)
 #pragma pack(pop)
 #pragma pack(push, 1)
 typedef struct { char name[ONLINE_GRAB_NAME]; float from[3]; float m[12]; } OnlineGrab;
