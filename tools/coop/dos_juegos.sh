@@ -43,7 +43,7 @@ if [ -x "$RAIZ/tools/venv/Scripts/python.exe" ]; then
 else
     PY="python"
 fi
-EXE="$RAIZ/build/savagewind.exe"
+EXE="${SW_EXE:-$RAIZ/build/savagewind.exe}"   # SW_EXE: otro ejecutable (p. ej. el de una etiqueta, para la firma de referencia)
 
 die() { echo "dos_juegos: $*" >&2; exit 1; }
 
