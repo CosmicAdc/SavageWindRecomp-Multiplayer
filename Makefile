@@ -948,3 +948,14 @@ test-quick-replace: $(B)/test_quick_replace
 
 .PHONY: test-quick-replace
 endif
+
+# the online client's handling of what comes from the server (runtime/online.c), without the game or a network
+$(B)/test_online_net: tools/test_online_net.c runtime/online.c $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -O1 -g -fno-strict-aliasing -Wall -Wno-unused-function $(OSFLAGS) -Iruntime -o $@ tools/test_online_net.c \
+	    -lpthread -lm $(if $(filter windows,$(PLATFORM)),-lws2_32)
+
+test-online-net: $(B)/test_online_net
+	$(B)/test_online_net
+
+.PHONY: test-online-net
