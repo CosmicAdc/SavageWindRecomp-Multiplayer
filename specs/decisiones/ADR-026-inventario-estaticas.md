@@ -1,6 +1,7 @@
 # ADR-026 · Inventario de las variables que guardan estado del juego en el código en línea (T211)
 
-- Estado: propuesta del agente de T211 (pendiente de revisión del orquestador y de las dudosas por el dueño)
+- Estado: aceptada con las resoluciones del orquestador sobre las dudosas (2026-11-25, abajo: "Resoluciones"); T212
+  la aplica
 - Tarea: T211 de `fases/F2-cimientos/tasks.md`; la usa T212 (`RT_ON_RESET` en todos los módulos)
 - Código inventariado: `coop/T211` sobre `e6be965` (T210 integrada)
 - Relacionadas: constitución, regla 8; [ADR-023](ADR-023-modulos-oa.md) (los módulos `oa_*`);
@@ -57,7 +58,7 @@ nombre en bloques distintos, la segunda es `nombre#2`, la tercera `nombre#3` (po
 - Una `?` tras la clase marca una dudosa (abajo).
 
 Nada que guarde una dirección del juego está en "permitir" (`no hagas` de T211): los búferes de trabajo que sí las
-guardan van como "puntero?" (dudosa 1).
+guardan iban como "puntero?" (dudosa 1); tras la resolución 1 son "puntero" (se limpian).
 
 ### Comprobación
 
@@ -180,6 +181,24 @@ pasaría al hilo del juego y sus cuatro estáticas cambiarían de hilo.
    (cambio mecánico, como el renombrado de T207). Alternativa: agrupar las de cada función en un `struct` de fichero.
    Las dos tocan el cuerpo, que T212 paso 2 dice no tocar.
 
+## Resoluciones (orquestador, 2026-11-25; las aplica T212)
+
+1. **Dudosa 1: limpiar.** Los cinco búferes de trabajo que guardan direcciones del juego (`oa_call_f:saved`,
+   `oa_call_sret:saved`, `oa_start_event:meta` y `req`, `korok_event:meta`) no se permiten: se suben a nivel de
+   fichero y se limpian en el reset. En la tabla pasan de "puntero?" a "puntero".
+2. **Dudosa 2: permitir.** Se aprueba la categoría "búfer de trabajo" **sin** direcciones del juego, con su motivo en
+   `oa_statics_permitidas.txt` (ya estaban allí).
+3. **Dudosa 3: `<función>_<nombre>`.** Una estática de función que choca al subirla (con otra subida del mismo fichero
+   o con una de fichero que ya existe) se sube como `<función>_<nombre>` (`_2`, `_3` para la segunda y la tercera de la
+   misma función, por orden en el fichero), y dentro de su función solo cambia ese nombre; nada más del cuerpo. Las
+   que no chocan conservan su nombre (T212 paso 2).
+4. **Variables globales sin `static`** (`oa_g_pool`, `oa_g_own`, ...): cuentan, y se limpian igual que las `static`,
+   en el reset del módulo que las define.
+
+Al subirlas, la clave de cada una cambia de `fichero:función:nombre` a `fichero:nombre` (o `fichero:<función>_<nombre>`):
+T212 cambia esas claves en la tabla de abajo (misma clase y motivo) para que `--clasificacion` siga cuadrando. Una
+variable nueva desde T211 (`online.c:g_state_cleared_n`, de T222) se añade a la tabla como "partida".
+
 ## Riesgos y lo que no se ha verificado
 
 - [sin verificar] El escáner es una heurística, no un compilador. Se contrastó con `grep` (toda línea con `static` que
@@ -226,8 +245,8 @@ oa_core.c:oa_g_trunks_gone                   partida   troncos que cortamos
 oa_core.c:oa_g_online_actor                  partida   qué ranuras tienen figura (online_has_actor; lo lee el overlay)
 oa_core.c:oa_actor_name:mod                  permitir  si el overlay tiene online_mod.txt: fichero del overlay mirado una vez (la ruta sale de una variable de entorno)
 oa_core.c:online_actors_on:on                permitir  versión 1.9.0 y overlay, mirados una vez: no cambian en el proceso
-oa_core.c:oa_call_f:saved                    puntero?  copia de los registros del hilo del juego (direcciones del juego); se escribe entera al entrar, antes de leerla: podría permitirse como búfer de trabajo
-oa_core.c:oa_call_sret:saved                 puntero?  como oa_call_f:saved
+oa_core.c:oa_call_f:saved                    puntero   copia de los registros del hilo del juego (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
+oa_core.c:oa_call_sret:saved                 puntero   como oa_call_f:saved
 oa_core.c:oa_g_pool                          puntero   piezas (actores) guardadas de cada jugador
 oa_core.c:g_orphan                           puntero   peticiones huérfanas (handles con unit del juego)
 oa_core.c:oa_g_pool_at                       partida   posición bajo el Link donde se esconden las piezas
@@ -248,8 +267,8 @@ oa_core.c:glider_of:miss                     partida   contador de reintentos de
 oa_core.c:oa_g_actors                        puntero   lista de actores del juego (oa_all_actors)
 oa_core.c:oa_g_theirs                        puntero   botín de los otros hecho aquí (Piece)
 # oa_gamedata.c
-oa_gamedata.c:oa_start_event:meta            puntero?  memoria donde el juego monta los datos del evento (direcciones del juego); se borra al entrar: podría permitirse como búfer de trabajo
-oa_gamedata.c:oa_start_event:req             puntero?  petición de evento con el actor (req.actor); se borra al entrar: podría permitirse como búfer de trabajo
+oa_gamedata.c:oa_start_event:meta            puntero   memoria donde el juego monta los datos del evento (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
+oa_gamedata.c:oa_start_event:req             puntero   petición de evento con el actor (req.actor); búfer de trabajo, pero se limpia (resolución 1)
 oa_gamedata.c:oa_give_heart:name             permitir  cadena constante
 # oa_enemies.c
 oa_enemies.c:enemy_actor:m                   permitir  tabla cargada de enemies.txt
@@ -326,7 +345,7 @@ oa_flags.c:oa_slate_event:tries              partida   intentos del evento de la
 oa_flags.c:oa_slate_event:wait               partida   espera entre intentos
 oa_flags.c:slate_rune:runes                  permitir  tabla constante
 oa_flags.c:korok_event:off                   permitir  desplazamiento del HashId dentro de un actor, descubierto una vez (el mismo en cada arranque de 1.9.0)
-oa_flags.c:korok_event:meta                  puntero?  memoria donde el juego monta los datos del evento (direcciones del juego); se borra al entrar: podría permitirse como búfer de trabajo
+oa_flags.c:korok_event:meta                  puntero   memoria donde el juego monta los datos del evento (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
 oa_flags.c:oa_g_fake_blood_moon              partida   orden `bloodmoon` pendiente (hilo de control → fotograma)
 oa_flags.c:oa_quests_update:m                permitir  tabla de oa_map_load que no se usa (siempre 0)
 oa_flags.c:oa_quests_update:names            permitir  tabla cargada de quests.txt
@@ -575,6 +594,7 @@ online.c:g_equip                             partida   equipo local para enviar.
 online.c:g_equip_t                           partida   su hora. Hilos: juego, red-c
 online.c:g_drop_name                         permitir  tabla constante. Hilo: red-c
 online.c:g_drop_n                            partida   mensajes descartados por tipo. Hilo: red-c (cl_message)
+online.c:g_state_cleared_n                   partida   entradas de STATE anuladas por la validación (T222, después de T211). Hilo: red-c (cl_message)
 online.c:cl_thread:lb                        permitir  búfer de envío: se escribe antes de cada envío. Hilo: red-c
 online.c:cl_thread:next_loots                partida   próximo envío de LOOTS. Hilo: red-c
 online.c:cl_thread:sb                        permitir  búfer de envío. Hilo: red-c
