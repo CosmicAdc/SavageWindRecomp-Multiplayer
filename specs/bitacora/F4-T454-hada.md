@@ -219,3 +219,99 @@ Ninguno es `fx Link`: son **otros emisores** → **H-B confirmada** (el hada es 
 emisor en `oa_sample.c` (la instancia `ui` que emite `ResurrectionFairy`).
 Siguiente: T454-b (who 5 = hada; vigilar los dos emisores mientras Link revive; reproducir en la marioneta con el
 molde de `ReactionField`).
+
+## T454-b: implementación (2026-11-25, agente Opus `coop/T454b` bajo el orquestador)
+
+Commits `de41a83` (código) y `457a26a` (validación). Base `647139b`. Marcas: **[L]** leído, **[S]** prueba sintética,
+**[C]** compilado (`clang -c`), **[H]** hipótesis; **nada visto en el juego**.
+
+### Qué se hizo
+
+**En B, el que muere (`runtime/oa_sample.c`)** [C]
+- Ventana del hada: desde que `oa_g_local_dead` es verdadero (AS `Dead…`) hasta 3 s (`FAIRY_AFTER_NS`, los 180
+  fotogramas de espera tras `back after dying`) después de que deja de serlo (`fairy_update`, `oa_sample.c:246`).
+  No depende de `rt_online_has_fairy`, así que vale igual con hada propia (CU-11 CA-9) [H: que la revivida con hada
+  propia también pase por el AS `Dead…`].
+- En el gancho `rt_online_xlink_emit` (`oa_sample.c:107`), durante la ventana, cada emisión de un emisor **no
+  vigilado** se anota en un anillo propio (`g_fy_ring`, 128) con su instancia y su nombre. El registro de
+  `SAVAGEWIND_ONLINE_FX_ALL` sigue igual.
+- En el bucle (`fairy_update`, dentro de `oa_fx_update`): un emisor que emite un efecto con `Fairy` en el nombre
+  (`ResurrectionFairy`, `Fairy_Light`, `FairyTail`) es candidato. **Se identifica por el nombre, no por la
+  dirección**. `fairy_found` (`oa_sample.c:224`) busca entre los actores el que tiene esa instancia como ELink o SLink,
+  escribe en el registro **el nombre del actor y su distancia** (dato que faltaba de PE-T454-1) y lo acepta si está
+  a menos de 8 m de Link (un hada de una fuente cercana no cuenta); acepta también su otra instancia (ELink/SLink) para
+  que vayan sus sonidos. Si no encuentra el actor, lo acepta igualmente.
+- Lo que emiten los emisores aceptados, **incluido lo anotado hasta 0,5 s antes** (`Appear` sale antes que
+  `ResurrectionFairy` del mismo emisor), entra en `fxev` con `who` 5. Un mismo nombre no se repite en 1 s. Nombres de
+  21 o más se descartan (los cuatro conocidos miden ≤ 17).
+- Todo el estado nuevo se limpia en `RT_ON_RESET(oa_sample_reset)`; `oa_statics.py`: 374 variables, pendientes 0.
+
+**En A, el que mira (`runtime/oa_puppet.c`)** [C]
+- `who` 5 se reproduce sobre la marioneta de B (su Link aquí, con `oa_running`), es decir, en su posición: primero
+  por palabra clave en su ELink (`FN_XLINK_EMIT`, w2 0), si no por nombre (`FN_EFFECT_EMIT`), si no como sonido por
+  palabra clave en su SLink (w2 1). Siempre escribe una línea:
+  `[online] <B>: the fairy's <efecto> on his Link: <ELink keyword | ELink name | SLink keyword | nothing here plays it> (<handle>)`.
+- Viven `FAIRY_EVENT_NS` = 6 s en lugar de 2 s (una máscara por jugador, `g_fairy_q`, limpia en el `RT_ON_RESET`).
+- **Diferencia con el molde de `ReactionField`**: allí se emite sobre el `ReactionField` de A y se mueve el efecto
+  a la posición de la marioneta. Aquí A no tiene ningún actor del hada, así que el único emisor disponible es la propia
+  marioneta, que ya está en la posición de B; no se mueve nada.
+
+**Validación (fuera de los `files:` del encargo, aprobado por el orquestador)**
+- `runtime/online_validate.h`: `ONLINE_V_FXEV_WHO_MAX` 4 → 5. Sin esto el receptor ponía a cero todo `who` 5.
+- `tools/test_online_validate.c` (cota del campo) y `specs/contratos/validacion-red.md` (`who > 5`).
+- `runtime/online.h`: solo el comentario de `who`. **Sin cambio de formato ni de `PROTOCOL`**: un par sin este cambio
+  descarta el `who` 5 (no lo reproduce), sin más efecto.
+
+### Pruebas ejecutadas
+
+- `clang -c` de `oa_sample.c`, `oa_puppet.c` y `online.c` con las opciones del encargo: sin avisos [C].
+- `make CC=clang B=<temporal> GEN=/nonexistent test-online-net test-online-wire test-online-validate test-online-gate`:
+  328, 16647 y 181510 comprobaciones, 0 fallos; `online gate: ok` [S].
+- `tools/coop/oa_statics.py`: `pendientes: 0` [S].
+
+### Riesgo principal [H]
+
+El efecto del hada pertenece al xlink del **actor del hada**, no al de Link. Si el xlink del jugador no tiene esos
+nombres, A escribirá `nothing here plays it` y no se verá nada. Eso **no** se puede saber sin el juego. Si pasa, la
+salida es T454-c: crear en A el actor del hada (su nombre lo da ahora la línea `[online] fairy: <actor>'s …` de B)
+junto a la marioneta y emitir sobre él, como ya se hace con `ReactionField`.
+
+### PE-T454-3 (la prueba en el juego, para el orquestador)
+
+Preparación: dos equipos (o dos instancias) con este build, 1.9.0, A anfitrión y B invitado, en la misma zona y a
+menos de 20 m. Los dos con `SAVAGEWIND_ONLINE_FX_LOG=1` y `SAVAGEWIND_ONLINE_LIFE_LOG=1`; B además con
+`SAVAGEWIND_ONLINE_FX_ALL=1`. Anotar FPS, GPU/controlador y ajustes.
+
+1. **Revivida por la regla (B sin hada).** Regla `revive` activa en A. B sin hadas en la bolsa. B arranca con
+   `SAVAGEWIND_ONLINE_DIE_TEST=180` (pone su vida a 0 a los 180×30 actualizaciones del juego, unos 3 min; o dejarse
+   matar). A mira a B.
+   - B.log, en orden: `[online] Link died: revived by a fairy (online play)`; una o más
+     `[online] fairy: <actor>'s <efecto> (<ui>), <d> m from Link: the one that revives him, sent` (**anotar el
+     nombre del actor y la distancia**); `[online] fx fairy: Appear`, `… ResurrectionFairy`, `… Fairy_Light`,
+     `… FairyTail` (los que salgan); `[online] back after dying`.
+   - A.log: una línea `[online] <B>: the fairy's <efecto> on his Link: <cómo> (<handle>)` por cada efecto. **Anotar
+     `<cómo>`** de cada uno.
+   - Pantalla de A: ¿se ve la luz/estela del hada sobre B mientras cae y se levanta? ¿Cuánto dura en B y en A
+     (segundos)? (fija `FAIRY_EVENT_NS`).
+2. **Hada propia (CU-11 CA-9).** En el equipo de A (o de B), `python tools/swctl.py give Animal_Insect_F 1`
+   (**sin verificar** que `give` acepte ese objeto; si no, coger un hada a mano) y morir con ella en la bolsa
+   (`SAVAGEWIND_ONLINE_DIE_TEST` o dejarse matar). Esperado: en su log **no** sale `revived by a fairy (online play)`
+   (el hada es suya), pero sí las líneas `[online] fairy: …` y `fx fairy: …`; el otro ve la revivida y su log tiene
+   las líneas `the fairy's …`.
+3. **Sin falsos positivos.** Con un hada suelta cerca (fuente de las hadas) y sin morir: ninguna línea
+   `[online] fairy:` ni `fx fairy:`. Morir junto a la fuente: si sale `… m from Link: not his, not sent` para un hada
+   ajena, es lo esperado.
+4. **Regla apagada.** Regla `revive` desactivada, B sin hada: fin de partida en B como siempre; en A ninguna línea
+   `the fairy's`.
+
+Resultado aceptado: en 1 y 2, el compañero **ve** la animación del hada (no solo la caída) y ningún cuelgue. Si
+todas las líneas de A dicen `nothing here plays it`, la tarea no está hecha: pasar a T454-c con el nombre del actor.
+
+### NO verificado
+
+- Nada de esto se ha visto en el juego: ni que la ventana `Dead…` cubra la revivida, ni que los emisores se
+  identifiquen, ni que la marioneta de A tenga esos efectos en su xlink, ni la duración (6 s es una suposición).
+- Que una revivida con hada propia pase por el AS `Dead…` (si no, la ventana no se abre).
+- Que `FN_XLINK_EMIT` / `FN_EFFECT_EMIT` con un nombre que el xlink no tiene no hagan nada malo (el `who` 4 ya lo
+  hace con nombres cualesquiera; se supone igual).
+- No se enlazó ni se ejecutó el juego; no se ejecutó `make` sin objetivo.
