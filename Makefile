@@ -982,6 +982,29 @@ test-online-names: $(B)/test_online_names
 
 .PHONY: test-online-names
 
+# The online wire (runtime/online.c) without the game or a network: how a byte stream is cut into messages and how
+# SKEL packs a bone
+$(B)/test_online_wire: tools/test_online_wire.c runtime/online.c runtime/online_wire.h $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -O1 -g -fno-strict-aliasing -Wall -Wno-unused-function $(OSFLAGS) -Iruntime -o $@ tools/test_online_wire.c \
+	    -lpthread -lm $(if $(filter windows,$(PLATFORM)),-lws2_32)
+
+test-online-wire: $(B)/test_online_wire
+	$(B)/test_online_wire
+
+.PHONY: test-online-wire
+
+# The network validation layer (runtime/online_validate.h, T213) without the game or a network: each structure the
+# online client keeps, described again by the test; one bad value per field, and 100 000 random ones (a fixed seed)
+$(B)/test_online_validate: tools/test_online_validate.c runtime/online_validate.c $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -std=gnu11 -O1 -g -Wall $(OSFLAGS) -Iruntime -o $@ tools/test_online_validate.c runtime/online_validate.c -lm
+
+test-online-validate: $(B)/test_online_validate
+	$(B)/test_online_validate
+
+.PHONY: test-online-validate
+
 # The online server's session state machine (runtime/online.c srv_message / srv_drop) over socketpairs: POSIX only
 ifeq ($(PLATFORM),windows)
 test-online-session:

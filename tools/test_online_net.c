@@ -342,6 +342,235 @@ static void test_lists_not_finite_dropped(void) {
     stop_all();
 }
 
+// ---- payloads too short, counters too high (T203)
+// Every type cl_message handles: with a payload one byte shorter than its minimum nothing changes, whatever the
+// session holds; at the minimum something does (so the short one proves something). "Nothing changes" is the whole
+// of g, byte for byte (the clock is fixed, so nothing in it moves by itself).
+static uint8_t cbuf[1 << 17];  // (room for 255 enemies of 311 bytes: beyond any real frame, on purpose)
+static unsigned char snap[sizeof g];
+
+static void take_snap(void) {
+    pthread_mutex_lock(&g.lock);
+    memcpy(snap, &g, sizeof g);
+    pthread_mutex_unlock(&g.lock);
+}
+
+static bool snap_same(void) {
+    pthread_mutex_lock(&g.lock);
+    bool same = !memcmp(snap, &g, sizeof g);
+    pthread_mutex_unlock(&g.lock);
+    return same;
+}
+
+// a session in which the message under test could do something: host or guest, a player in slot 1
+static void prepare(bool hosting) {
+    set_connected();
+    if (hosting) {
+        pthread_mutex_lock(&g.lock);
+        g.hosting = true;
+        pthread_mutex_unlock(&g.lock);
+    }
+    CHECK(send_join(1, "Bot"));
+}
+
+// the message `type` of `minlen` bytes (first byte `first`, then `fill`): one byte short changes nothing, whole does
+static void short_vs_whole_first(const char *what, uint8_t type, bool hosting, int minlen, uint8_t fill, uint8_t first) {
+    prepare(hosting);
+    memset(cbuf, fill, sizeof cbuf);
+    cbuf[0] = first;
+    take_snap();
+    bool ok = cl_message(type, cbuf, minlen - 1);
+    checks++;
+    if (!ok || !snap_same()) failures++, printf("FAIL %s: a payload of %d bytes changed something\n", what, minlen - 1);
+    ok = cl_message(type, cbuf, minlen);
+    checks++;
+    if (!ok || snap_same()) failures++, printf("FAIL %s: a payload of %d bytes changed nothing\n", what, minlen);
+}
+
+// (first byte the slot 1: what the server puts in front of most messages)
+static void short_vs_whole(const char *what, uint8_t type, bool hosting, int minlen, uint8_t fill) {
+    short_vs_whole_first(what, type, hosting, minlen, fill, 1);
+}
+
+static void test_short_payload_ignored(void) {
+    short_vs_whole("JOIN", M_JOIN, false, 1 + ONLINE_NAME_MAX, 0);
+    short_vs_whole("LEAVE", M_LEAVE, false, 1, 0);
+    short_vs_whole("STATE", M_STATE, false, 1 + (int)sizeof(WireState), 0);
+    short_vs_whole("EQUIP", M_EQUIP, false, 1 + (int)sizeof(WireEquip), 'A');
+    short_vs_whole("CHAT", M_CHAT, false, 2, 'x');
+    short_vs_whole("TIME", M_TIME, false, 4, 0);
+    short_vs_whole("PONG", M_PONG, false, 8, 0);
+    short_vs_whole("QUESTS", M_QUESTS, false, ONLINE_QUEST_BYTES, 0);
+    short_vs_whole("HIT", M_HIT, false, 9, 0);
+    // (PICK has no slot in front: its first byte is the weapon's name's, so a slot 1 there would be a name "\x01",
+    // which the validation layer refuses; "W" is a name, the rest zeros: its end and a position at the origin)
+    short_vs_whole_first("PICK", M_PICK, false, 52, 0, 'W');
+    short_vs_whole("LOOT_ADD", M_LOOT_ADD, true, 1 + (int)sizeof(OnlineLoot), 0);
+    short_vs_whole("LOOT_TAKE", M_LOOT_TAKE, true, 5, 0);
+    short_vs_whole("QUEST", M_QUEST, true, 1 + ONLINE_QUEST_BYTES, 0);
+
+    // WELCOME: with no slot in it the session is not welcomed (what the status line says changes with any WELCOME,
+    // so this one compares the slot and the state, not all of g)
+    stop_all();
+    pthread_mutex_lock(&g.lock);
+    g.state = ONLINE_CONNECTING;
+    pthread_mutex_unlock(&g.lock);
+    memset(cbuf, 0, 4);
+    CHECK(cl_message(M_WELCOME, cbuf, 0));
+    CHECK(g.id == -1 && g.state == ONLINE_CONNECTING);
+    cbuf[0] = ONLINE_MAX;  // (a slot that does not exist: the same)
+    CHECK(cl_message(M_WELCOME, cbuf, 1));
+    CHECK(g.id == -1 && g.state == ONLINE_CONNECTING);
+    cbuf[0] = 3;
+    CHECK(cl_message(M_WELCOME, cbuf, 1));
+    CHECK(g.id == 3 && g.state == ONLINE_CONNECTED);
+
+    // REJECT has no minimum: with nothing in it it is a refusal all the same (the session ends)
+    set_connected();
+    CHECK(!cl_message(M_REJECT, cbuf, 0));
+    CHECK(g.state == ONLINE_FAILED);
+    stop_all();
+}
+
+// SKEL: a payload one byte short of what its bone counts say changes nothing; n + nbow above 160 changes nothing
+static void test_skel_short_and_counts(void) {
+    const int bone = SKEL_BONE_BYTES;
+    // one bone of Link's: slot, 2 counts, 12 bytes
+    prepare(false);
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[0] = 1, cbuf[1] = 1, cbuf[2] = 0;
+    take_snap();
+    CHECK(cl_message(M_SKEL, cbuf, 3 + bone - 1));
+    CHECK(snap_same());
+    CHECK(cl_message(M_SKEL, cbuf, 2));  // (the counts and no bone at all)
+    CHECK(snap_same());
+    CHECK(cl_message(M_SKEL, cbuf, 1));
+    CHECK(snap_same());
+    CHECK(cl_message(M_SKEL, cbuf, 0));
+    CHECK(snap_same());
+    CHECK(cl_message(M_SKEL, cbuf, 3 + bone));  // (whole: it is kept)
+    CHECK(!snap_same());
+    CHECK(g.r[1].skn == 1 && g.r[1].sk[0].n == 1);
+
+    // counts above the 160 bones there are: dropped, with all the bytes they ask for there
+    const int over[][2] = {{161, 0}, {160, 1}, {100, 61}, {129, 32}, {255, 255}, {0, 161}};
+    for (size_t k = 0; k < sizeof over / sizeof *over; k++) {
+        prepare(false);
+        memset(cbuf, 0, sizeof cbuf);
+        cbuf[0] = 1, cbuf[1] = (uint8_t)over[k][0], cbuf[2] = (uint8_t)over[k][1];
+        take_snap();
+        int need = 3 + (over[k][0] + over[k][1]) * bone;
+        CHECK(need <= (int)sizeof cbuf);
+        CHECK(cl_message(M_SKEL, cbuf, need));
+        CHECK(snap_same());
+        CHECK(g.r[1].skn == 0);
+    }
+    // and the most there is, 160, is kept
+    prepare(false);
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[0] = 1, cbuf[1] = 128, cbuf[2] = 32;
+    CHECK(cl_message(M_SKEL, cbuf, 3 + ONLINE_BONES * bone));
+    CHECK(g.r[1].skn == 1 && g.r[1].sk[0].n == 128 && g.r[1].sk[0].nbow == 32);
+    stop_all();
+}
+
+// ENEMIES: a count above 32 is dropped whole (all its bytes there or not); one byte short of its entries is too
+static void test_enemies_counts(void) {
+    static OnlineEnemy en[ONLINE_ENEMIES + 8];
+    float centre[3];
+    uint64_t age;
+    const int esz = (int)sizeof(OnlineEnemy);
+
+    set_connected();
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[12] = 1;
+    CHECK(cl_message(M_ENEMIES, cbuf, 13 + esz - 1));  // (one entry, one byte short)
+    CHECK(online_enemies(centre, en, &age) == -1);
+    CHECK(cl_message(M_ENEMIES, cbuf, 12));  // (not even the count)
+    CHECK(online_enemies(centre, en, &age) == -1);
+    CHECK(cl_message(M_ENEMIES, cbuf, 0));
+    CHECK(online_enemies(centre, en, &age) == -1);
+    const int over[] = {ONLINE_ENEMIES + 1, 64, 255};
+    for (size_t k = 0; k < sizeof over / sizeof *over; k++) {
+        set_connected();
+        memset(cbuf, 0, sizeof cbuf);
+        cbuf[12] = (uint8_t)over[k];
+        int need = 13 + over[k] * esz;
+        CHECK(need <= (int)sizeof cbuf);
+        CHECK(cl_message(M_ENEMIES, cbuf, need));  // (all the bytes it asks for are there)
+        CHECK(online_enemies(centre, en, &age) == -1);
+        CHECK(cl_message(M_ENEMIES, cbuf, need - 1));  // (and one short of them)
+        CHECK(online_enemies(centre, en, &age) == -1);
+    }
+    set_connected();  // (the most there is: kept)
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[12] = ONLINE_ENEMIES;
+    CHECK(cl_message(M_ENEMIES, cbuf, 13 + ONLINE_ENEMIES * esz));
+    CHECK(online_enemies(centre, en, &age) == ONLINE_ENEMIES);
+    stop_all();
+}
+
+// LOOTS: a count above 64 is dropped whole; one byte short of its entries is too
+static void test_loots_counts(void) {
+    static OnlineLoot loots[ONLINE_LOOT + 8];
+    const int lsz = (int)sizeof(OnlineLoot);
+
+    set_connected();
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[0] = 1;
+    CHECK(cl_message(M_LOOTS, cbuf, 1 + lsz - 1));
+    CHECK(online_loots(loots) == 0);
+    CHECK(cl_message(M_LOOTS, cbuf, 0));
+    CHECK(online_loots(loots) == 0);
+    const int over[] = {ONLINE_LOOT + 1, 100, 255};
+    for (size_t k = 0; k < sizeof over / sizeof *over; k++) {
+        set_connected();
+        memset(cbuf, 0, sizeof cbuf);
+        cbuf[0] = (uint8_t)over[k];
+        int need = 1 + over[k] * lsz;
+        CHECK(need <= (int)sizeof cbuf);
+        CHECK(cl_message(M_LOOTS, cbuf, need));
+        CHECK(online_loots(loots) == 0);
+        CHECK(cl_message(M_LOOTS, cbuf, need - 1));
+        CHECK(online_loots(loots) == 0);
+    }
+    set_connected();
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[0] = ONLINE_LOOT;
+    CHECK(cl_message(M_LOOTS, cbuf, 1 + ONLINE_LOOT * lsz));
+    CHECK(online_loots(loots) == ONLINE_LOOT);
+    stop_all();
+}
+
+// ESTATE (the host's game): one byte short of its first entry, nothing; a count that claims more than the payload
+// holds gives what it holds; entries beyond the 64 the host keeps are not kept
+static void test_estate_counts(void) {
+    static OnlineEnemy in[64 + 8];
+    uint8_t from[64 + 8];
+    const int esz = (int)sizeof(OnlineEnemy);
+
+    set_connected();
+    pthread_mutex_lock(&g.lock);
+    g.hosting = true;
+    pthread_mutex_unlock(&g.lock);
+    memset(cbuf, 0, sizeof cbuf);
+    cbuf[0] = 1, cbuf[1] = 1;
+    CHECK(cl_message(M_ESTATE, cbuf, 2 + esz - 1));
+    CHECK(online_take_estates(in, from, 64) == 0);
+    CHECK(cl_message(M_ESTATE, cbuf, 1));
+    CHECK(cl_message(M_ESTATE, cbuf, 0));
+    CHECK(online_take_estates(in, from, 64) == 0);
+    cbuf[1] = 255;  // (it claims 255; the payload holds two)
+    CHECK(cl_message(M_ESTATE, cbuf, 2 + 2 * esz));
+    CHECK(online_take_estates(in, from, 64) == 2);
+    cbuf[1] = 70;  // (seventy entries there: 64 are kept)
+    CHECK(2 + 70 * esz <= (int)sizeof cbuf);
+    CHECK(cl_message(M_ESTATE, cbuf, 2 + 70 * esz));
+    CHECK(g.nest_in == 64);
+    CHECK(online_take_estates(in, from, 64 + 8) == 64);
+    stop_all();
+}
+
 int main(void) {
     test_state_reaches_players();
     test_state_without_join_ignored();
@@ -352,6 +581,11 @@ int main(void) {
     test_time_range();
     test_hit_negative_dropped();
     test_lists_not_finite_dropped();
+    test_short_payload_ignored();
+    test_skel_short_and_counts();
+    test_enemies_counts();
+    test_loots_counts();
+    test_estate_counts();
     stop_all();
     printf("test_online_net: %d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

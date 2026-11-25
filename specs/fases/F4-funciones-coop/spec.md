@@ -49,6 +49,7 @@ contraseña de sesión es opcional (`[DUEÑO]` ADR-007, decisión 12; el acceso 
 | CU-11 Revivir al compañero | Reanimación automática instantánea por hada (OA:2825-2831) | Primera entrega: reanimación automática mientras el compañero siga en pie; si caen los dos, fin de partida normal. El rescate manual (estado "caído") queda planificado para después |
 | CU-12 PvP por acuerdo, daño validado | Interruptor por jugador; el atacante declara el daño en su STATE y la víctima lo aplica (OA:2874-2942) | Acuerdo mutuo como regla de sesión, que el anfitrión puede prohibir; el anfitrión valida cada golpe; solo cuerpo a cuerpo y bombas |
 | CU-15 Amenaza de los enemigos (ADR-012) | El enemigo es del más cercano, o del último que le golpeó desde menos de 80 m (OA:2520-2623) | El enemigo pasa a quien más daño le hace, con el más cercano como desempate; se conservan los 80 m y los 10 s sin cambiar de dueño |
+| CU-16 El compañero en el minimapa (ADR-022) | No existe; el compañero solo se ve por la flecha de borde de pantalla y la lista | Flecha con su color y forma dibujada encima del minimapa, marca pegada al borde con distancia si queda fuera de alcance; el minimapa se mide antes (T445). El mapa grande no entra |
 
 Además (forma parte de CU-06/CU-07): las recompensas de santuario son **para los dos**. El contenido de un cofre es
 **de quien lo abre**, que puede soltarlo marcado para el compañero; se revisa después de probarlo (`[DUEÑO]` ADR-008,
@@ -77,6 +78,7 @@ ADR-007, decisión 9).
 | L | Rescate manual: estado "caído" esperando al compañero (**entrega posterior, prioridad baja**) | **Sí** |
 | M | PvP por acuerdo y daño validado por el anfitrión | No |
 | N | Amenaza de los enemigos: dueño por daño, calculado por el anfitrión (CU-15) | No |
+| O | El compañero en el minimapa: flecha encima del minimapa y marca de borde (CU-16, ADR-022) | No (se mide el minimapa en T445; investigación delante: **No**) |
 
 Los elementos H, I y L tienen una tarea de investigación delante y **no forman parte de la primera entrega** de F4
 (`[DUEÑO]` ADR-007, decisiones 7 y 10; ADR-009, decisión 24): la fase se cierra sin ellos. Sus tareas se conservan,
@@ -86,8 +88,9 @@ con prioridad baja.
 
 - Teletransporte entre mapas, jugar santuarios y Bestias Divinas juntos, momentos de historia, tinte 3D del segundo
   Link, colisión física con el compañero, más de 2 jugadores: F5.
-- Marcadores en el mapa o minimapa del propio juego (es un layout nativo; hoy el runtime solo sabe reconocerlo,
-  mapa 04 §4a): F5 o posterior.
+- Marcadores en el **mapa grande** del propio juego (es un layout nativo; hoy el runtime solo sabe reconocerlo,
+  mapa 04 §4a): F5 o posterior (T447, sin fecha). El **minimapa** sí entra, dibujado encima (elemento O, ADR-022). Pines
+  o marcas reales del juego: descartados (se guardan en la partida).
 - Flechas y runas en PvP (`[DUEÑO]` ADR-008, decisión 17), derribo real.
 - Dar o marcar para el compañero armas, arcos y escudos, hasta que la durabilidad y las bonificaciones viajen por
   la red (cambio de protocolo con su subida de versión). Nunca se envían rupias ni los objetos que el juego ya
@@ -177,7 +180,8 @@ con prioridad baja.
   registra, OA:5999).
 - **R4-22** Tamaño de texto del overlay ajustable; ningún estado depende solo del color.
 - **R4-35** `[DUEÑO]` (ADR-011, decisión 41) No hay marcador en el mapa del propio juego en F4: junto a la flecha en pantalla
-  se muestran la distancia y el **nombre del mapa** del compañero. Se estudia después.
+  se muestran la distancia y el **nombre del mapa** del compañero. Se estudia después. (ADR-022 **amplía** esta decisión: el
+  **minimapa** sí muestra al compañero, dibujado encima; ver R4-37. El mapa grande sigue fuera de F4.)
 
 ### K–L. Revivir
 
@@ -208,6 +212,15 @@ con prioridad baja.
   la vida que baja; nunca a un jugador a más de 80 m, ni más de un cambio de dueño cada 10 s. Sin golpes, la regla
   de cercanía de hoy no cambia.
 
+### O. El compañero en el minimapa (CU-16)
+
+- **R4-37** `[DUEÑO]` (ADR-022, decisiones 1 a 4; amplía ADR-011, decisión 41) El compañero se ve en el **minimapa** del
+  juego como una **flecha pequeña con su color y forma** (los 8 de R4-18) que apunta hacia donde mira, **dibujada
+  encima** por la capa de UI del runtime, sin tocar el layout del juego ni el guardado. Fuera del alcance del minimapa:
+  marca pegada al borde del círculo, en su dirección, con la distancia al lado. No se dibuja en otro mapa, santuario o
+  mazmorra, con el minimapa oculto o animando hacia el mapa grande, con el HUD apagado o en modo pro, ni con menús
+  abiertos. El mapa grande de pausa sigue fuera de F4.
+
 ## 5. Criterios de salida (medibles)
 
 | # | Criterio | Cómo se mide |
@@ -229,6 +242,7 @@ con prioridad baja.
 | S15 | Regresión | Recorrido de 30 minutos de F1 sin crash |
 | S16 | Ponerse al día al entrar | Un invitado con perfil cooperativo recién creado entra en un mundo avanzado: mismos contenedores de corazón y mejoras de resistencia que el anfitrión, habilidades de campeón ya ganadas, inventario vacío; al volver a entrar no recibe nada por segunda vez |
 | S17 | Amenaza de los enemigos | CU-15 CA-2 a CA-5 con `tools/coop/threat_run.sh` (0 traspasos al que hace menos daño, 1 al que hace más, 0 a más de 80 m) y CA-6 con dos juegos: el enemigo se vuelve hacia quien dispara en < 12 s |
+| S18 | Compañero en el minimapa | CU-16 CA-3 a CA-10 con captura de ventana (`SAVAGEWIND_WINDOW_SHOT`): la flecha del compañero cae en su sitio del minimapa con un error ≤ ±6 px a 1080p (±0,6 % del alto en otras resoluciones), en 16:9 y en ultrawide; marca de borde con distancia fuera de alcance; nada en otro mapa, con el minimapa oculto o animando, con el HUD apagado o con menús abiertos; el guardado no cambia (CA-13) |
 
 ## 6. Riesgos
 
@@ -250,6 +264,7 @@ con prioridad baja.
 | 14 | No hay en el código una vía para fijar la resistencia máxima; para los corazones solo existe `give_heart` (OA:3763), que entrega un contenedor cada vez **[sin verificar que sirva para igualar]** | Primer paso de T442: comprobarlo; si falta, parar y abrir investigación |
 | 15 | Un arma soltada llega hoy al otro jugador por el botín de suelo, solo con su nombre (DOC:528-547) | R4-31: impedirlo o documentarlo en T423 |
 | 16 | Más cambios de dueño de enemigos con la amenaza: cada uno borra el enemigo en un juego y lo crea en otro | Margen de 1,5, 10 s de `hold` y CU-15 CA-9 |
+| 17 | El minimapa del juego cambia de escala, de giro o de sitio según el formato de pantalla, `hud_size`/`hud_edges` o el zoom, y la flecha cae en un sitio falso | T445 lo mide antes (16:9 y ultrawide, ajustes alterados); constantes por proporción de pantalla; sin medida fiable no se dibuja (CU-16) |
 
 ## 7. Preguntas para el dueño
 
@@ -274,3 +289,4 @@ Siguen abiertas (se construye con su valor por defecto y se anota):
 | P4-10 | Al ponerse al día (R4-28): ¿los orbes que el anfitrión tiene **sin canjear** también se entregan al invitado? Los ADR solo hablan de contenedores y mejoras ya canjeados | No se entregan | T442 |
 | P4-11 | Un invitado que **vuelve** a un mundo que avanzó sin él: ¿se le iguala otra vez al anfitrión o recibe los hitos que se perdió? | Recibe los hitos que se perdió (orbes, contenedores, habilidades), por el libro de entregas; así conserva su propio reparto entre corazones y resistencia | T442 |
 | P4-12 | Amenaza (CU-15, Q-15-1 a Q-15-4): peso de una flecha frente a un golpe, margen para quitar el enemigo, memoria y distancia a la que el líder lo conserva | Mismo peso por punto de daño; 1,5 veces; semivida de 8 s; hasta 80 m | T443 |
+| P4-13 | Compañero en el minimapa (CU-16, Q-16-1 a Q-16-8): altura, tamaño de la flecha, orientación, interruptor, distancia en el borde, atenuación en pausa, varias personas, zoom | Solo horizontal; 3 % del alto; según la medida de T445; "Show partner on minimap" activado; metros redondeados; atenuada en pausa; una flecha por compañero; solo en el zoom por defecto | T446 |

@@ -30,12 +30,12 @@ static void remove_list(const char *file) {
 static bool loot(const char *n) {
     char f[40] = {0};
     snprintf(f, sizeof f, "%s", n);
-    return loot_name_listed(f, sizeof f);
+    return oa_loot_name_listed(f, sizeof f);
 }
 static bool weapon(const char *n) {
     char f[40] = {0};
     snprintf(f, sizeof f, "%s", n);
-    return weapon_name_listed(f, sizeof f);
+    return oa_weapon_name_listed(f, sizeof f);
 }
 
 int main(int argc, char **argv) {
@@ -101,10 +101,10 @@ int main(int argc, char **argv) {
     // ---- a field not ended within its bytes is no name
     char full[16];
     memcpy(full, "Item_Fruit_A....", sizeof full);
-    CHECK(!loot_name_listed(full, sizeof full));
+    CHECK(!oa_loot_name_listed(full, sizeof full));
     memcpy(full, "Item_Fruit_A\0...", sizeof full);
-    CHECK(loot_name_listed(full, sizeof full));
-    CHECK(!loot_name_listed("Item_Fruit_A", 12));  // (its 0 just past the field's bytes)
+    CHECK(oa_loot_name_listed(full, sizeof full));
+    CHECK(!oa_loot_name_listed("Item_Fruit_A", 12));  // (its 0 just past the field's bytes)
 
     // ---- read once: the files changing afterwards change nothing
     write_list("items.txt", "Item_Other=Item\n");

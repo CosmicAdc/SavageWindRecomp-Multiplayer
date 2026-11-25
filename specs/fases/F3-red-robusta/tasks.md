@@ -388,7 +388,8 @@ adivinar, para y pregunta: no inventes.
 
 ## Bloque 4 — Módulos puros (paralelo; cada uno en ficheros nuevos)
 
-- [ ] T320 [P] [módulo] Cubo de fichas con reloj inyectado
+- [~] T320 [P] [módulo] Cubo de fichas con reloj inyectado
+  reclamada: agente Sonnet modulos-f3 (coop/F3MOD, en curso; adelantada)
   files: runtime/online_ratelimit.c, runtime/online_ratelimit.h, tests/test_online_ratelimit.c
   verify: `clang -Wall -Iruntime tests/test_online_ratelimit.c runtime/online_ratelimit.c -o build/test_online_ratelimit && build/test_online_ratelimit` sale con 0
   depende de: ninguna
@@ -421,7 +422,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no inventes un algoritmo propio; no uses `rand()`/`srand()`; si `online_auth_random` falla, no sigas con ceros: devuelve error.
   modelo sugerido: alto
 
-- [ ] T322 [P] [módulo] Código de invitación (dirección + puerto ↔ texto)
+- [~] T322 [P] [módulo] Código de invitación (dirección + puerto ↔ texto)
+  reclamada: agente Sonnet modulos-f3 (coop/F3MOD, en curso; adelantada)
   files: runtime/online_invite.c, runtime/online_invite.h, tests/test_online_invite.c
   verify: `clang -Wall -Iruntime tests/test_online_invite.c runtime/online_invite.c -o build/test_online_invite && build/test_online_invite` sale con 0
   depende de: ninguna
@@ -500,7 +502,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no resuelvas nombres (nada de `getaddrinfo`) en este módulo; no devuelvas direcciones de bucle local; no toques `online.c` (lo integrará el carril UI/núcleo).
   modelo sugerido: medio
 
-- [ ] T327 [P] [módulo] Estadísticas de calidad de red
+- [~] T327 [P] [módulo] Estadísticas de calidad de red
+  reclamada: agente Sonnet modulos-f3 (coop/F3MOD, en curso; adelantada)
   files: runtime/online_netstat.c, runtime/online_netstat.h, tests/test_online_netstat.c
   verify: `clang -Wall -Iruntime tests/test_online_netstat.c runtime/online_netstat.c -lm -o build/test_online_netstat && build/test_online_netstat` sale con 0
   depende de: ninguna

@@ -63,7 +63,7 @@ Defectos vistos (cada uno: qué, dónde, cuántas veces):
 - [x] `make test-online-net` → 0. Número de casos: `162 checks, 0 failed` (`fe68382`).
 - [x] `make test-online-names` → 0 (`39 checks, 0 failures`, `fe68382`).
 - [x] `tools/i18n_check.py` → 0 (`0 missing` en los 13 idiomas, `fe68382`).
-- [ ] Pruebas de la línea base de F0 (`F0/verificacion.md` §3): mismo resultado o mejor. Diferencias: pendiente de re-ejecutar todas juntas en `T120` (en `coop/TESTS` ya se corrigieron `launch-flags` y `gyro`; `test-actions` pendiente de confirmar en Windows).
+- [ ] Pruebas de la línea base de F0 (`F0/verificacion.md` §3): mismo resultado o mejor. Diferencias: pendiente de re-ejecutar todas juntas en `T120` (en `coop/TESTS` ya se corrigieron `launch-flags` y `gyro`; `test-actions` falla solo por entorno: `TMP`/`TEMP` vacías bajo el `make` de MSYS2 lanzado desde Git Bash; con `TMP` pasa, ver `bitacora/2026-11-24-F2-adelanto-escritura.md`). Resto de F0 en 0 (`250a25a`).
 - [x] `make -j8` en Windows → termina (`fe68382`).
 - [ ] `ENGINE=docker JOBS=4 tools/linux/distro_build.sh debian:13` → 0 (pasó antes en `2026-11-24-F1-arreglos-adelantados.md`; pendiente de repetir tras `fe68382` en `T120`).
 - [x] `grep -n "define PROTOCOL" runtime/online.c` → `38` (verificado en `064d68a`).
