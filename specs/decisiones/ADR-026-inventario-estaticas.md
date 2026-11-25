@@ -371,7 +371,7 @@ oa_flags.c:oa_quests_update:wait_n           partida   intentos de cada uno
 oa_frame.c:g_last_link                       partida   última posición del Link local
 oa_frame.c:g_settle                          partida   fotogramas de espera tras una carga
 oa_frame.c:was_dead                          partida   el Link local estaba muerto el fotograma anterior
-oa_frame.c:frame_owns_loot_quests:st         partida   contador de la prueba SLATE_TEST
+oa_frame.c:st                                partida   contador de la prueba SLATE_TEST
 # oa_loot.c
 oa_loot.c:g_death                            partida   muertes vigiladas (posición, fotogramas, ids de antes)
 oa_loot.c:g_mine                             puntero   botín nuestro (actor, Watch)

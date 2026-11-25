@@ -1,6 +1,7 @@
 // Online play's actors, oa_frame: rt_online_frame, each frame's work in its order; forget_all. What the modules share:
 // runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 static float g_last_link[3];
 static int g_settle;  // frames to wait after a load before creating anything
@@ -87,12 +88,14 @@ static bool frame_wait(void) {
     return false;
 }
 
+// frame_owns_loot_quests's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int st;
+
 // step 11: our enemies left, the loot, the quests
 static void frame_owns_loot_quests(Cpu *c, uint64_t player, const float link[3], int me) {
     oa_owns_left(c);
     if (VALID(player)) oa_loot_update(c, player, link, me, online_is_host());
     if (getenv("SAVAGEWIND_ONLINE_SLATE_TEST") && VALID(player)) {  // (test: the slate's event here, that many s in)
-        static int st;
         if (++st == atoi(getenv("SAVAGEWIND_ONLINE_SLATE_TEST")) * 30) oa_slate_event(c, player);
     }
     oa_quests_update(c, player, online_is_host());
@@ -195,4 +198,16 @@ void rt_online_frame(Cpu *c) {
         g_settle = 180;
         return;
     }
+}
+
+// A reboot (back to the start screen: runtime/main.c teardown): the game's threads are stopped and its memory is about
+// to be wiped. What this module keeps of the last boot goes, so the next one starts as in a fresh process; the
+// actors themselves go with the game's memory (nothing here calls the game). The session is closed by online.c's
+// own reset (ADR-025 n.º 2)
+RT_ON_RESET(oa_frame_reset) {
+    LOG("[online] reset\n");
+    memset(g_last_link, 0, sizeof g_last_link);
+    g_settle = 0;
+    was_dead = false;
+    st = 0;
 }
