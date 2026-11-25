@@ -803,3 +803,37 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   hecho cuando: todos los criterios están en OK o cada FALLO tiene tarea abierta.
   no hagas: no uses tu guardado real; no marques OK sin evidencia.
   modelo sugerido: medio
+
+## Bloque 9 — Amenaza de los enemigos (CU-15, ADR-012)
+
+- [ ] T443 [P] [lógica] Amenaza de los enemigos: lógica pura
+  files: runtime/coop_threat.c, runtime/coop_threat.h, tests/test_coop_threat.c
+  verify: `clang -Wall -Iruntime tests/test_coop_threat.c runtime/coop_threat.c -lm -o build/test_coop_threat && build/test_coop_threat` sale con 0
+  depende de: ninguna
+  quién: agente
+  contexto: Hoy el dueño de cada enemigo es el más cercano o el último que le golpeó (`enemies_host`, OA:2520-2623 del PR; en `runtime/oa_enemies.c` tras F2). `[DUEÑO]` (ADR-012, decisión 2): pasa a ser el que más daño le hace, con el más cercano como desempate, sin perder 80 m ni los 10 s de `hold`. Diseño completo en `specs/casos-de-uso/CU-15-amenaza-de-los-enemigos.md`, "Qué hay que construir", paso 2.
+  pasos:
+    1. `#define COOP_THREAT_SLOTS 8`; `CoopThreatCfg` (semivida 8 s, margen 1,5, pendiente 2 s: valores por defecto de Q-15-2 y Q-15-3); `CoopThreat` por enemigo (amenaza por ranura, última vida vista, pendiente con caducidad, hora del último decaimiento).
+    2. `coop_threat_reset`, `coop_threat_decay(t, cfg, ahora_ns)`, `coop_threat_blow(t, cfg, ranura, daño, vida_actual, ahora_ns)` (suma `min(daño, vida_actual)`, nunca negativo, a la ranura y al pendiente), `coop_threat_life(t, cfg, dueño, vida, ahora_ns)` (lo que baja se descuenta primero del pendiente; el resto es del dueño; una subida no cuenta), `coop_threat_forget_slot`.
+    3. `coop_threat_pick(t, cfg, puede[COOP_THREAT_SLOTS], dueño, &a)` → `COOP_THREAT_NEAREST` (sin líder claro), `COOP_THREAT_KEEP` (el dueño es el líder claro) o `COOP_THREAT_TO` (a otra ranura). Líder claro: amenaza > 0 y ≥ margen × la segunda mayor (el dueño cuenta aunque ya no pueda serlo). `puede[i]` = puede ser dueño y está a menos de 80 m; lo calcula la integración. `dueño` = -1 si no hay.
+    4. Pruebas: los casos de CU-15 CA-1.
+  hecho cuando: la prueba pasa; sin cabeceras del juego ni de red.
+  no hagas: no leas el reloj dentro del módulo; no cuentes fotogramas; no uses globales.
+  modelo sugerido: alto
+
+- [ ] T444 [enemigos] Integrar la amenaza en el reparto de dueños del anfitrión
+  files: runtime/oa_enemies.c, tools/coop/threat_run.sh, specs/contratos/autoridad-mundo.md (fila "Enemigos: simulación"), docs/ONLINE.md (párrafo "Blows")
+  verify: `make runtime-objs` sin avisos nuevos **y** el verify de T443 **y** `sh tools/coop/threat_run.sh` sale con 0 (un juego anfitrión + bot `BOT_THREAT`; escenarios CU-15 CA-2 a CA-5 comprobados en el registro; lo ejecuta el orquestador con un guardado copiado y la posición del campamento de la bitácora de T104) **y** recorrido manual CU-15 CA-6 a CA-10 con dos juegos (dueño)
+  depende de: F2 (T207, T212, T213, T216), F3 (T311, T312), T409 (HIT con ranura de origen), T438 (modo `BOT_THREAT`), T443
+  quién: agente escribe; orquestador y dueño ejecutan
+  contexto: CU-15, "Estado actual" y "Qué hay que construir", paso 3. Ninguna otra tarea de F4 toca `oa_enemies.c`: no está en la cadena única de `plan.md` §5.
+  pasos:
+    1. Tabla `CoopThreat` paralela a `g_reg` (64 × 8), borrada con cada entrada nueva, en `owns_forget`, al cortar la sesión y en el `RT_ON_RESET` del módulo. `_Static_assert(COOP_THREAT_SLOTS == ONLINE_MAX)`.
+    2. Alimentarla en `enemies_host`: HIT recibidos con su ranura (`online_take_hits` de T409), los que envía el propio anfitrión al golpear una copia (junto a `online_send_hit`), la vida de sus enemigos (`enemy_state`) y la de ESTATE. `coop_threat_decay` con `plat_now_ns()`. `coop_threat_forget_slot` para quien está muerto, cargando, en otro mapa o desconectado.
+    3. Sustituir el traspaso por golpe (`aggro_seen`/`striker`) por `coop_threat_pick`: TO usa el código de traspaso de hoy solo con `hold == 0` (o dueño ido); KEEP salta la cercanía; NEAREST deja la cercanía de hoy intacta.
+    4. Registro con `SAVAGEWIND_ONLINE_AGGRO_LOG=1` (golpes sumados, traspasos con motivo y amenazas). Gancho `SAVAGEWIND_ONLINE_THREAT_TEST=<daño>,<hz>,<s>` (CU-15, paso 3).
+    5. `tools/coop/threat_run.sh`: lanza los escenarios CA-2 a CA-5 y cuenta las líneas de traspaso; sin rutas absolutas (juego, guardado y campamento por variables de entorno).
+    6. Actualizar la fila de autoridad (A-10) y el párrafo "Blows".
+  hecho cuando: los verify pasan y hay entrada en `specs/bitacora/`.
+  no hagas: no toques `OWN_SAFE`, `hold`, ni la guarda de `own_ready`; no cambies el cable (es T409); no escribas la vida de enemigos ajenos; no toques los jefes.
+  modelo sugerido: alto
