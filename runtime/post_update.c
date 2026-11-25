@@ -25,6 +25,9 @@ void vk_cache_path(char *out, size_t n, const char *name);  // (runtime/nvn/vulk
 #include "update_core.h"
 bool plat_exe_path(char *buf, size_t size);  // (runtime/platform.h: not included, its mkdir would take MAKE_DIR's place)
 
+// Fork: no update checks. The fork publishes no releases and the updater points at the original project.
+#define SW_FORK_NO_UPDATE 1
+
 extern const char *rt_version(void);  // (runtime/ui/launcher.mm)
 
 static bool file_there(const char *p) {
@@ -432,6 +435,9 @@ const char *update_launcher(void) {
 }
 
 void update_check_start(void) {
+#ifdef SW_FORK_NO_UPDATE
+    return;
+#endif
     if (update_launcher()) return;  // (the launcher that installed it updates it)
 #ifdef _WIN32
     char exe[1100];
