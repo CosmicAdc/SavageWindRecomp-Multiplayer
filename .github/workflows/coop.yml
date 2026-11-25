@@ -38,7 +38,7 @@ jobs:
             clang -Wall -Iruntime tests/test_online_$m.c runtime/online_$m.c -lm -o /tmp/b/test_online_$m
             /tmp/b/test_online_$m
           done
-          for m in threat world rewards revive pvp; do
+          for m in threat world rewards revive pvp shrine_invite; do
             clang -Wall -Iruntime tests/test_coop_$m.c runtime/coop_$m.c -lm -o /tmp/b/test_coop_$m
             /tmp/b/test_coop_$m
           done
