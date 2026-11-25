@@ -399,11 +399,11 @@ oa_puppet.c:g_boom                           puntero   explosiones hechas aquí 
 oa_puppet.c:g_pose_q                         partida   esqueleto con el que se posó el Link
 oa_puppet.c:g_pose_t                         partida   va con g_pose_q
 oa_puppet.c:g_pose_n                         partida   va con g_pose_q
-oa_puppet.c:oa_pose_link:last                partida   último esqueleto recibido de cada jugador
+oa_puppet.c:last                             partida   último esqueleto recibido de cada jugador
 oa_puppet.c:oa_puppet_frame:dp               permitir  búfer de trabajo: se borra antes de cada uso (parámetros de tinte)
 oa_puppet.c:oa_puppet_frame:name             permitir  búfer de trabajo: se escribe antes de cada uso
 oa_puppet.c:oa_puppet_frame:kinds            permitir  tabla constante
-oa_puppet.c:oa_puppet_frame:n                partida   contador de log (GEAR_LOG)
+oa_puppet.c:n                                partida   contador de log (GEAR_LOG)
 oa_puppet.c:oa_puppet_frame:heap             permitir  tabla constante
 # oa_rules.c
 oa_rules.c:oa_g_nopause_now                  partida   hay un menú sin pausa abierto (lo leen rt_scene_state y el backend)

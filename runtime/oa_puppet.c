@@ -1,6 +1,7 @@
 // Online play's actors, oa_puppet: the remote players' Links here: posed and animated, their armour, their blasts, the
 // blur. What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 static void animate(Cpu *c, int i, const OnlinePlayer *p);
 
@@ -160,13 +161,15 @@ void oa_booms_update(Cpu *c, uint64_t player) {
 static float g_pose_q[ONLINE_BONES][4], g_pose_t[ONLINE_BONES][3];  // (the skeleton pose_link posed his Link by)
 static int g_pose_n;  // (its Link bones; 0: none this frame)
 
+// oa_pose_link's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static struct { float q[ONLINE_BONES][4], t[ONLINE_BONES][3]; int n, nbow; } last[ONLINE_MAX];
+
 void oa_pose_link(Cpu *c, int i, const OnlinePlayer *p) {
     float (*q)[4] = g_pose_q, (*t)[3] = g_pose_t;
     int n = 0, nbow = 0, nb = 0, nbb = 0;
     g_pup[i].frames++;
     g_pose_n = 0;
     // (none lately: paused, in a menu - the last one he sent kept; his armour posed by it too)
-    static struct { float q[ONLINE_BONES][4], t[ONLINE_BONES][3]; int n, nbow; } last[ONLINE_MAX];
     bool fresh = online_skeleton(i, &n, &nbow, q, t);
     if (fresh) memcpy(last[i].q, q, sizeof last[i].q), memcpy(last[i].t, t, sizeof last[i].t), last[i].n = n, last[i].nbow = nbow;
     else if (g_pup[i].skeleton && last[i].n)
@@ -257,6 +260,9 @@ bool oa_puppets_validate(void) {
         }
     return false;
 }
+
+// oa_puppet_frame's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int n;
 
 // rt_online_frame, step 18: each other player's Link here, made or dropped, placed and posed, with his armour, gear,
 // horse, effects, shots and bombs. True: a Link of theirs deleted by the game (logged): rt_online_frame forgets
@@ -562,7 +568,6 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
                 }
             }
             oa_call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)gm, 0, 0, 0, 0);
-            static int n;
             if (getenv("SAVAGEWIND_ONLINE_GEAR_LOG") && n++ % 120 < ONLINE_GEAR)
                 LOG("[online] gear %d %s bone %d (%s) at %.2f %.2f %.2f, Link %.2f %.2f %.2f, rel t %.2f %.2f %.2f\n", k,
                     p->name, b, b >= 0 && (have >> b & 1) ? "ok" : "-", gm[3], gm[7], gm[11], pl[i].pos[0], pl[i].pos[1],
@@ -719,4 +724,20 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
         }
     }
     return false;
+}
+
+// A reboot (runtime/main.c teardown): the others' Links, their pieces, blurs and our blasts were actors of the last boot,
+// gone with its memory - forgotten, never deleted (nothing here calls the game); each puppet as oa_puppet_forget leaves
+// it (anim and covered -1: none yet), the rest as in a fresh process
+RT_ON_RESET(oa_puppet_reset) {
+    memset(g_pup, 0, sizeof g_pup);
+    for (int i = 0; i < ONLINE_MAX; i++) g_pup[i].anim = -1, g_pup[i].covered = -1;
+    memset(oa_g_blast, 0, sizeof oa_g_blast);
+    for (int i = 0; i < ONLINE_MAX; i++) oa_g_blur[i] = (OaBlur){0};  // (volatile: one by one)
+    memset(g_boom, 0, sizeof g_boom);
+    memset(g_pose_q, 0, sizeof g_pose_q);
+    memset(g_pose_t, 0, sizeof g_pose_t);
+    g_pose_n = 0;
+    memset(last, 0, sizeof last);
+    n = 0;
 }
