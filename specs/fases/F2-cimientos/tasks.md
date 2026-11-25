@@ -325,7 +325,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies la búsqueda por nombre ni las distancias; no toques `oa_loot.c`.
   modelo sugerido: medio
 
-- [ ] T218 [P] [red] Estado de `online.c` sin estáticas de función y con atómicos.
+- [~] T218 [P] [red] Estado de `online.c` sin estáticas de función y con atómicos.
+  reclamada: agente Opus ag-t218 (integrada, adelantada) — net 328/0, validate 181510/0, wire 16647/0; Docker debian: session 12 casos/272 comprobaciones/0; compila; HE-01 (b) diseñado en su bitácora; FALTA recorrido y firma
   files: `runtime/online.c`, `tools/test_online_net.c`, `tools/test_online_session.c`
   verify: `grep -nE "^\s+static " runtime/online.c` solo devuelve las que quedan justificadas en un comentario; `make test-online-net` con un caso nuevo "dos sesiones seguidas en el mismo proceso: la segunda no ve nada de la primera" en 0; en Docker, `test-online-session` con los casos pendientes de T204 (sesión llena, expulsión por silencio) en 0; `make -j8`; recorrido corto pasa
   depende de: T214
