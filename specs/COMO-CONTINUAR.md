@@ -42,16 +42,23 @@ cooperativo de 2 jugadores** (ampliable) sobre el PR #294 "Online mode" de byluk
 
 Las preguntas que siguen abiertas están en `casos-de-uso/PREGUNTAS-ABIERTAS.md`.
 
-## Estado al 2026-11-24
+## Estado al 2026-11-25 (fin de jornada)
 
-- Hecho: investigación, 7 mapas del código, plan aprobado, estructura de `specs/`.
-- **No hecho:** no se ha compilado ni ejecutado nada. Todo lo que dicen los mapas sale de leer el código.
-- Bloqueos que dependen del dueño:
-  1. Crear el fork en GitHub (cuenta CosmicAdc).
-  2. Extraer sus NSP a `exefs/` y `romfs/` (más `aoc1/` y `aoc2/` para el DLC). Nadie de este proyecto
-     da instrucciones de volcado ni de descifrado.
-  3. Liberar disco (hay ~70 GB libres; lo cómodo son ~100 GB).
-- Falta en el equipo: MSYS2 UCRT64 (clang, make), entorno de Python del proyecto, Go.
+- **F0, F1 y F2 cerradas** (etiquetas `f0-cerrada`, `f1-cerrada`, `f2-cerrada`). F2 se cerró por decisión del dueño
+  con verificaciones aplazadas: lista exacta en `bitacora/2026-11-25-F2-cierre.md` (tanda de firma, `distro_build`,
+  pruebas en el juego de T215/T216/T217/T222/T454-b). Hacerlas antes de cerrar F3 (T340).
+- Verificado con el dueño: el reinicio en caliente ("Salir al inicio") ya no cierra el juego y cierra la sesión (T212).
+- **F3 en curso** (`fases/F3-red-robusta/tasks.md`): hechas T307, T320, T322, T325, T327; integradas T301 (arnés
+  `tools/nettest/`), T321, T323 (LAN, Docker OK), T326. Ramas sin integrar al cerrar la jornada: `coop/T302` (modos
+  del bot) y `coop/T306` (spike UPnP), con su estado en su bitácora. **Siguiente:** ejecutar
+  `MSYS_NO_PATHCONV=1 sh tools/nettest/run.sh smoke` (se cortó compilando), integrar T302/T306, medir T303/T304 y
+  presentar al dueño la tabla para decidir TCP/UDP (T305, ADR-027 n.º 4); después T308 y el núcleo T309-T319 en serie.
+- F4 adelantada: T452, T454-b, T455, T465a integradas; investigaciones T449, T450, T451, T454, T540. Decisiones del
+  dueño de esta jornada: **ADR-025** (estados del juego, santuarios, Eventide, hora, Luna de Sangre, amiibo, giro) y
+  **ADR-027** (F3: contraseña, mods, `--server`, solo mismo sistema, DLC distinto se rechaza, T305 lo decide el dueño).
+- Pruebas: dos juegos en un PC con `tools/coop/dos_juegos.sh` (necesitan ~7 GB libres: como mucho un agente abierto)
+  y `tools/coop/recorrido.py` (lanzarlo en un panel de Herdr, no como tarea de fondo de Claude Code). Docker solo sin
+  los juegos abiertos.
 
 ## Equipo de desarrollo
 
