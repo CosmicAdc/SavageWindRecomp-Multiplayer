@@ -1,0 +1,69 @@
+# Network test bench (T301): a dedicated server and two bots on a bridge network of their own, each able to degrade
+# its own link with tc netem (tools/nettest/netem.sh). Driven by tools/nettest/run.sh; read README.md first.
+#
+# The three nodes only idle (sleep): run.sh starts the server and the bots inside them with `docker compose exec`, so
+# it can apply a netem profile before anything connects and change it in the middle of a scenario. The `build`
+# service (profile "build", not started by `up`) compiles the app without game code and the bot into the `nettest`
+# volume; the nodes mount it read-only, so nothing is compiled three times.
+#
+# Nothing is published to the host and there is no host networking: the bots reach the server as "server:52530" on
+# the compose network. The tree is mounted read-only; no game files are used or copied.
+name: swcoop-nettest
+
+x-nodo: &nodo
+  image: swcoop-nettest
+  working_dir: /src
+  init: true             # (sleep as PID 1 would ignore SIGTERM: `down` would wait 10 s per container)
+  cap_add: [NET_ADMIN]   # tc qdisc ... netem on this container's own eth0
+  networks: [nettest]
+  volumes:
+    - ../..:/src:ro
+    - nettest:/opt/nt:ro
+  command: ["sleep", "infinity"]
+
+services:
+  # `docker compose --profile build run --rm build`: make in /opt/nt/obj (kept for the next run: incremental), the
+  # bot in /opt/nt/bin. JOBS=4 fits Docker Desktop's 6.2 GB.
+  build:
+    image: swcoop-nettest
+    pull_policy: never
+    profiles: [build]
+    working_dir: /src
+    network_mode: none   # (compiling needs no network)
+    volumes:
+      - ../..:/src:ro
+      - nettest:/opt/nt
+    environment:
+      JOBS: "${JOBS:-4}"
+    command:
+      - sh
+      - -ec
+      - |
+        mkdir -p /opt/nt/obj /opt/nt/bin
+        make -j"$$JOBS" B=/opt/nt/obj GEN=/nonexistent /opt/nt/obj/savagewind
+        cp /opt/nt/obj/savagewind /opt/nt/bin/savagewind
+        clang -O2 -Wall -Iruntime -o /opt/nt/bin/online_bot tools/online_bot.c -lm
+        echo "[nettest] build: /opt/nt/bin/savagewind y /opt/nt/bin/online_bot listos"
+
+  server:
+    <<: *nodo
+    build:               # (the image of all four services; only this one says how to build it)
+      context: .
+      dockerfile: Dockerfile
+
+  bot_a:
+    <<: *nodo
+    pull_policy: never   # (built by `docker compose build server`, never pulled)
+    depends_on: [server]
+
+  bot_b:
+    <<: *nodo
+    pull_policy: never
+    depends_on: [server]
+
+networks:
+  nettest:
+    driver: bridge
+
+volumes:
+  nettest:  # /opt/nt/obj (make objects) and /opt/nt/bin (savagewind, online_bot)
