@@ -74,7 +74,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no arregles nada; no dejes la contraseña de prueba en `online.ini`.
   modelo sugerido: bajo
 
-- [~] T104 [pruebas] CU-02: ver al compañero.
+- [x] T104 [pruebas] CU-02: ver al compañero.
+  cierre: presencia y seguimiento vistos en la sesión con ventana (2026-11-25); paso 5 (a) PASA, (b) y (c) pasan a la sesión del dueño / T444
   nota: corrida automatizada en `specs/bitacora/2026-11-24-F1-linea-base-pasada.md` (B vio `OnlinePlayer` de A; en la pasada de `recorrido.py` A devolvió 0, pero en la prueba con contraseña A sí registró `Client: OnlinePlayer`; paso 5 de enemigos falló por no detectar `Enemy_`). Pendiente de revisión y de `T107`.
   files: `specs/bitacora/<fecha>-F1-base-CU02.md`
   verify: tras `goto tower 7` en ambos, `$PY tools/swctl.py --port 7778 actors OnlinePlayer` devuelve un actor a menos de 20 m; tras mover a A con `stick l 0 1 150`, la posición de ese actor en B cambia
@@ -113,7 +114,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no dependas de paquetes fuera de la biblioteca estándar de Python; no leas memoria del juego con `mem`; no pongas rutas absolutas.
   modelo sugerido: medio
 
-- [~] T106 [pruebas] CU-03: pasada desatendida de 30 minutos y medida de RAM.
+- [x] T106 [pruebas] CU-03: pasada desatendida de 30 minutos y medida de RAM.
+  cierre: pasada con fallos explicados (pasos 2-3: herramienta `goto`, no red); ver `2026-11-25-F1-cierre.md`
   nota: pasada ejecutada en `specs/bitacora/2026-11-24-F1-linea-base-pasada.md` (pasos 1, 4, 6, 7 PASA; pasos 2, 3, 5, 8, 9, 10 FALLA; RAM libre 7,17 GB → 0,14 GB mín, sin cuelgues).
   files: `specs/bitacora/<fecha>-F1-base-CU03.md`
   verify: salida completa de `$PY tools/coop/recorrido.py` guardada; tabla de pasos de `verificacion.md` §2 rellena; RAM libre antes y uso por proceso anotados
@@ -129,7 +131,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no compiles durante la pasada; no arregles nada todavía.
   modelo sugerido: bajo
 
-- [~] T107 [pruebas] Sesión con ventana, vista por el dueño.
+- [x] T107 [pruebas] Sesión con ventana, vista por el dueño.
+  cierre: sesión del dueño 2026-11-25 (`2026-11-25-F1-T120-sesion-ventana.md`)
   dueño: confirma 2026-11-24 que las pruebas con ventana funcionaron; las casillas de `verificacion.md` §3 no se marcaron una a una (se repasan en la pasada con ventana de T120).
   nota: primera prueba con ventana hecha (`specs/bitacora/2026-11-24-F1-prueba-ventana-dueno.md`): conexión, presencia, equipo y golpes funcionaron; cierre inesperado `0xc0000409` en `Client` al volver a acercarse al Host tras salir a la pantalla de título sin guardar y recargar en el mismo proceso. Pendiente completar lista de `verificacion.md` §3.
   files: `specs/bitacora/<fecha>-F1-base-ventana.md`
@@ -349,7 +352,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## F. Cierre (en serie)
 
-- [ ] T120 [pruebas] Integrar los carriles y repetir la pasada completa.
+- [x] T120 [pruebas] Integrar los carriles y repetir la pasada completa.
+  cierre: pruebas automáticas, Linux y sesión con ventana; FALLAS explicadas y asignadas en `2026-11-25-F1-cierre.md`
   files: `specs/bitacora/<fecha>-F1-final.md`
   verify: en `coop/main` con T109-T119 integrados: `make -j8`, `make test-online-gate test-online-net`, las pruebas de la línea base de F0 y `ENGINE=docker JOBS=4 tools/linux/distro_build.sh debian:13` terminan como en F0 o mejor; `$PY tools/coop/recorrido.py` completo: todos los pasos PASA, dos veces (desatendida y con ventana)
   depende de: T109, T114, T118, T119
@@ -364,7 +368,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no aplastes los commits de los arreglos en uno; no subas nada.
   modelo sugerido: medio
 
-- [ ] T121 [bitácora] Cierre de F1.
+- [x] T121 [bitácora] Cierre de F1.
+  cierre: `2026-11-25-F1-cierre.md`; aprobado por el dueño (ADR-024, decisión 1)
   files: `specs/bitacora/<fecha>-F1-cierre.md`, `specs/fases/F1-prueba-y-arreglos/verificacion.md`
   verify: los ocho criterios S1-S8 de `spec.md` con evidencia; lista priorizada de pendientes actualizada; `grep -n "define PROTOCOL" runtime/online.c` da 38; `git diff f0-cerrada -- runtime/online.h` vacío; el dueño aprueba
   depende de: T120
