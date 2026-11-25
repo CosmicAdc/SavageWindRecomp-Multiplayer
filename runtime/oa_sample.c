@@ -865,3 +865,18 @@ void oa_sample_skeleton(Cpu *c, uint64_t pinfo) {
     }
     online_set_local_skeleton(n, nbow, (const float (*)[4])q, (const float (*)[3])t);
 }
+
+// rt_online_frame, step 5: our pose and skeleton sampled
+void oa_sample_frame(Cpu *c, uint64_t pinfo) {
+    // (sampled with a menu up too while the world goes on for it: the others see him as he is)
+    if (!framepace_paused() || oa_g_nopause_now) oa_sample_pose(c, pinfo), oa_sample_skeleton(c, pinfo);
+}
+
+static int why = -1;  // (oa_sample_why_frame's)
+
+// rt_online_frame, after step 6:
+// (why our pose isn't sent, logged as it changes: the others treat a player without one as on their map)
+void oa_sample_why_frame(void) {
+    int now = framepace_paused() ? 1 : 0;
+    if (now != why) LOG("[online] our pose: %s\n", now ? "not sampled (paused)" : "sampled"), why = now;
+}

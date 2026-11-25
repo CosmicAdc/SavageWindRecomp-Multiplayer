@@ -223,3 +223,112 @@ void oa_pvp_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
 
 volatile int g_online_block_a;  // (runtime/hle/input.c: A held back)
 volatile uint64_t g_game_buttons;  // (runtime/hle/input.c: the buttons the game is given, as it reads them)
+
+// (oa_rules_nopause_frame's, kept from frame to frame)
+static int logged;
+static bool held_stop, x_was;
+static uint32_t seen_ps[16];
+static int told;
+
+// rt_online_frame, step 6, menus that don't pause:
+// The pause menu and the map don't stop the world in a session with others (the host's rule, `nopause`): the
+// UI's pause state (0x7001e1611c) is 2 while they are up, and the game stops the world through the actor
+// system's pause bits (ksys::act::BaseProcMgr at 0x7001e937f8, its u16 at +0x168: bit n "paused for n";
+// 0x70015195c0 asks one, 0x70015195d0 / 0x70015195e0 set and clear them; the world manager's update is
+// skipped while bit 0 is set, 1.9.0 0x700127f810): opening either sets 0x7f. Those are cleared each frame
+// while the state is 2, so the others' blows, the enemies and the time of day go on while he looks at his
+// things, as in a game made for several. The quick menus (state 4) too: they stop it the same way. Not a
+// pause of another kind (cutscenes, loading: the state is 0 then)
+void oa_rules_nopause_frame(Cpu *c, int me) {
+    int others = 0;
+    OnlinePlayer np[ONLINE_MAX];
+    online_players(np);
+    for (int i = 0; i < ONLINE_MAX; i++) others += np[i].used && i != me;
+    int rule = oa_g_nopause_rule < 0 ? g_online.nopause : oa_g_nopause_rule;
+    uint64_t bpm = *(uint64_t *)(uintptr_t)0x7001e937f8ull;
+    // (any of the UI's pauses: 2 the pause menu and the map, 4 the quick menus, others the windows that come up
+    // in play, as a new item's (uiPickUpWin_00Screen); each new one logged once. Not with UI_PAUSE_LOAD, a load's:
+    // the world waits for the map then)
+    uint32_t ps_now = g_site.pause_state ? *(uint32_t *)(uintptr_t)g_site.pause_state : 0;
+    oa_g_nopause_now = rule && others && online_state() == ONLINE_CONNECTED && ps_now && !(ps_now & UI_PAUSE_LOAD);
+    // (but not once he presses A or X in the pouch - X "take", or A on a material and "take" in its list, to hold
+    // it over his head; A for anything else there too: the world stops sooner than it must - until the menu goes:
+    // what he takes out is made then, and made with the actors' pause bits cleared (the world going on) the game
+    // never puts it in his hands: it hung in the air where he took it out as he walked off, his hands empty. The
+    // world is stopped again as the menu stopped it as it opened (the physics world, 0x700156f61c(its system, 1,
+    // 0) as 1.9.0 0x7000c40458; the bits, 0x70015195d0(manager, 0x7f), the manager's procs told; the scene's
+    // paused byte): the menu's own resume undoes it as it goes)
+    {
+        bool x = (g_game_buttons & 5) != 0;  // (A or X: runtime/hle/input.c BTN_A, BTN_X)
+        if (!ps_now) held_stop = false;
+        else if (ps_now == 2 && x && !x_was && oa_g_nopause_now && !held_stop) {
+            held_stop = true;
+            LOG("[online] A or X in the pouch (take to hold): the menu stops the world\n");
+            uint64_t phys = *(uint64_t *)(uintptr_t)0x7001d66ab0ull, scene = *(uint64_t *)(uintptr_t)0x7001d66b80ull;
+            phys = VALID(phys) ? *(uint64_t *)(uintptr_t)phys : 0, scene = VALID(scene) ? *(uint64_t *)(uintptr_t)scene : 0;
+            if (VALID(phys)) oa_call(c, 0x700156f61cull, phys, 1, 0, 0, 0, 0);
+            if (VALID(bpm)) oa_call(c, 0x70015195d0ull, bpm, 0x7f, 0, 0, 0, 0), oa_call(c, 0x7001519720ull, bpm, 0, 0, 0, 0, 0);
+            if (VALID(scene)) *(volatile uint8_t *)(uintptr_t)(scene + 0x8b8) = 1;
+        }
+        x_was = x;
+        if (held_stop) oa_g_nopause_now = 0;
+    }
+    if (oa_g_nopause_now) {
+        int q;
+        for (q = 0; q < 16 && seen_ps[q] && seen_ps[q] != ps_now; q++) {}
+        if (q < 16 && !seen_ps[q]) seen_ps[q] = ps_now, LOG("[online] the UI's pause %#x: the world goes on\n", ps_now);
+    }
+    oa_g_nopause_frames = oa_g_nopause_now ? oa_g_nopause_frames + 1 : 0;
+    if (oa_g_nopause_now && VALID(bpm) && (*(uint16_t *)(uintptr_t)(bpm + 0x168) & 1)) {
+        if (!logged++) LOG("[online] the menu doesn't stop the world (%#x)\n", *(uint16_t *)(uintptr_t)(bpm + 0x168));
+        // (undone as the menu's own resume does it, 1.9.0 0x7000d462d0, for the world alone: the physics world
+        // going on (0x700156f61c(its system, 0, 0)), the actors' pause bits cleared (0x70015195e0(manager, 0x7f))
+        // and the manager's procs told (0x7001519720), the scene's paused byte (+0x8b8) cleared; the menu's own
+        // screens, sounds and inputs are left as they are)
+        uint64_t phys = *(uint64_t *)(uintptr_t)0x7001d66ab0ull, scene = *(uint64_t *)(uintptr_t)0x7001d66b80ull;
+        phys = VALID(phys) ? *(uint64_t *)(uintptr_t)phys : 0, scene = VALID(scene) ? *(uint64_t *)(uintptr_t)scene : 0;
+        if (VALID(phys)) oa_call(c, 0x700156f61cull, phys, 0, 0, 0, 0, 0);
+        oa_call(c, 0x70015195e0ull, bpm, 0x7f, 0, 0, 0, 0);
+        oa_call(c, 0x7001519720ull, bpm, 0, 0, 0, 0, 0);
+        if (VALID(scene)) *(volatile uint8_t *)(uintptr_t)(scene + 0x8b8) = 0;
+    } else if (g_site.pause_state && *(uint32_t *)(uintptr_t)g_site.pause_state == 0) logged = 0;
+    if (oa_g_nopause_now && !getenv("SAVAGEWIND_ONLINE_MENU_STILL")) {
+        // (the world drawn behind it: the pause menu also turns the world's camera off as it opens, 1.9.0
+        // 0x7000e6840c: 0x7000e89490(1, false), camera 1 of the game's list ([[0x7001d6b0b8] +0x48][1]) made
+        // inactive (its +0x90 bit 0), so its view isn't drawn; turned on again the same way, 0x7000e89490(1, true).
+        // The menu's own drawing pause is the patch menu_draw, runtime rt_menu_draw_pause)
+        uint64_t cl = *(uint64_t *)(uintptr_t)0x7001d6b0b8ull;
+        cl = VALID(cl) ? *(uint64_t *)(uintptr_t)cl : 0;
+        uint64_t arr = VALID(cl) && *(uint32_t *)(uintptr_t)(cl + 0x40) > 1 ? *(uint64_t *)(uintptr_t)(cl + 0x48) : 0;
+        uint64_t cam = VALID(arr) ? *(uint64_t *)(uintptr_t)(arr + 8) : 0;
+        if (VALID(cam) && !(*(uint16_t *)(uintptr_t)(cam + 0x90) & 1)) {
+            if (!told++) LOG("[online] the world's camera on behind the menu\n");
+            oa_call(c, 0x7000e89490ull, 1, 1, 0, 0, 0, 0);
+        }
+    }
+}
+
+static int dlog;  // (oa_rules_block_a_frame's)
+
+// rt_online_frame, step 16, A held back:
+// another player at a Sheikah pedestal within 30 m (not us in an event): our A does nothing meanwhile
+void oa_rules_block_a_frame(const float link[3], int me) {
+    OnlinePlayer bp[ONLINE_MAX];
+    online_players(bp);
+    int block = 0;
+    for (int i = 0; i < ONLINE_MAX; i++) {
+        if (i == me || !bp[i].used || !bp[i].pose.valid || !(bp[i].pose.effects & ONLINE_E_DEMO)) continue;
+        float dx = bp[i].pos[0] - link[0], dz = bp[i].pos[2] - link[2];
+        if (dx * dx + dz * dz < 30 * 30) block = 1;
+    }
+    extern bool framepace_in_event(void);
+    if (getenv("SAVAGEWIND_ONLINE_DEMO_LOG") && dlog++ % 150 == 0)
+        for (int i = 0; i < ONLINE_MAX; i++)
+            if (bp[i].used && i != me)
+                LOG("[online] demo check: %s valid %d effects %02x at %.0f m, we in event %d\n", bp[i].name, bp[i].pose.valid,
+                    bp[i].pose.effects, sqrtf((bp[i].pos[0] - link[0]) * (bp[i].pos[0] - link[0]) +
+                                              (bp[i].pos[2] - link[2]) * (bp[i].pos[2] - link[2])), framepace_in_event());
+    if (framepace_in_event()) block = 0;
+    if (block != g_online_block_a) LOG("[online] %s\n", block ? "another player is at a Sheikah pedestal near: A held back" : "A back");
+    g_online_block_a = block;
+}

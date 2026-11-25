@@ -215,8 +215,8 @@ enum { UI_PAUSE_LOAD = 0x200 };  // (the UI's pause state while a load runs: the
 // ---- The types of state shared that were anonymous: the variable is in its module (oa_check.py --modulos
 // puts the type back on it)
 
-// A remote player's puppet here: his Link and its pieces (the table, g_pup, is oa_puppet's; rt_online_frame works on
-// an entry through oa_pup. His runes: oa_runes' g_rune, g_ice)
+// A remote player's puppet here: his Link and its pieces (the table, g_pup, is oa_puppet's; oa_puppet_frame and
+// rt_online_frame's steps 3 and 4 work on an entry through oa_pup. His runes: oa_runes' g_rune, g_ice)
 typedef struct {
     uint64_t link;  // OnlinePlayer; 0: none
     Watch link_w;
@@ -350,6 +350,8 @@ extern char oa_g_map[32];
 bool oa_same_map(const OnlinePlayer *p);
 void oa_sample_pose(Cpu *c, uint64_t pinfo);
 void oa_sample_skeleton(Cpu *c, uint64_t pinfo);
+void oa_sample_frame(Cpu *c, uint64_t pinfo);
+void oa_sample_why_frame(void);
 
 // runtime/oa_puppet.c
 uint64_t oa_link_live(int i);
@@ -367,6 +369,7 @@ const char *oa_puppet_name(int i);
 void oa_puppet_pieces(Cpu *c, int i, void (*each)(Cpu *c, int i, Piece *p));
 void oa_puppet_drop(Cpu *c, int i);
 void oa_puppet_forget(void);
+bool oa_puppet_frame(Cpu *c, const float link[3], int me);
 
 // runtime/oa_runes.c
 uint64_t oa_magne_held(void);
@@ -402,6 +405,7 @@ void oa_enemies_client(Cpu *c, uint64_t player, int me);
 void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, const float centre[3], int me, bool suppress);
 void oa_boss_sample(Cpu *c, uint64_t player, OnlinePose *pose);
 void oa_boss_update(Cpu *c, const OnlinePlayer *pl, int me);
+void oa_enemies_frame(Cpu *c, uint64_t player, const float link[3], int me);
 
 // runtime/oa_loot.c
 bool oa_players_own_item(const char *n);
@@ -420,6 +424,7 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
 void oa_movers_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
 void oa_movers_forget(void);
 void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
+void oa_world_frame(Cpu *c, uint64_t player, const float link[3], int me);
 
 // runtime/oa_flags.c
 uint8_t oa_weather_now(void);
@@ -429,6 +434,7 @@ void oa_weather_follow(const OnlinePlayer *pl, int me, const float at[3]);
 bool oa_slate_event(Cpu *c, uint64_t player);
 extern volatile int oa_g_fake_blood_moon;
 void oa_quests_update(Cpu *c, uint64_t player, bool host);
+void oa_flags_hour_frame(void);
 
 // runtime/oa_rules.c
 extern volatile int oa_g_nopause_now;
@@ -439,8 +445,12 @@ void oa_players_collide(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
 void oa_pvp_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
 extern volatile int g_online_block_a;
 extern volatile uint64_t g_game_buttons;
+void oa_rules_nopause_frame(Cpu *c, int me);
+void oa_rules_block_a_frame(const float link[3], int me);
 
 // runtime/oa_control.c
 void oa_flag_query(Cpu *c);
 void oa_event_query(Cpu *c, uint64_t pinfo);
 void oa_find_actors(uint64_t pinfo);
+void oa_control_frame(Cpu *c, uint64_t pinfo);
+void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]);

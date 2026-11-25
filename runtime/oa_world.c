@@ -943,3 +943,14 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
         }
     }
 }
+
+// rt_online_frame, step 14: the world's objects, movers and breaks
+void oa_world_frame(Cpu *c, uint64_t player, const float link[3], int me) {
+    if (VALID(player)) {
+        OnlinePlayer op[ONLINE_MAX];
+        online_players(op);
+        oa_objs_update(c, player, link, op, me);
+        oa_movers_update(c, player, link, op, me);
+        oa_breaks_update(c, player, link, op, me);
+    }
+}
