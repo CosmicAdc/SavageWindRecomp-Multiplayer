@@ -1109,7 +1109,8 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             int n = p[1];
             for (int k = 0; k < n && 2 + (k + 1) * (int)sizeof(OnlineEnemy) <= len && g.nest_in < 64; k++) {
                 memcpy(&g.est_in[g.nest_in], p + 2 + k * sizeof(OnlineEnemy), sizeof(OnlineEnemy));
-                g.est_in[g.nest_in].name[39] = g.est_in[g.nest_in].as[31] = g.est_in[g.nest_in].weapon[39] = 0;
+                g.est_in[g.nest_in].name[39] = g.est_in[g.nest_in].as[31] = g.est_in[g.nest_in].weapon[39] =
+                    g.est_in[g.nest_in].shield[39] = 0;
                 g.est_from[g.nest_in++] = p[0];
             }
         }

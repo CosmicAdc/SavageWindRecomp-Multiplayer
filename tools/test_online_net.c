@@ -186,11 +186,34 @@ static void test_stop_clears_session(void) {
     CHECK(!memcmp(g.quest_of[1], none, ONLINE_QUEST_BYTES));
 }
 
+// An ESTATE whose strings fill their fields with no NUL comes out terminated, shield too
+static void test_estate_strings_terminated(void) {
+    static uint8_t buf[2 + sizeof(OnlineEnemy)];
+    static OnlineEnemy e[64];
+    uint8_t from[64];
+    set_connected();
+    pthread_mutex_lock(&g.lock);
+    g.hosting = true;  // (ESTATE goes to the host's game)
+    pthread_mutex_unlock(&g.lock);
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1, buf[1] = 1;
+    memset(buf + 2 + offsetof(OnlineEnemy, name), 'A', sizeof e[0].name);
+    memset(buf + 2 + offsetof(OnlineEnemy, as), 'B', sizeof e[0].as);
+    memset(buf + 2 + offsetof(OnlineEnemy, weapon), 'C', sizeof e[0].weapon);
+    memset(buf + 2 + offsetof(OnlineEnemy, shield), 'D', sizeof e[0].shield);
+    CHECK(cl_message(M_ESTATE, buf, 2 + (int)sizeof(OnlineEnemy)));
+    CHECK(online_take_estates(e, from, 64) == 1);
+    CHECK(from[0] == 1);
+    CHECK(strlen(e[0].shield) <= 39);
+    CHECK(strlen(e[0].name) <= 39 && strlen(e[0].as) <= 31 && strlen(e[0].weapon) <= 39);
+}
+
 int main(void) {
     test_state_reaches_players();
     test_state_without_join_ignored();
     test_slot_out_of_range_ignored();
     test_stop_clears_session();
+    test_estate_strings_terminated();
     stop_all();
     printf("test_online_net: %d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
