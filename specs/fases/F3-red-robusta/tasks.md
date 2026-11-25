@@ -22,10 +22,18 @@ adivinar, para y pregunta: no inventes.
 
 ## Reglas que valen para todas las tareas (léelas una vez)
 
+- **ADR-006 manda sobre los pasos de cada tarea.** El subagente solo escribe código y documentos, hace commit y marca
+  todo como "NO verificado". **No compila, no ejecuta pruebas, no lanza el juego ni Docker, no descarga dependencias
+  (ENet, miniupnpc, imágenes) y no hace push.** Todo paso de abajo que diga "ejecuta", "mide", "compila", "descarga" o
+  "regenera" lo hace **el orquestador** (o el dueño), de uno en uno, y anota la salida en `specs/bitacora/`. El
+  subagente solo puede usar `grep` y `git diff`. El push al fork ocurre solo al cerrar la fase.
 - Repositorio: el fork, rama de trabajo creada desde `coop/main`. Rutas siempre **relativas a la raíz del repo**.
   Nunca escribas rutas absolutas ni nombres de usuario en código, pruebas o documentos.
 - Las líneas `fichero:línea` son del PR #294 original (HEAD `350c5f8`). Si F2 movió el código, busca la función por
   su nombre con `grep -n`.
+- Escenarios de `tools/nettest/`: cada uno es un fichero `tools/nettest/scenarios/<nombre>.sh`; `run.sh <nombre>` lo
+  descubre por el nombre (lo implementa T301). Una tarea que añade un escenario lo declara en su `files:` y no edita
+  `run.sh`, así dos tareas no se pisan.
 - No edites `generated/`, `extracted/`, `online_mod/` ni nada de `third_party/` (única excepción: añadir miniupnpc
   como diga el ADR de T306). No subas ficheros del juego.
 - Decisiones del dueño que mandan sobre cualquier tarea (`specs/decisiones/`): ENet y miniupnpc aceptadas, con
@@ -33,7 +41,12 @@ adivinar, para y pregunta: no inventes.
   ahora (diseña para N, prueba con 2), contraseña opcional y el código de invitación puede contener la IP (ADR-007,
   decisión 12); plazo de gracia de reconexión de 10 minutos (ADR-008, decisión 18); si la conexión directa falla, el
   juego solo muestra un error claro: sin guía de red virtual (Tailscale, ZeroTier) ni servicio de presentación o
-  perforación de NAT (ADR-009, decisión 23).
+  perforación de NAT (ADR-009, decisión 23); ronda 4 (**ADR-011**, decisiones 29-47): el anfitrión es siempre la
+  misma persona y, si cae, la sesión termina sin traspaso (decisiones 29 y 32); lo que el invitado hace en el mundo
+  durante un corte se pierde y conserva solo su inventario (31); los menús no pausan y la colisión entre jugadores
+  está activada, con opción del anfitrión para apagarla (44, 45); recorrido de prueba de la Meseta de los Albores (46).
+  **Dato de planificación (ADR-011, decisión 47):** F3 **no se cierra** sin la prueba con dos PC por Internet (T341). Si
+  no hay segundo PC, esa prueba queda como pendiente explícito en la bitácora y **no se sustituye por Docker**.
 - No toques `tools/patches.py` ni `tools/game_sites.py` en F3 (cambian `GAMELIB_ID` y obligan a recompilar el juego).
 - No cambies estructuras de cable, números de mensaje ni `PROTOCOL` salvo que la tarea diga "dueño del protocolo".
 - No bloquees nunca el hilo del juego ni el de presentación: nada de `recv`, `send`, `connect`, `getaddrinfo`, UPnP
@@ -41,37 +54,37 @@ adivinar, para y pregunta: no inventes.
 - Todo campo que llega por red es hostil: comprueba longitud, rango, terminador de cadena y `isfinite` antes de usar.
 - Código C11 que compile con `clang -Wall` en Windows (MSYS2 UCRT64), Linux y macOS. Sockets con `#ifdef _WIN32`
   como en `runtime/control.c:2-39`. Funciones internas `static`; las públicas con prefijo `online_`.
-- Texto visible para el jugador: en inglés en el código, dentro de un `.mm` de `runtime/ui/`, y entrégalo en la
+- Texto visible para el jugador: en inglés en el código, envuelto con `tr()`, dentro de un `.mm` de `runtime/ui/`, y entrégalo en la
   lista de textos nuevos (T333). No edites `runtime/ui/i18n/*.inc` si no eres el carril i18n.
 - Órdenes en Windows: shell MSYS2 UCRT64 con `export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"`. Python del
   proyecto: `tools/venv/Scripts/python.exe` (en Linux `tools/venv/bin/python`).
-- Comprobación mínima de cualquier cambio en `runtime/`: `make runtime-objs` sin avisos nuevos.
-- Una tarea está hecha cuando su `verify` pasa **y** queda una entrada en `specs/bitacora/` con la salida.
+- Comprobación mínima de cualquier cambio en `runtime/`: `make runtime-objs` sin avisos nuevos (la ejecuta el orquestador).
+- Una tarea está hecha cuando su `verify` pasa (ejecutado por el orquestador) **y** queda una entrada en `specs/bitacora/` con la salida.
 
 ---
 
 ## Bloque 1 — Arnés, bot y medidas
 
 - [ ] T301 [pruebas] Arnés de red en Docker con latencia y pérdida simuladas
-  files: tools/nettest/compose.yml, tools/nettest/Dockerfile, tools/nettest/netem.sh, tools/nettest/run.sh, tools/nettest/README.md
+  files: tools/nettest/compose.yml, tools/nettest/Dockerfile, tools/nettest/netem.sh, tools/nettest/run.sh, tools/nettest/scenarios/smoke.sh, tools/nettest/README.md
   verify: `sh tools/nettest/run.sh smoke` sale con 0 e imprime `smoke: OK` (dos bots se ven entre sí a través del servidor con el perfil `wifi`)
   depende de: F0 (imagen Docker de pruebas), F2 (servidor ejecutable sin el juego)
-  quién: agente
+  quién: agente escribe; orquestador ejecuta (Docker)
   contexto: Hoy no hay ninguna prueba automática de red; el bot `tools/online_bot.c` se compila a mano (`cc -O2 -o build/online_bot tools/online_bot.c`) y no está en el `Makefile`. Las pruebas de F3 necesitan tres contenedores (servidor y dos bots) y poder estropear la red con `tc netem`.
   pasos:
     1. Crea `tools/nettest/Dockerfile` a partir de la imagen de pruebas de F0; añade el paquete `iproute2` (da `tc`).
     2. Crea `compose.yml` con tres servicios (`server`, `bot_a`, `bot_b`) en una red puente propia y `cap_add: [NET_ADMIN]`.
     3. El servicio `server` arranca el servidor sin juego. Prueba primero `build/savagewind --server 52530`; si el binario completo no arranca en el contenedor, usa el arnés de servidor de las pruebas de F2 y anótalo en el README.
     4. `netem.sh <perfil>` aplica en `eth0` uno de: `lan` (nada), `fibra` (`delay 20ms 4ms loss 0.2%`), `normal` (`delay 40ms 10ms loss 1%`), `wifi` (`delay 80ms 20ms loss 2%`), `movil` (`delay 150ms 40ms loss 5%`), `rafagas` (`delay 60ms 15ms loss gemodel 1% 20% 70% 0.1%`), `corte` (`loss 100%`), y `quitar`.
-    5. `run.sh <escenario>` levanta el compose, aplica el perfil, espera, recoge los registros de los tres contenedores en `build/nettest/<escenario>/` y devuelve 0 o 1.
-    6. Escenario `smoke`: perfil `wifi`, 20 s; pasa si cada bot registró al menos 200 STATE del otro.
+    5. `run.sh <escenario>` ejecuta `scenarios/<escenario>.sh` (descubrimiento por nombre), levanta el compose, aplica el perfil, espera, recoge los registros de los tres contenedores en `build/nettest/<escenario>/` y devuelve 0 o 1.
+    6. Escenario `smoke` (`scenarios/smoke.sh`): perfil `wifi`, 20 s; pasa si cada bot registró al menos 200 STATE del otro.
     7. Escribe el README con cómo lanzar cada cosa y cuánta RAM usa.
   hecho cuando: `run.sh smoke` pasa tres veces seguidas y deja los registros en `build/nettest/smoke/`.
   no hagas: no uses `network_mode: host`; no metas ficheros del juego en la imagen; no llames a un directorio `input`, `save`, `keys`, `dump` o `generated` (los ignora git y los rechaza el CI); no dejes `netem` aplicado al terminar.
   modelo sugerido: medio
 
 - [ ] T302 [P] [pruebas] Modos de fallo y de ataque en el bot
-  files: tools/online_bot.c
+  files: tools/online_bot.c, tools/nettest/scenarios/bot_modes.sh
   verify: `sh tools/nettest/run.sh bot_modes` sale con 0 (lanza el bot una vez por modo y comprueba en el registro la línea `bot: mode <nombre> active`)
   depende de: T301, F2 (cabecera de protocolo compartida)
   quién: agente
@@ -80,20 +93,20 @@ adivinar, para y pregunta: no inventes.
     1. Sube el buffer de recepción a 32768 bytes (igual que el juego).
     2. Añade, leyendo variables de entorno como las existentes: `BOT_NOREAD=<s>` (a los s segundos deja de llamar a `recv` pero mantiene el socket abierto), `BOT_FLOOD=<tipo>,<hz>` (envía ese tipo de mensaje a esa frecuencia), `BOT_SPOOF=1` (envía ENEMIES, LOOTS y QUESTS sin ser anfitrión), `BOT_BADPASS=<n>` (hace n intentos con contraseña mala y sale), `BOT_PREAUTH=<n>` (abre n conexiones sin enviar HELLO y las mantiene), `BOT_DROP=<s>,<d>` (a los s segundos cierra el socket y reintenta a los d segundos), `BOT_STATS=1` (imprime cada segundo: STATE recibidos por ranura, intervalo máximo entre STATE en ms, mensajes de cada tipo).
     3. Cada modo imprime al activarse `bot: mode <nombre> active`.
-    4. Añade el escenario `bot_modes` a `tools/nettest/run.sh`.
+    4. Crea el escenario `tools/nettest/scenarios/bot_modes.sh`.
   hecho cuando: los siete modos funcionan contra el servidor actual y `BOT_STATS` da números coherentes (unos 20 STATE por segundo del otro bot en perfil `lan`).
   no hagas: no copies a mano estructuras de cable (usa la cabecera compartida de F2); no cambies el comportamiento por defecto del bot (sin variables debe seguir andando en círculo); no añadas dependencias.
   modelo sugerido: medio
 
 - [ ] T303 [P] [medidas] Línea base de TCP bajo latencia y pérdida
-  files: tools/nettest/measure.sh, tools/nettest/report.py, specs/bitacora/F3-T303-linea-base-tcp.md
+  files: tools/nettest/measure.sh, tools/nettest/report.py, specs/bitacora/F3-T303-linea-base-tcp.md (la entrada la completa el orquestador con las medidas)
   verify: `sh tools/nettest/measure.sh tcp` sale con 0 y escribe `build/nettest/tcp/resumen.csv` con una fila por perfil
   depende de: T301, T302
-  quién: agente
+  quién: agente escribe `measure.sh` y `report.py`; **orquestador** ejecuta las medidas (Docker) y rellena la bitácora
   contexto: Todo viaja por una conexión TCP: un paquete perdido retiene lo posterior y llega en ráfaga, y la hora de cada instantánea es la de recepción (`runtime/online.c:910`), así que el interpolador salta. No hay ninguna medida; el dueño debe decidir con datos si se cambia de transporte.
   pasos:
-    1. Para cada perfil (`lan`, `fibra`, `normal`, `wifi`, `movil`, `rafagas`) y 3 repeticiones de 120 s: levanta servidor y dos bots con `BOT_STATS=1`.
-    2. Haz que el bot registre, por cada STATE recibido, la hora de recepción en ms.
+    1. (Orquestador, al ejecutar `measure.sh`.) Para cada perfil (`lan`, `fibra`, `normal`, `wifi`, `movil`, `rafagas`) y 3 repeticiones de 120 s: levanta servidor y dos bots con `BOT_STATS=1`.
+    2. Haz que `measure.sh` obtenga del bot (`BOT_STATS`, T302) la hora de recepción en ms de cada STATE; si falta una columna, pídela a T302, no edites el bot aquí.
     3. `report.py` calcula por perfil: intervalo entre STATE p50/p95/p99/máximo; atascos por minuto (intervalos > 150 ms); bytes/s por nodo; latencia de un CHAT (hora de envío en el texto, hora de recepción).
     4. Añade el perfil `subida` (`rate 1mbit` en el servidor más `normal`).
     5. Prueba de recuperación: `corte` durante 3 s y tiempo hasta el primer STATE nuevo.
@@ -103,17 +116,17 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: medio
 
 - [ ] T304 [P] [medidas] Prototipo de banco con UDP (ENet) para comparar
-  files: tools/netbench/** (nuevo), specs/bitacora/F3-T304-banco-udp.md
+  files: tools/netbench/** (nuevo), tools/nettest/measure.sh (solo la rama `udp`), specs/bitacora/F3-T304-banco-udp.md
   verify: `sh tools/nettest/measure.sh udp` sale con 0 y escribe `build/nettest/udp/resumen.csv` con las mismas columnas que T303
   depende de: T303
-  quién: agente
+  quién: agente escribe; orquestador descarga, compila y mide
   contexto: Pregunta a responder: con los mismos tamaños y ritmos de mensaje, ¿cuánto mejoran los atascos y la edad del estado usando un canal no fiable para el estado continuo y uno fiable para los eventos? ENet (licencia MIT) ofrece canales fiables y no fiables sobre UDP y está aceptada por el dueño como dependencia (ADR-007, decisión 11): esta tarea no espera ningún permiso. Esto es un banco aparte: no se integra en el juego.
   pasos:
     1. Crea un programa emisor y uno receptor en `tools/netbench/` que usen ENet con 2 canales: 0 no fiable secuenciado, 1 fiable.
     2. El emisor imita a un jugador: 3375 bytes a 20 Hz y 1600 bytes a 20 Hz por el canal 0; un evento de 120 bytes por segundo por el canal 1.
     3. Como 3375 bytes no caben en un datagrama de ~1200 bytes, mide dos variantes: (a) dejando que ENet fragmente; (b) partiendo el estado en 3 trozos independientes de ≤ 1150 bytes. Anota ambas.
     4. Mismos perfiles, repeticiones y métricas que T303, con el mismo `report.py`.
-    5. Descarga ENet dentro de `build/` en el contenedor (no lo añadas al repositorio en esta tarea).
+    5. ENet: el **orquestador** la descarga dentro de `build/` en el contenedor (el subagente no descarga nada; tampoco se añade al repositorio en esta tarea). El subagente deja en el README de `tools/netbench/` la versión y la orden exactas.
     6. Bitácora con la tabla comparada con T303.
   hecho cuando: hay dos CSV comparables (TCP y UDP) y la bitácora dice, por perfil, cuál gana y por cuánto.
   no hagas: no toques `runtime/`; no añadas ENet a `third_party/` ni al `Makefile` (eso solo ocurre si T305 decide migrar); no saques conclusiones: la decisión es de T305.
@@ -126,7 +139,7 @@ adivinar, para y pregunta: no inventes.
   quién: dueño (el agente redacta el borrador)
   contexto: F3 mide y decide; no migra. Usar ENet ya está permitido (ADR-007, decisión 11): la decisión depende solo de las medidas, y es la que cierra ADR-005. Regla propuesta en `plan.md` §L: migrar si en el perfil `wifi` TCP con colas no bloqueantes da más de 2 atascos por minuto o p99 > 200 ms y UDP da menos de la mitad.
   pasos:
-    1. Repite T303 después de T309 (colas no bloqueantes) y añade esa tercera columna.
+    1. El orquestador repite T303 después de T309 (colas no bloqueantes) y añade esa tercera columna.
     2. Redacta: contexto, opciones (TCP con colas; UDP con ENet; UDP propio), medidas, coste de cada opción (dependencia nueva en tres plataformas, partir STATE), recomendación.
     3. El dueño elige y firma.
   hecho cuando: el ADR está firmado. Si la decisión es migrar, queda creada una fase o tarea aparte; F3 no la ejecuta.
@@ -134,16 +147,16 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T306 [P] [investigación] Spike: apertura automática de puerto con miniupnpc
-  files: tools/netbench/upnp_probe.c, specs/decisiones/ADR-upnp.md, specs/bitacora/F3-T306-upnp.md
+  files: tools/netbench/upnp_probe.c, tools/nettest/scenarios/upnp_probe.sh, specs/decisiones/ADR-upnp.md, specs/bitacora/F3-T306-upnp.md
   verify: `sh tools/nettest/run.sh upnp_probe` sale con 0 (la sonda abre y cierra una redirección contra `miniupnpd` en un contenedor)
   depende de: T301
   quién: agente (la prueba contra el router real la hace el dueño)
   contexto: Hoy no hay UPnP ni NAT-PMP; la pestaña Online solo dice que se redirija el puerto (`runtime/ui/online_ui.mm:57-59`). El dueño ya aceptó miniupnpc (ADR-007, decisión 11): no hay que elegir entre código propio y biblioteca ni pedir permiso. Lo que queda por saber es si funciona y cómo se incluye, porque una biblioteca enlazada es cara en este proyecto (tres plataformas, script de instalación, CI, `docs/third-party.md`).
   pasos:
     1. Pregunta exacta: ¿miniupnpc hace la secuencia completa (descubrimiento SSDP, `AddPortMapping`, `GetExternalIPAddress`, `DeletePortMapping`, y NAT-PMP si lo cubre) y cómo conviene incluirla: fuente en `third_party/` o paquete del sistema en cada plataforma?
-    2. Escribe `upnp_probe.c` (programa suelto, un solo fichero) que haga esa secuencia con miniupnpc, con plazo total de 5 s, e imprima cada paso. Descarga miniupnpc dentro de `build/` en el contenedor; no la añadas al repositorio en esta tarea.
-    3. Añade al compose un contenedor con `miniupnpd` como puerta de enlace de prueba y el escenario `upnp_probe`.
-    4. Pide al dueño que lo ejecute contra su router y pegue la salida en la bitácora.
+    2. Escribe `upnp_probe.c` (programa suelto, un solo fichero) que haga esa secuencia con miniupnpc, con plazo total de 5 s, e imprima cada paso. El orquestador descarga miniupnpc dentro de `build/` en el contenedor (el subagente no descarga nada); no se añade al repositorio en esta tarea.
+    3. Añade al compose un contenedor con `miniupnpd` como puerta de enlace de prueba y el escenario `scenarios/upnp_probe.sh`.
+    4. El orquestador ejecuta la sonda en Docker; el dueño la ejecuta contra su router y pega la salida en la bitácora.
     5. Forma de la respuesta: ADR con tabla (forma de incluirla, versión y licencia leída en su fichero de licencia, funcionó en Docker sí/no, funcionó en el router real sí/no, coste de integración en Windows, Linux y macOS) y recomendación, más el texto de la entrada que T324 añadirá a `docs/third-party.md`.
   hecho cuando: el ADR existe con las dos pruebas (Docker y router real) anotadas y la licencia confirmada como compatible con MIT.
   no hagas: no integres nada en `runtime/` todavía; no analices XML con funciones sin límite de longitud; no confíes en la respuesta del router (tamaño máximo, plazo).
@@ -151,17 +164,17 @@ adivinar, para y pregunta: no inventes.
 
 - [ ] T307 [P] [investigación] Qué identificador de compilación se puede comparar entre dos PC
   files: specs/bitacora/F3-T307-identificador-compilacion.md
-  verify: la bitácora responde a las tres preguntas de `pasos` con la orden usada y su salida
+  verify: `grep -c '^| [123] |' specs/bitacora/F3-T307-identificador-compilacion.md` da 3 (una fila de tabla por pregunta, con la orden usada y su salida en el cuerpo)
   depende de: F0
-  quién: agente + dueño (hace falta una segunda máquina o una compilación con otra arquitectura)
-  contexto: El saludo solo compara `PROTOCOL` (`runtime/online.c:240`). Queremos rechazar a quien tenga otra compilación del código del juego. El identificador `GAMELIB_ID` se calcula de las fuentes del generador **más los indicadores del compilador** (`Makefile:160-164`) y existe `GAMELIB_ID_COMPAT` para CPU sin AVX2/FMA (`runtime/gamelib.c:43-59`).
+  quién: agente redacta la tabla vacía; orquestador y dueño ejecutan las órdenes (hace falta una segunda máquina o una compilación con otra arquitectura)
+  contexto: El saludo solo compara `PROTOCOL` (`runtime/online.c:240`). Queremos rechazar a quien tenga otra compilación del código del juego. El identificador `GAMELIB_ID` se calcula de las fuentes del generador **más los indicadores del compilador** (`Makefile:136-142`) y existe `GAMELIB_ID_COMPAT` (`Makefile:150-152`) para CPU sin AVX2/FMA (`runtime/gamelib.c:43-59`).
   pasos:
     1. Pregunta 1: con el mismo commit, ¿`make -s --eval='print-gamelib-id:;@echo $(GAMELIB_ID)' print-gamelib-id` da lo mismo en Windows y en Linux (Docker)?
     2. Pregunta 2: ¿qué función de `runtime/gamelib.c` devuelve el identificador en ejecución y está disponible cuando no hay biblioteca cargada?
     3. Pregunta 3: ¿`savagewind --server <puerto>` arranca en un contenedor Linux sin GPU ni pantalla?
     4. Forma de la respuesta: una tabla (pregunta, respuesta sí/no, evidencia) y una recomendación de qué enviar en el saludo: un identificador, los dos, o uno nuevo solo de fuentes.
   hecho cuando: T314 puede implementarse sin suposiciones.
-  no hagas: no edites el fichero `.id` ni el `Makefile`; no deduzcas la respuesta leyendo: ejecuta.
+  no hagas: no edites el fichero `.id` ni el `Makefile`; no deduzcas la respuesta leyendo: el orquestador ejecuta las órdenes y pega la salida (ADR-006).
   modelo sugerido: medio
 
 ## Bloque 2 — Protocolo (dueño único)
@@ -169,7 +182,7 @@ adivinar, para y pregunta: no inventes.
 - [ ] T308 [protocolo] Definir el cambio de cable de F3 en un solo salto de versión
   files: runtime/online.h, runtime/online.c (solo `PROTOCOL`, enumeración de mensajes y estructuras de cable), la cabecera compartida con el bot que dejó F2, tools/online_bot.c, tests/test_online_wire.c, specs/contratos/protocolo.md
   verify: `clang -Wall -Iruntime tests/test_online_wire.c -o build/test_online_wire && build/test_online_wire` sale con 0 (aserciones de tamaño y de ida y vuelta de cada estructura nueva)
-  depende de: F2
+  depende de: F2, T302 (las dos tareas editan `tools/online_bot.c`: T302 va primero)
   quién: agente designado como **dueño del protocolo** (solo uno en todo el proyecto)
   contexto: El protocolo es `PROTOCOL 38`, con igualdad exacta en el servidor (`runtime/online.c:39-40`, `:240`). Las cargas son estructuras C empaquetadas (`:59-108`). F3 necesita campos y mensajes nuevos; se definen todos de una vez para que los demás carriles trabajen sin tocar el cable.
   pasos:
@@ -188,7 +201,7 @@ adivinar, para y pregunta: no inventes.
 ## Bloque 3 — Núcleo de red (en serie, dueño único de `runtime/online.c`)
 
 - [ ] T309 [núcleo] Cola de envío por cliente en el servidor, sin bloqueo
-  files: runtime/online.c, runtime/online_sendq.c, runtime/online_sendq.h, tests/test_online_sendq.c
+  files: runtime/online.c, runtime/online_sendq.c, runtime/online_sendq.h, tests/test_online_sendq.c, tools/nettest/scenarios/h1_noread.sh
   verify: `clang -Wall -Iruntime tests/test_online_sendq.c -o build/test_online_sendq && build/test_online_sendq` sale con 0 **y** `sh tools/nettest/run.sh h1_noread` sale con 0
   depende de: T301, T302, T308
   quién: agente
@@ -200,13 +213,13 @@ adivinar, para y pregunta: no inventes.
     4. En `online.c`: pon todos los sockets aceptados en modo no bloqueante; `srv_broadcast` pasa a `sendq_push`; en `srv_loop` añade el conjunto de escritura a `select()` y vacía cada cola con `send()` no bloqueante.
     5. Expulsa (`srv_drop`) si `sendq_overflow` o si pasan 5 s con datos pendientes sin que el socket acepte un byte.
     6. En `select() < 0` duerme 10 ms en vez de `continue` inmediato (`:356`).
-    7. Escenario `h1_noread`: bot A con `BOT_NOREAD=5`, bot B con `BOT_STATS=1` más un tercer bot que emite; pasa si el intervalo máximo entre STATE de B no supera 150 ms y A aparece expulsado antes de 15 s.
+    7. Escenario `scenarios/h1_noread.sh`: bot A con `BOT_NOREAD=5`, bot B con `BOT_STATS=1` más un tercer bot que emite; pasa si el intervalo máximo entre STATE de B no supera 150 ms y A aparece expulsado antes de 15 s.
   hecho cuando: las dos pruebas pasan y `run.sh smoke` sigue pasando.
   no hagas: no crees un hilo por cliente; no descartes nunca un mensaje fiable en silencio; no uses `SO_SNDTIMEO` como sustituto; no cambies estructuras de cable.
   modelo sugerido: alto
 
 - [ ] T310 [núcleo] Cliente sin bloqueo y salida de sesión que no cuelga la UI
-  files: runtime/online.c
+  files: runtime/online.c, tools/nettest/scenarios/leave_fast.sh
   verify: `sh tools/nettest/run.sh leave_fast` sale con 0 (mide que `online_leave` vuelve en < 1 s con el servidor congelado y con una dirección que no responde)
   depende de: T309
   quién: agente
@@ -222,7 +235,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T311 [núcleo] El servidor sabe quién es el anfitrión y le reserva la ranura 0
-  files: runtime/online.c, tests/test_online_host_slot.c
+  files: runtime/online.c, tests/test_online_host_slot.c, tools/nettest/scenarios/host_slot.sh
   verify: `sh tools/nettest/run.sh host_slot` sale con 0
   depende de: T310
   quién: agente
@@ -239,7 +252,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T312 [núcleo] Tabla de autoridad y validación en el servidor
-  files: runtime/online.c, runtime/online_authority.c, runtime/online_authority.h, tests/test_online_authority.c
+  files: runtime/online.c, runtime/online_authority.c, runtime/online_authority.h, tests/test_online_authority.c, tools/nettest/scenarios/spoof.sh
   verify: `clang -Wall -Iruntime tests/test_online_authority.c -o build/test_online_authority && build/test_online_authority` sale con 0 **y** `sh tools/nettest/run.sh spoof` sale con 0
   depende de: T311, F2 (validación única de entradas)
   quién: agente
@@ -256,7 +269,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T313 [núcleo] Límite de tasa y conexiones sin autenticar
-  files: runtime/online.c
+  files: runtime/online.c, tools/nettest/scenarios/flood.sh, tools/nettest/scenarios/preauth.sh
   verify: `sh tools/nettest/run.sh flood` y `sh tools/nettest/run.sh preauth` salen con 0
   depende de: T312, T320
   quién: agente
@@ -272,7 +285,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T314 [núcleo] Saludo con comprobación estricta de versión
-  files: runtime/online.c
+  files: runtime/online.c, tools/online_bot.c, tools/nettest/scenarios/version_matrix.sh
   verify: `sh tools/nettest/run.sh version_matrix` sale con 0 (5 bots, cada uno con un campo distinto, reciben cada uno su motivo de rechazo)
   depende de: T307, T313, T325
   quién: agente
@@ -283,13 +296,13 @@ adivinar, para y pregunta: no inventes.
     3. Cada diferencia envía REJECT con su motivo y las dos cadenas (la del servidor y la del cliente).
     4. El cliente pone un estado legible: literal fijo en inglés como formato y los valores como argumentos (igual que `set_status` hoy).
     5. Usa para la compilación la regla que decidió T307.
-    6. Añade al bot las variables para falsear cada campo y escribe el escenario `version_matrix`.
+    6. Añade al bot (`tools/online_bot.c`) las variables para falsear cada campo y escribe `scenarios/version_matrix.sh`.
   hecho cuando: cada una de las 5 diferencias produce su motivo y dos jugadores idénticos entran.
   no hagas: no uses datos de la red como cadena de formato; no reveles la contraseña ni si era correcta cuando falla la versión; no hagas la comprobación solo en el cliente.
   modelo sugerido: medio
 
 - [ ] T315 [núcleo] Contraseña por desafío-respuesta y límite de intentos
-  files: runtime/online.c
+  files: runtime/online.c, tools/nettest/scenarios/badpass.sh
   verify: `sh tools/nettest/run.sh badpass` sale con 0 **y** `grep -c "secreto-de-prueba" online.ini` da 0 tras guardar una sesión con esa contraseña
   depende de: T314, T321
   quién: agente
@@ -323,7 +336,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T317 [núcleo] Reconexión, lado servidor: reservar la ranura y reanudar
-  files: runtime/online.c
+  files: runtime/online.c, tools/nettest/scenarios/resume_server.sh
   verify: `sh tools/nettest/run.sh resume_server` sale con 0
   depende de: T316
   quién: agente
@@ -341,7 +354,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T318 [núcleo] Reconexión, lado cliente: reintentos automáticos
-  files: runtime/online.c, runtime/online.h (solo el estado `ONLINE_RECONNECTING` y la función `online_reconnect_cancel`; pide permiso al dueño del protocolo)
+  files: runtime/online.c, runtime/online.h (solo el estado `ONLINE_RECONNECTING` y la función `online_reconnect_cancel`; pide permiso al dueño del protocolo), tools/nettest/scenarios/resume_client.sh
   verify: `sh tools/nettest/run.sh resume_client` sale con 0 (corte de 10 s con `netem corte`: el cliente real o el arnés de F2 vuelve a `CONNECTED` con la misma ranura)
   depende de: T317
   quién: agente
@@ -425,7 +438,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: bajo
 
 - [ ] T323 [P] [módulo] Descubrimiento de partidas en la red local
-  files: runtime/online_discovery.c, runtime/online_discovery.h, tests/test_online_discovery.c
+  files: runtime/online_discovery.c, runtime/online_discovery.h, tests/test_online_discovery.c, tools/nettest/scenarios/lan.sh
   verify: `clang -Wall -Iruntime tests/test_online_discovery.c runtime/online_discovery.c -o build/test_online_discovery && build/test_online_discovery` sale con 0 **y** `sh tools/nettest/run.sh lan` sale con 0
   depende de: T301, T308
   quién: agente
@@ -442,7 +455,7 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T324 [P] [módulo] Apertura automática de puerto (UPnP y NAT-PMP)
-  files: runtime/online_upnp.c, runtime/online_upnp.h, tests/test_online_upnp.c, docs/third-party.md (solo la entrada de miniupnpc), y la fuente de miniupnpc donde diga el ADR de T306
+  files: runtime/online_upnp.c, runtime/online_upnp.h, tests/test_online_upnp.c, tools/nettest/scenarios/upnp.sh, docs/third-party.md (solo la entrada de miniupnpc), y la fuente de miniupnpc donde diga el ADR de T306
   verify: `sh tools/nettest/run.sh upnp` sale con 0 (abre, consulta la IP externa y cierra contra `miniupnpd`; y sin IGD devuelve "no disponible" en < 5 s)
   depende de: T306 (ADR con la forma de incluir miniupnpc)
   quién: agente
@@ -583,12 +596,12 @@ adivinar, para y pregunta: no inventes.
   quién: agente
   contexto: El PR #294 añadió 63 entradas de Online solo a `runtime/ui/i18n/es.inc`. En los otros 12 ficheros hay 0 (comprobado: `grep -c "Create session" runtime/ui/i18n/*.inc` da 1 solo en `es.inc`). La clave de cada entrada es el texto en inglés: `T("English", "traducción")`.
   pasos:
-    1. Por cada idioma: `tools/venv/Scripts/python.exe tools/i18n_check.py --missing <idioma>` imprime las líneas que faltan.
+    1. Por cada idioma, el orquestador ejecuta `tools/venv/Scripts/python.exe tools/i18n_check.py --missing <idioma>` y te pasa las líneas que faltan.
     2. Añade esas líneas al final del fichero del idioma, en un bloque con el comentario `// Online (co-op)`.
     3. Traduce conservando los `%s`/`%d` en el mismo orden y los nombres propios sin traducir. El texto de ayuda que nombra Tailscale, ZeroTier y Radmin VPN lo retira T328 (ADR-009, decisión 23): tradúcelo solo si sigue en el código cuando hagas esta tarea.
     4. Usa la terminología del propio fichero para palabras ya traducidas (busca cómo tradujo "Settings", "Port", "Password").
-    5. Ejecuta el comprobador.
-  hecho cuando: `0 missing` en los 13 y `make runtime-objs` compila.
+    5. Deja listo el cambio; el orquestador ejecuta el comprobador (`i18n_check.py`).
+  hecho cuando: `0 missing` en los 13 y `make runtime-objs` compila (ambas cosas las comprueba el orquestador).
   no hagas: no cambies la cadena inglesa (es la clave); no reordenes ni reformatees líneas existentes; no dejes `T("...", "")` en frases enteras; no toques `es.inc` salvo que falte algo.
   modelo sugerido: bajo
 
@@ -599,9 +612,9 @@ adivinar, para y pregunta: no inventes.
   quién: agente
   contexto: Los carriles de UI dejaron sus textos en inglés en `specs/fases/F3-red-robusta/textos-nuevos.txt`. El comprobador solo escanea `runtime/ui/*.mm` (menos `console.mm`), `runtime/language.c`, `runtime/hle/bindings.c` y `runtime/launch_flags.c`: los textos de estado que nacen en `runtime/online.c` no los ve.
   pasos:
-    1. Ejecuta `--missing es` y compara con `textos-nuevos.txt`. Si un texto de estado de `online.c` no aparece, comprueba que el literal figure también en `online_ui.mm` dentro de `tr("...")`; si no, añade ahí una tabla de textos de estado.
+    1. Compara con `textos-nuevos.txt` la lista que dé `--missing es` (la ejecuta el orquestador y te la pasa). Si un texto de estado de `online.c` no aparece, comprueba que el literal figure también en `online_ui.mm` dentro de `tr("...")`; si no, añade ahí una tabla de textos de estado.
     2. Añade las líneas a los 13 `.inc` en el mismo bloque `// Online (co-op)`.
-    3. Hebreo: comprueba en pantalla que el código de invitación y las direcciones IP se leen de izquierda a derecha.
+    3. Hebreo: el dueño o el orquestador comprueban en pantalla que el código de invitación y las direcciones IP se leen de izquierda a derecha.
   hecho cuando: `0 missing` y una captura de la pestaña Online en español, japonés y hebreo en bitácora.
   no hagas: no añadas `runtime/online.c` a `SOURCES` sin comprobar que no genera falsos positivos; no traduzcas el código de invitación.
   modelo sugerido: bajo
@@ -609,13 +622,13 @@ adivinar, para y pregunta: no inventes.
 ## Bloque 7 — Integración, pruebas y cierre
 
 - [ ] T334 [pruebas] Suite de integración en Docker
-  files: tools/nettest/run.sh, tools/nettest/scenarios/*.sh, tools/nettest/README.md
+  files: tools/nettest/scenarios/all.sh, tools/nettest/README.md
   verify: `sh tools/nettest/run.sh all` sale con 0 y termina en menos de 15 minutos
   depende de: T309-T319, T323, T324
   quién: agente
   contexto: Cada tarea del núcleo añadió un escenario suelto. Hace falta una orden única que los ejecute todos y sirva de regresión.
   pasos:
-    1. Un fichero por escenario en `scenarios/`: `smoke, bot_modes, h1_noread, leave_fast, host_slot, spoof, flood, preauth, version_matrix, badpass, resume_server, resume_client, lan, upnp`.
+    1. Cada tarea ya dejó su `scenarios/<nombre>.sh`; comprueba que existen todos y crea `all.sh`. Escenarios: `smoke, bot_modes, h1_noread, leave_fast, host_slot, spoof, flood, preauth, version_matrix, badpass, resume_server, resume_client, lan, upnp`.
     2. `run.sh all` los lanza en orden, imprime una tabla `escenario | OK/FALLO | segundos` y devuelve 1 si alguno falla.
     3. Cada escenario limpia sus contenedores y su `netem` aunque falle (`trap`).
     4. Documenta en el README cómo depurar uno (dónde quedan los registros).
@@ -632,7 +645,7 @@ adivinar, para y pregunta: no inventes.
   pasos:
     1. Objetivo 1: un `Server` en memoria con dos clientes simulados; la entrada del fuzzer se trocea en mensajes para `srv_message`.
     2. Objetivo 2: lo mismo con `cl_message`, en modo anfitrión y no anfitrión.
-    3. Compila con `clang -fsanitize=fuzzer,address,undefined` dentro del contenedor Linux.
+    3. Deja escrita `fuzz.sh`, que compila con `clang -fsanitize=fuzzer,address,undefined` dentro del contenedor Linux; **la compila y la ejecuta el orquestador**, no el subagente.
     4. Siembra el corpus con un mensaje válido de cada tipo generado por código (no con capturas reales).
   hecho cuando: 120 s por objetivo sin hallazgos; cualquier hallazgo se arregla o se abre como tarea.
   no hagas: no guardes en el repo capturas de sesiones reales; no desactives un sanitizador para "que pase".
@@ -640,15 +653,15 @@ adivinar, para y pregunta: no inventes.
 
 - [ ] T336 [ci] Flujo de CI para las pruebas de red
   files: .github/workflows/coop-net.yml
-  verify: el flujo aparece en verde en un PR interno del fork que toque `runtime/online.c`
+  verify: `grep -c 'run.sh all' .github/workflows/coop-net.yml` da 1 y `git diff --check` sin errores; el orquestador lo comprueba en verde en el push de cierre de F3 (ADR-006: no hay push antes) o con `act` en local
   depende de: T334, T337
-  quién: agente (el dueño habilita Actions en el fork)
+  quién: agente escribe el flujo; orquestador lo verifica (el dueño habilita Actions en el fork)
   contexto: El PR #294 borró los flujos de CI por un efecto de sus fusiones y F0 los restauró. Ninguno ejecuta pruebas de red.
   pasos:
     1. Disparo: PR y push que toquen `runtime/online*`, `tools/online_bot.c`, `tools/nettest/**`, `tests/test_online_*`.
     2. Trabajo en `ubuntu-latest`: compilar, `make test-online`, `sh tools/nettest/run.sh all`.
     3. Permisos `contents: read`; sin secretos.
-  hecho cuando: el flujo corre en menos de 20 minutos y falla si se rompe un escenario (compruébalo con un PR de prueba que lo rompa a propósito).
+  hecho cuando: el flujo corre en menos de 20 minutos y falla si se rompe un escenario (lo comprueba el orquestador con `act` o, tras el push de cierre de F3, con una rama de prueba que lo rompa a propósito; no hay push antes).
   no hagas: no edites los flujos existentes; no uses `pull_request_target`; no subas artefactos con ficheros del juego.
   modelo sugerido: bajo
 
@@ -661,7 +674,7 @@ adivinar, para y pregunta: no inventes.
   pasos:
     1. Añade al final del `Makefile` un bloque `# co-op network tests` con una regla por binario `$(B)/test_online_*` y el objetivo `test-online` que los ejecuta todos; añádelo a `.PHONY`.
     2. Copia el estilo de `test-control` o `test-update-core` del propio `Makefile`.
-    3. Regenera la tabla: `tools/venv/Scripts/python.exe tools/gen_launch_flags.py`.
+    3. Pide al orquestador que regenere la tabla (`tools/venv/Scripts/python.exe tools/gen_launch_flags.py`); el subagente no ejecuta el generador.
   hecho cuando: los dos `verify` pasan en Windows (MSYS2) y en Linux (Docker).
   no hagas: no cambies `RT_SRC`, `LDFLAGS` ni nada de `GAMELIB_SRCS`; no edites a mano la tabla generada; no intercales reglas en mitad del fichero.
   modelo sugerido: bajo
@@ -683,7 +696,7 @@ adivinar, para y pregunta: no inventes.
 - [ ] T339 [docs] Dejar claro qué hace y qué no hace `--server`
   files: runtime/main.c (solo el mensaje de arranque de `--server`), docs/coop-conexion.md
   verify: `build/savagewind.exe --server 52530` imprime al arrancar el aviso nuevo; `make runtime-objs` sin avisos
-  depende de: T312, decisión P3-4 del dueño
+  depende de: T312, T338 (las dos escriben `docs/coop-conexion.md`). `--server` se construye con la propuesta de P3-4 (relé sin mundo); no espera al dueño
   quién: agente
   contexto: `savagewind.exe --server [puerto]` (`runtime/main.c:440-446`) arranca solo el relé. En ese modo ningún cliente es `g.hosting`, así que nadie envía enemigos, botín ni misiones, y TIME no sale porque `g_local_hour` vale -1 (`runtime/online.c:43`, `:373-379`). `docs/ONLINE.md:15` no lo advierte.
   pasos:
@@ -697,21 +710,21 @@ adivinar, para y pregunta: no inventes.
 - [ ] T340 [cierre] Recorrido de dos instancias en un PC y bitácora de F3
   files: specs/bitacora/F3-cierre.md
   verify: la bitácora contiene, para cada criterio S1-S16 de `spec.md`, OK o FALLO con evidencia (orden, salida o captura)
-  depende de: todas las anteriores
+  depende de: todas las anteriores y **T341** (aunque lleve el número siguiente)
   quién: dueño (con un agente que prepara las órdenes)
   contexto: Un arreglo cuenta como hecho cuando se ha visto funcionar en el juego, no cuando compila (regla del plan aprobado). Dos juegos a la vez usan unos 9,5 GB de RAM: hay que cerrar Docker Desktop y el navegador.
   pasos:
     1. Sigue `verificacion.md` de esta carpeta de principio a fin.
     2. Repite el recorrido de F1 (CU-01 a CU-03, 30 minutos) con la versión nueva.
     3. Rellena la plantilla de bitácora.
-  hecho cuando: todos los criterios están en OK, o cada FALLO tiene una tarea abierta.
+  hecho cuando: todos los criterios están en OK, o cada FALLO tiene una tarea abierta. **F3 no se da por cerrada** sin la prueba de T341 con dos PC por Internet (ADR-011, dato de planificación): si no hay segundo PC, T340 deja esa prueba como pendiente explícito y F3 queda abierta; no se sustituye por Docker ni por pruebas simuladas.
   no hagas: no uses tu carpeta de guardado real (copia siempre); no marques OK sin evidencia.
   modelo sugerido: medio
 
 - [ ] T341 [cierre] Prueba con router real, cortafuegos de Windows y dos PC
   files: specs/bitacora/F3-T341-red-real.md
   verify: la bitácora registra: aviso del cortafuegos visto y aceptado; resultado de la apertura automática en el router del dueño; unión por código desde otra red (móvil compartiendo datos o un amigo); unión por IPv6 si hay
-  depende de: T328, T324
+  depende de: T328, T324, T338
   quién: dueño
   contexto: Docker no reproduce el cortafuegos de Windows ni un router doméstico. El aviso del cortafuegos aparece la primera vez que el programa escucha en un puerto; si se rechaza, nadie de fuera puede entrar y no hay ningún mensaje de error.
   pasos:

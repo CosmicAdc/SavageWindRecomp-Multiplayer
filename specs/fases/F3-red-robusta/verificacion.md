@@ -104,7 +104,7 @@ el bot como par que se cae (`BOT_DROP`), o dos PC y desconecta el cable/WiFi de 
 | 4.9 | Cierre de la redirección | Terminar sesión y mirar el router o `miniupnpd` | La redirección ya no está | ☐ |
 | 4.10 | IPv6 local | Juego A crea sesión; B se une a `[::1]:52530` | Conecta | ☐ |
 | 4.11 | IPv6 en la lista de direcciones | Pestaña de A con sesión abierta | Aparecen las IPv6 globales si el PC tiene | ☐ |
-| 4.12 | Router real y cortafuegos | Tarea T341 | Bitácora rellena | ☐ |
+| 4.12 | Router real y cortafuegos, con dos PC por Internet | Tarea T341 | Bitácora rellena. **Sin esta fila en OK, F3 no se cierra** (ADR-011, decisión 47); sin segundo PC queda como pendiente explícito y no se sustituye por Docker | ☐ |
 | 4.13 | Guía | El dueño sigue `docs/coop-conexion.md` sin ayuda; además `grep -ci -e tailscale -e zerotier docs/coop-conexion.md` | Conecta o llega a un diagnóstico claro; el `grep` da 0 | ☐ |
 | 4.15 | Dependencia anotada | `grep -ci miniupnpc docs/third-party.md` | Distinto de 0, con versión y licencia (ADR-007, decisión 11) | ☐ |
 | 4.14 | Accesibilidad | Recorre la pestaña solo con mando; mira los indicadores con la opción de visión de color activada y desactivada | Todo alcanzable; ningún estado depende solo del color | ☐ |
