@@ -56,3 +56,10 @@ salir al título y recargar.
 ## NO verificado
 
 - Nada de F2 se ha visto en el juego; T201 no tiene referencia real todavía.
+
+## 2026-11-25 (madrugada) · pasada completa interrumpida por memoria
+
+Con `revisor` y `oa-t209` (Opus) trabajando, la pasada completa de dos juegos (`recorrido.py --enemigos`, build con T208,
+`0fbcfa1`) la cortó Claude Code por memoria crítica antes del primer paso (el anfitrión ya ocupaba 4,2 GB). Se cerraron
+los dos juegos (6,2 GB libres después). **No se relanzó automáticamente**: queda para cuando el dueño lo pida o con
+menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un agente abierto.
