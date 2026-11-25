@@ -24,6 +24,7 @@
 #include "control_cells.h"
 #include "game_sites.h"
 #include "online.h"
+#include "online_gate.h"
 #include "rt.h"
 #include "settings.h"
 
@@ -179,6 +180,10 @@ static struct {
     bool skeleton;                                // his skeleton has come: his Link is posed by it, plays no AS
 } g_act[ONLINE_MAX];
 
+// a player's Link here, if the game still has it (0: none, or deleted since the last frame - game over, a load - and
+// not forgotten yet: rt_online_frame finds that later in the frame). The runes' work on it goes through this
+static uint64_t link_live(int i) { return g_act[i].link && alive(g_act[i].link, g_act[i].link_w) ? g_act[i].link : 0; }
+
 // tools/online_mod.py ANIMS: the AS names of OnlinePlayer's one-clip animations, in ONLINE_A_* order
 static const char *const k_anims[ONLINE_A_COUNT] = {
     "OnlineWait", "OnlineWalk", "OnlineRun", "OnlineDash", "OnlineJump", "OnlineFall", "OnlineGlide",
@@ -222,9 +227,15 @@ static const char *actor_name(void) {
 
 static bool is_online_player(void) { return actor_name() && !strcmp(actor_name(), "OnlinePlayer"); }
 
+// (not on another version of the game: the addresses here are 1.9.0's, runtime/online_gate.h; said once in the log)
 static bool online_actors_on(void) {
     static int on = -1;
-    if (on < 0) on = actor_name() != NULL;
+    if (on < 0) {
+        bool version = online_version_ok(g_game_version);
+        on = version && actor_name() != NULL;
+        LOG("[online] game version %s: actors %s\n", g_game_version && *g_game_version ? g_game_version : "unknown",
+            on ? "on" : version ? "off" : "off (online play's actors need 1.9.0)");
+    }
     return on;
 }
 
@@ -812,12 +823,13 @@ static uint64_t volatile g_bomb_made[4];
 static volatile int g_bomb_next;
 
 void rt_online_bomb(uint64_t bomb) {
-    if (!VALID(bomb)) return;
+    if (!online_version_ok(g_game_version) || !VALID(bomb)) return;
     int k = __atomic_fetch_add(&g_bomb_next, 1, __ATOMIC_RELAXED);
     g_bomb_made[k & 3] = bomb;
 }
 
 void rt_online_arrow(uint64_t action) {
+    if (!online_version_ok(g_game_version)) return;
     uint64_t a = *(uint64_t *)(uintptr_t)(action + 8);
     if (!VALID(a)) return;
     int k = __atomic_fetch_add(&g_arrow_next, 1, __ATOMIC_RELAXED);
@@ -866,7 +878,7 @@ static volatile int g_rf_next;
 static int g_rf_taken;
 
 void rt_online_xlink_emit(uint64_t ui, uint64_t loc) {
-    if (!VALID(ui)) return;
+    if (!online_version_ok(g_game_version) || !VALID(ui)) return;
     if (ui == g_rf_ui && g_rf_ui && VALID(loc)) {  // (ReactionField's: what and where, its matrix as it plays it)
         uint64_t t = *(uint64_t *)(uintptr_t)(loc + 8), nm = VALID(t) ? *(uint64_t *)(uintptr_t)t : 0;
         if (VALID(nm)) {
@@ -933,12 +945,14 @@ static void anim_slots(uint64_t actor, int16_t idx[3], float frame[3]) {
 static struct { uint64_t actor; int16_t anim[3]; float frame[3]; } volatile g_blur[ONLINE_MAX];  // (each puppet's)
 
 uint32_t rt_blur_anim(uint64_t actor, uint32_t slot, uint32_t id) {
+    if (!online_version_ok(g_game_version)) return id;
     for (int i = 0; actor && i < ONLINE_MAX; i++)
         if (g_blur[i].actor == actor) return slot < 3 && g_blur[i].anim[slot] >= 0 ? (uint32_t)g_blur[i].anim[slot] << 16 : id;
     return id;
 }
 
 float rt_blur_frame(uint64_t actor, uint32_t slot, float frame) {
+    if (!online_version_ok(g_game_version)) return frame;
     for (int i = 0; actor && i < ONLINE_MAX; i++)
         if (g_blur[i].actor == actor) return slot < 3 && g_blur[i].anim[slot] >= 0 ? g_blur[i].frame[slot] : frame;
     return frame;
@@ -2801,6 +2815,7 @@ uint32_t rt_scene_state(uint32_t v) { return v == 1 && g_nopause_now ? 0 : v; }
 // Not in its first frames: the world's camera is turned on again a frame after the menu opens (the frame hook), so
 // until then the game's own picture, made as it opened, stays (made again from a frame without the world: a flash)
 int rt_online_menu_live(void) {
+    if (!online_version_ok(g_game_version)) return 0;
     static int still = -1;
     if (still < 0) still = getenv("SAVAGEWIND_ONLINE_MENU_STILL") != NULL;
     return g_nopause_now && g_nopause_frames > MENU_LIVE_AFTER && !still;
@@ -2810,6 +2825,7 @@ int rt_online_menu_live(void) {
 // reading of the menu's state, not g_nopause_now: that is set later in the frame, after the menu has opened.
 // SAVAGEWIND_ONLINE_MENU_STILL: the still picture)
 uint32_t rt_menu_draw_pause(void) {
+    if (!online_version_ok(g_game_version)) return 1;
     static int still = -1;
     if (still < 0) still = getenv("SAVAGEWIND_ONLINE_MENU_STILL") != NULL;
     if (still || online_state() != ONLINE_CONNECTED || !g_site.pause_state) return 1;
@@ -2823,6 +2839,7 @@ uint32_t rt_menu_draw_pause(void) {
     return rule && others ? 0 : 1;
 }
 uint32_t rt_online_has_fairy(uint32_t had) {
+    if (!online_version_ok(g_game_version)) return had;
     if (had || online_state() != ONLINE_CONNECTED) return had;
     int rule = g_revive_rule;
     if (rule < 0) rule = g_online.revive;
@@ -4106,7 +4123,7 @@ static void stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
         if (VALID(body)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)g->m, 0, 0, 0, 0);
         stasis_look(c, g_act[i].stop, true);
         // its chains, the game's own, where it is
-        if (!g_act[i].link) continue;
+        if (!link_live(i)) continue;
         rune_keep(c, i, &g_act[i].stop_fx, "OnlineRuneFx", pl[i].name);
         uint64_t fxa = g_act[i].stop_fx.actor;
         if (!fxa) continue;
@@ -4303,8 +4320,9 @@ static void fx_end(Cpu *c, void *h) {
 // made again for him is never drawn (his beam and magnet were then gone for good)
 static void rune_keep(Cpu *c, int i, Piece *p, const char *name, const char *who) {
     if (piece_update(c, i, p, name, who)) model_visible(c, p->actor, false);
-    if (!p->actor || !g_act[i].link) return;
-    const float *lm = (const float *)(uintptr_t)(g_act[i].link + 0x398);
+    uint64_t lk = link_live(i);
+    if (!p->actor || !lk) return;
+    const float *lm = (const float *)(uintptr_t)(lk + 0x398);
     float at[12] = {1, 0, 0, lm[3], 0, 1, 0, lm[7] + 1, 0, 0, 1, lm[11]};
     call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)at, 0, 0, 0, 0);  // (moved again where it's used, after)
 }
@@ -4319,11 +4337,12 @@ static void rune_pieces(Cpu *c, int i, bool holding, const char *who) {
     rune_keep(c, i, &g_act[i].magnet_fx, "OnlineMagnetFx", who);
     if (!g_act[i].stop) rune_keep(c, i, &g_act[i].stop_fx, "OnlineRuneFx", who);
     float hand[12];
-    if (g_act[i].slate.actor && g_act[i].link) {
-        if (holding && bone_mtx(c, g_act[i].link, "Weapon_R", hand))
+    uint64_t lk = link_live(i);
+    if (g_act[i].slate.actor && lk) {
+        if (holding && bone_mtx(c, lk, "Weapon_R", hand))
             call(c, FN_SET_MTX, g_act[i].slate.actor, (uint64_t)(uintptr_t)hand, 0, 0, 0, 0);
         else if (!holding) {
-            const float *lm = (const float *)(uintptr_t)(g_act[i].link + 0x398);
+            const float *lm = (const float *)(uintptr_t)(lk + 0x398);
             float at[12] = {1, 0, 0, lm[3], 0, 1, 0, lm[7] + 1, 0, 0, 1, lm[11]};
             call(c, FN_SET_MTX, g_act[i].slate.actor, (uint64_t)(uintptr_t)at, 0, 0, 0, 0);
         }
@@ -4333,7 +4352,8 @@ static void rune_pieces(Cpu *c, int i, bool holding, const char *who) {
 static void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
     for (int i = 0; i < ONLINE_MAX; i++) {
         const OnlineGrab *g = i != me && pl[i].used && pl[i].pose.valid ? &pl[i].pose.grab : NULL;
-        bool want = g && g->name[0] && g_act[i].link;
+        uint64_t lk = link_live(i);
+        bool want = g && g->name[0] && lk;
         if (g_act[i].grab) {
             float dx = want ? g->from[0] - g_act[i].grab_from[0] : 0, dz = want ? g->from[2] - g_act[i].grab_from[2] : 0;
             if (!want || strcmp(g->name, g_act[i].grab_name) || dx * dx + dz * dz > 0.25f ||
@@ -4355,7 +4375,7 @@ static void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
         }
         if (!want) {
             g_act[i].grab_name[0] = 0, g_act[i].grab_wait = 0;
-            if (g_act[i].link && i != me && pl[i].used) rune_pieces(c, i, false, pl[i].name);
+            if (lk && i != me && pl[i].used) rune_pieces(c, i, false, pl[i].name);
             continue;
         }
         if (!g_act[i].grab && (strcmp(g->name, g_act[i].grab_name) || g_act[i].grab_wait-- <= 0)) {
@@ -4434,9 +4454,9 @@ static void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
         // its x = y x z
         uint64_t fxa = g_act[i].rune_fx.actor;
         float hand[12], left[12];
-        if (!fxa || !bone_mtx(c, g_act[i].link, "Weapon_R", hand)) continue;
+        if (!fxa || !bone_mtx(c, lk, "Weapon_R", hand)) continue;
         float o[3] = {hand[3], hand[7], hand[11]};
-        if (bone_mtx(c, g_act[i].link, "Weapon_L", left))
+        if (bone_mtx(c, lk, "Weapon_L", left))
             o[0] = (o[0] + left[3]) / 2, o[1] = (o[1] + left[7]) / 2, o[2] = (o[2] + left[11]) / 2;
         const float *gm = g_act[i].grab ? (const float *)(uintptr_t)(g_act[i].grab + 0x398) : g->m;  // (as it's drawn)
         float z[3] = {gm[3] - o[0], gm[7] - o[1], gm[11] - o[2]};
@@ -4899,7 +4919,7 @@ static void movers_update(Cpu *c, uint64_t player, const float link[3], const On
                 uint64_t a = g_mv[held].a;
                 if (*(uint8_t *)(uintptr_t)(a + 0x64) != 1) call(c, FN_ACTOR_WAKE, a, 0, 0, 0, 0, 0), g_mv[held].w = watch(a);
                 uint64_t body = *(uint64_t *)(uintptr_t)(a + 0x190);
-                if (VALID(body)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
+                if (has_body(a)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
                 call(c, FN_SET_MTX, a, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
             }
         }
@@ -4926,7 +4946,7 @@ static void movers_update(Cpu *c, uint64_t player, const float link[3], const On
                     g_mv[t].w = watch(a);
                 }
                 uint64_t body = *(uint64_t *)(uintptr_t)(a + 0x190);
-                if (VALID(body)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)o->m, 0, 0, 0, 0);
+                if (has_body(a)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)o->m, 0, 0, 0, 0);
                 call(c, FN_SET_MTX, a, (uint64_t)(uintptr_t)o->m, 0, 0, 0, 0);
                 if (o->as[0] && strcmp(playing(c, a, 0, 0), o->as)) {
                     bool ok = play_as(c, a, o->as, 0, 0, -1, false);
@@ -5580,6 +5600,11 @@ static struct { volatile int state; char name[64]; int found, set; uint32_t word
 
 static void flag_query(Cpu *c) {
     if (__atomic_load_n(&g_flagq.state, __ATOMIC_ACQUIRE) != 1) return;
+    if (!online_version_ok(g_game_version)) {  // (its setter is at a 1.9.0 address: answered, with nothing)
+        g_flagq.found = 0, g_flagq.word = 0;
+        __atomic_store_n(&g_flagq.state, 2, __ATOMIC_RELEASE);
+        return;
+    }
     uint32_t h = crc32_str(g_flagq.name);
     uint32_t *v = bool_flag(h);
     if (v && g_flagq.set && !(*v & 1) && !set_bool_flag(c, h)) *v |= 1;
@@ -5628,7 +5653,9 @@ static struct { volatile int state; char flow[64], entry[64]; int ok; } g_eventq
 static void event_query(Cpu *c, uint64_t pinfo) {
     if (__atomic_load_n(&g_eventq.state, __ATOMIC_ACQUIRE) != 1) return;
     uint64_t player = pinfo ? *(uint64_t *)(uintptr_t)(pinfo + 0x60) : 0;
-    g_eventq.ok = VALID(player) && start_event(c, player, g_eventq.flow, g_eventq.entry);
+    // (the event manager and its calls are at 1.9.0 addresses: on another version, answered as not started)
+    g_eventq.ok = online_version_ok(g_game_version) && VALID(player) &&
+                  start_event(c, player, g_eventq.flow, g_eventq.entry);
     __atomic_store_n(&g_eventq.state, 2, __ATOMIC_RELEASE);
 }
 
