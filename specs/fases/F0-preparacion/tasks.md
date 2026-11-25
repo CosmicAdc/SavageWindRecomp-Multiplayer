@@ -41,8 +41,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## A. Requisitos del dueño
 
-- [~] T001 [P] [dueño] Crear el fork de `Revivedx/SavageWindRecomp` en la cuenta CosmicAdc, con todas las ramas.
-  reclamada: orquestador (Opus), 2026-11-24 — fork existe (`main`); falta subir `test` (credencial HTTPS de CosmicAdc caducada)
+- [x] T001 [P] [dueño] Crear el fork de `Revivedx/SavageWindRecomp` en la cuenta CosmicAdc, con todas las ramas.
+  reclamada: orquestador (Opus), 2026-11-24 — fork con `main` y `test` (2ae4b39, subida tras renovar la credencial HTTPS de CosmicAdc); verify `git ls-remote --heads` lista las dos
   files: ninguno (web de GitHub)
   verify: `git ls-remote --heads https://github.com/CosmicAdc/SavageWindRecomp-Multiplayer.git` lista `refs/heads/test` y `refs/heads/main`
   depende de: —
