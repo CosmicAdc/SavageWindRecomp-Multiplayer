@@ -23,7 +23,15 @@ savagewind --server 7777                                                        
 
 ### Salidas
 
-(pendiente: las pega el orquestador)
+Windows (MSYS2 UCRT64, orquestador, 2026-11-25, `coop/main` en `0fbcfa1`):
+
+```
+GAMELIB_ID         9bc886f8314dd42b   (igual que en F0, 2026-11-24: el generador no ha cambiado; coincide con build/swgame.dll.id)
+GAMELIB_ID_COMPAT  38c19f2359512ce4
+commit 0fbcfa1, tree 9484ddd
+```
+
+Linux (Docker) y `--server` sin GPU: pendientes del próximo uso de Docker.
 
 ## Inventario de identificadores
 
