@@ -2045,6 +2045,23 @@ static bool is_enemy(uint64_t a, char name[48]) {
     return !strncmp(name, "Enemy_", 6) && !is_boss(name) && enemy_actor(name);
 }
 
+// A name from the network that would make an actor here is one of a list first (specs/contratos/validacion-red.md
+// V-11): one that isn't makes nothing, that entry alone. Each kind's refusals are counted, said at most once a second
+typedef struct { uint64_t last; unsigned n; } Refused;
+static Refused g_refused_enemy, g_refused_weapon, g_refused_loot;
+static void name_refused(Refused *r, const char *what, const char *name) {
+    r->n++;
+    uint64_t now = plat_now_ns();
+    if (r->last && now - r->last < 1000000000ull) return;
+    r->last = now;
+    LOG("[online] %s name refused: %.40s (%u so far)\n", what, name, r->n);
+}
+
+// an enemy's name another game sent, as is_enemy has its actor's: an Enemy_*, not a boss, one enemies.txt knows
+static bool enemy_name_ok(const char *n) {
+    return !strncmp(n, "Enemy_", 6) && !is_boss(n) && enemy_actor(n);
+}
+
 // what an enemy holds: a weapon actor it links (the link's place in an enemy found once, by looking through one
 // holding a Weapon_*; again every second while none is found)
 static uint64_t enemy_weapon(uint64_t a) {
@@ -2232,10 +2249,17 @@ static void own_guard(uint64_t player) {
 static bool own_ready(Cpu *c, Own *o, const OnlineEnemy *e) {
     if (o->state == OWN_HAVE) return true;
     if (o->state == OWN_GONE) return false;
+    if (!enemy_name_ok(e->name)) {  // (not asked for, here nor by piece_update: a name not an enemy's makes nothing)
+        name_refused(&g_refused_enemy, "enemy", e->name);
+        return false;
+    }
     if (!o->made.pending && !o->made.actor && !o->made.name[0]) {  // (asked for with the weapon it holds)
         memset(&o->params, 0, sizeof o->params);
-        if (e->weapon[0]) inst_params_string(&o->params, "EquipItem1", e->weapon);
-        if (e->shield[0]) inst_params_string(&o->params, "EquipItem2", e->shield);
+        // (what it holds only if a Weapon_*: a shield is one too)
+        if (e->weapon[0] && strncmp(e->weapon, "Weapon_", 7)) name_refused(&g_refused_weapon, "enemy weapon", e->weapon);
+        else if (e->weapon[0]) inst_params_string(&o->params, "EquipItem1", e->weapon);
+        if (e->shield[0] && strncmp(e->shield, "Weapon_", 7)) name_refused(&g_refused_weapon, "enemy shield", e->shield);
+        else if (e->shield[0]) inst_params_string(&o->params, "EquipItem2", e->shield);
         o->made.handle = new_handle();
         if (request_p(c, e->name, o->made.handle, o->params.n ? (uint64_t)(uintptr_t)&o->params : 0)) {
             o->made.pending = true;
@@ -2409,7 +2433,10 @@ static void enemies_host(Cpu *c, uint64_t player, const float link[3], const Onl
             } else {
                 uint8_t owner = g_reg[r].e.owner;
                 uint32_t hash = g_reg[r].e.hash;
+                char name[sizeof g_reg[r].e.name];  // (its name is ours, as its owner: what one sends is not what it is)
+                memcpy(name, g_reg[r].e.name, sizeof name);
                 g_reg[r].e = st[k], g_reg[r].e.owner = owner;
+                memcpy(g_reg[r].e.name, name, sizeof name);
                 if (!g_reg[r].e.hash) g_reg[r].e.hash = hash;
             }
             break;
@@ -3371,6 +3398,10 @@ static void loot_host_take(uint32_t gid) {
 }
 
 static void loot_host_add(const OnlineLoot *l) {
+    if (!is_loot(l->name)) {  // (on no one's list: an item, a weapon or a rupee only)
+        name_refused(&g_refused_loot, "loot", l->name);
+        return;
+    }
     for (int k = 0; k < g_nloot_list; k++)
         if (g_loot_list[k].origin == l->origin && g_loot_list[k].lid == l->lid) return;
     if (g_nloot_list == ONLINE_LOOT) return;  // (full: this one stays only where it fell; taking one off the list
@@ -3616,6 +3647,11 @@ static void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bo
         }
         if (!had) {
             if (!pc->pending && !pc->name[0]) {  // (asked for; one the game didn't make is asked for again, 5 times)
+                if (!is_loot(list[j].name)) {  // (the host's list, as it came: one not loot is never made here)
+                    name_refused(&g_refused_loot, "loot", list[j].name);
+                    g_theirs[t].gone = true;
+                    continue;
+                }
                 if (plat_now_ns() < g_theirs[t].retry_t) continue;
                 pc->handle = new_handle();
                 if (request(c, list[j].name, pc->handle)) pc->pending = true, snprintf(pc->name, sizeof pc->name, "%s", list[j].name);
