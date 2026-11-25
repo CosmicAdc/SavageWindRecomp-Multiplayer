@@ -103,6 +103,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 | T405 | Durabilidad y modificador de armas | ADR-009, decisión 24: no se envían armas hasta que viajen por la red |
 | T406, T432 | Rescate manual (estado caído) | ADR-007, decisión 7: planificado para después |
 | T408, T417 | Copia del contenido de un cofre | ADR-008, decisión 14: el cofre es de quien lo abre; se revisa tras probar |
+| T447 | Mapa grande: leer desplazamiento y zoom | ADR-022, decisión 5: investigación para después, sin fecha |
 
 ---
 
@@ -766,7 +767,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T439 [integración] Registrar los módulos en el fotograma, objetivos de prueba y variables
   files: el orquestador de fotograma de `online_actors` (`rt_online_frame`), Makefile (bloque de pruebas del final), runtime/launch_flags_table.c (regenerado)
   verify: `make test-online test-coop` sale con 0 y `make test-launch-flags` sale con 0
-  depende de: T411, T416, T419, T423, T431, T434, T442, T444 (variable nueva `SAVAGEWIND_ONLINE_THREAT_TEST`) y de todo lo que edite `online.c` (cadena de `plan.md` §5)
+  depende de: T411, T416, T419, T423, T431, T434, T442, T444, T446 (variable nueva `SAVAGEWIND_ONLINE_THREAT_TEST`) y de todo lo que edite `online.c` (cadena de `plan.md` §5)
   quién: agente integrador
   contexto: Tras F2, `rt_online_frame` es una lista de llamadas con el orden escrito. Cada función de F4 necesita su llamada por fotograma en un sitio concreto del orden, y su limpieza al salir de sesión y en `RT_ON_RESET`.
   pasos:
@@ -794,8 +795,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 - [ ] T441 [cierre] Recorrido de extremo a extremo y bitácora de F4
   files: specs/bitacora/F4-cierre.md
-  verify: la bitácora tiene OK o FALLO con evidencia para cada criterio S1-S17 de `spec.md`
-  depende de: todas las de la primera entrega, incluida T442. No esperan al cierre las de "después" (T404, T405, T406, T408, T417, T420, T421, T422, T432): ver la tabla del principio de este fichero
+  verify: la bitácora tiene OK o FALLO con evidencia para cada criterio S1-S18 de `spec.md` (S18: CU-16 CA-3 a CA-10, con capturas de ventana)
+  depende de: todas las de la primera entrega, incluidas T442 y T446. No esperan al cierre las de "después" (T404, T405, T406, T408, T417, T420, T421, T422, T432, T447): ver la tabla del principio de este fichero
   quién: dueño (un agente prepara las órdenes)
   contexto: Un cambio cuenta como hecho cuando se ha visto funcionar en el juego. F4 escribe en guardados: todas las pruebas se hacen con copias.
   pasos:
@@ -839,4 +840,52 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     6. Actualizar la fila de autoridad (A-10) y el párrafo "Blows".
   hecho cuando: los verify pasan y hay entrada en `specs/bitacora/`.
   no hagas: no toques `OWN_SAFE`, `hold`, ni la guarda de `own_ready`; no cambies el cable (es T409); no escribas la vida de enemigos ajenos; no toques los jefes.
+  modelo sugerido: alto
+
+## Bloque 10 — El compañero en el minimapa (CU-16, ADR-022)
+
+- [~] T445 [P] [investigación] Medir el minimapa
+  reclamada: agente Opus minimapa-t445 (investigación en el código)
+  files: specs/bitacora/<fecha>-F4-T445-minimapa.md y, si hace falta, tools/coop/minimapa_medir.py
+  verify: la bitácora existe y tiene la tabla de medidas de CU-16 CA-1 (centro, radio, metros por radio, giro con la cámara o norte arriba, en 16:9 y en ultrawide, con `hud_size` y `hud_edges` por defecto y alterados, y cuándo está oculto o animando), al menos una captura de ventana por formato y una línea que dice si la medida es fiable; `git diff --check` sin errores
+  depende de: ninguna (adelantada)
+  quién: agente investiga el código + orquestador mide en el juego con capturas (el subagente no lanza el juego, ADR-006)
+  contexto: ADR-022 decide dibujar al compañero encima del minimapa. El runtime solo sabe si la pantalla del mapa está en modo minimapa, mapa grande o animando (`ui_layout_map_mode`, `runtime/ui_layout.c`, solo 1.9.0) y escala el HUD con `hud_size` y `hud_edges` (`runtime/nvn/hud_scale.h`). No se sabe dónde cae el minimapa ni cuántos metros cubre. CU-16, "Qué hay que construir", paso 1. Otro agente ya hace la parte de código (investigación); el orquestador hace la de medir en el juego.
+  pasos:
+    1. (agente, código) Describir qué sabe y qué no sabe el runtime del minimapa: dónde se dibuja, qué escala el HUD, qué datos de posición y tamaño hay sin parches nuevos. Solo lectura; sin inventar desplazamientos ni direcciones.
+    2. (orquestador, juego) Con el montaje común y capturas de ventana (`SAVAGEWIND_WINDOW_SHOT`), medir: centro y radio del círculo en proporción de pantalla; metros del mundo que cubre el radio, y si cambia con el zoom o la zona; si gira con la cámara o lleva el norte arriba; cuándo está oculto (escenas, HUD quitado) y cómo se ve animando hacia el mapa grande. En 16:9 y en ultrawide, con `hud_size` y `hud_edges` por defecto y alterados.
+    3. Si ayuda, `tools/coop/minimapa_medir.py` lee una captura y devuelve centro y radio; sin rutas absolutas.
+    4. Escribir la bitácora: tabla, conclusión "fiable / no fiable / solo en el zoom por defecto" y, si el layout expone los datos, cómo leerlos (en palabras). Las capturas llevan imagen del juego: se anota dónde están y **no** se suben al repositorio.
+  hecho cuando: la bitácora tiene la tabla y la conclusión; T446 puede leer de ahí sus constantes o saber que no es viable.
+  no hagas: no toques código del runtime ni `tools/patches.py` ni `tools/game_sites.py`; no pegues desensamblado ni nada copiado de proyectos de descompilación; no subas capturas con imagen del juego; si la única vía exige un parche nuevo, para y pregunta al dueño.
+  modelo sugerido: alto
+
+- [ ] T446 [ui] Flecha del compañero en el minimapa
+  files: runtime/coop_minimap.c, runtime/coop_minimap.h, tests/test_coop_minimap.c, runtime/ui/coop_hud.mm, runtime/ui/online_ui.mm (solo la llamada y el ajuste "Show partner on minimap"), specs/fases/F4-funciones-coop/textos-nuevos.txt
+  verify: `clang -Wall -Iruntime tests/test_coop_minimap.c runtime/coop_minimap.c -lm -o build/test_coop_minimap && build/test_coop_minimap` sale con 0 **y** `make runtime-objs` sin avisos nuevos **y** capturas de ventana que cumplen CU-16 CA-3 a CA-10 (±6 px a 1080p); las dos últimas las ejecuta el orquestador y las anota en bitácora
+  depende de: T445 (medidas), T425 (la tarea de CU-10 que crea la capa de marcadores: `coop_hud.mm`, `coop_shape_draw`, color y forma por jugador) y el orden de la cadena de UI de `plan.md` §5 (después de T429 y antes de T442)
+  quién: agente escribe; orquestador ejecuta
+  contexto: ADR-022 y CU-16. El overlay ya dibuja marcadores del compañero con su color y forma (T425). Falta una flecha en el minimapa y una marca de borde fuera de alcance. Los datos del minimapa salen de la bitácora de T445; si T445 dice "no viable", **no hagas esta tarea** y anótalo.
+  pasos:
+    1. Lee la bitácora de T445 y copia sus medidas como **constantes por proporción de pantalla**, una por formato medido, con su fuente en un comentario (o léelas del layout si T445 explica cómo).
+    2. `runtime/coop_minimap.c/.h` (puro, sin punteros del juego, sin ImGui, sin reloj): diferencia de posición y rumbo a píxeles del círculo, giro con la cámara o norte arriba según T445, recorte al borde con ángulo y distancia, NaN → "no dibujar". `tests/test_coop_minimap.c` con los casos de CU-16 CA-2.
+    3. En `coop_hud.mm`: función de dibujo llamada desde `online_overlay_draw`, con `coop_shape_draw` (forma y color) y un triángulo orientado; marca de borde con la distancia al lado (Q-16-5); atenuada con el compañero en pausa; una flecha por compañero (Q-16-7). Solo si el modo del mapa es minimapa (instantánea publicada por el hilo del juego o de render; el dibujo no llama al juego), HUD y ajuste activos, sin menú abierto, mismo mapa, compañero con datos de menos de 0,5 s y medida fiable para el formato actual.
+    4. Ajuste "Show partner on minimap" (activado por defecto) en la pestaña Online, guardado en `online.ini`. Añade los textos a `textos-nuevos.txt`.
+    5. Campo `minimap` de `coop overlay` (CU-10) con `{visible, x, y, angulo, borde, distancia}` en proporciones de pantalla.
+    6. Si el rumbo del compañero no está en el estado, para y pregunta (cambiaría el cable: T409).
+  hecho cuando: los tres `verify` pasan y hay entrada en `specs/bitacora/`.
+  no hagas: no toques el layout del juego ni el guardado; no dibujes desde el hilo del juego ni el de red; no uses píxeles absolutos; no dibujes con el mapa grande abierto o animando; no cambies `online.h` ni el protocolo; no edites `runtime/ui/menu.mm` ni `runtime/ui/i18n/*.inc`; no uses iconos ni fuentes del juego.
+  modelo sugerido: medio
+
+- [ ] T447 [investigación] Mapa grande: leer desplazamiento y zoom
+  files: specs/bitacora/F4-T447-mapa-grande.md
+  verify: la bitácora responde por escrito las dos preguntas del paso 1 o dice "no viable" con el motivo; `git diff --check` sin errores
+  depende de: la primera entrega de F4 (T446 hecha). Después, prioridad baja, sin fecha; no bloquea T441
+  quién: agente investiga el código + orquestador mide en el juego
+  contexto: ADR-022, decisión 5 (opción B): investigar si se puede colocar al compañero en el mapa grande del menú de pausa leyendo su desplazamiento y su zoom. Hoy el mapa grande es un layout nativo del que el runtime solo reconoce el modo (`ui_layout_map_mode`). La opción C (pines o marcas reales del juego) está descartada porque se guardan en la partida.
+  pasos:
+    1. Responder: ¿se pueden leer el desplazamiento y el zoom del mapa grande sin parches nuevos, y con qué fiabilidad? ¿Cómo se convierte un punto del mundo en un píxel de ese mapa?
+    2. Si se puede, proponer en la bitácora el diseño (reutilizar `coop_minimap` con otros parámetros) y las tareas; si hace falta un sitio o parche nuevo, dejarlo escrito para el dueño (Ghidra, `tools/ghidra/README.md`), sin inventar nada.
+  hecho cuando: la bitácora tiene la respuesta.
+  no hagas: no escribas código de dibujo; no toques `tools/patches.py` ni `tools/game_sites.py`; no pegues desensamblado ni nada de proyectos de descompilación; no crees marcas ni pines reales del juego.
   modelo sugerido: alto

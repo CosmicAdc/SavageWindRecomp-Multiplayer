@@ -1,4 +1,4 @@
-# Casos de uso del modo cooperativo (CU-01 … CU-15)
+# Casos de uso del modo cooperativo (CU-01 … CU-16)
 
 Un archivo por caso de uso. Cada uno describe qué quiere hacer el jugador, qué hace hoy el PR #294, qué falta
 construir y cómo se comprueba. La lista y las fases salen de `../PLAN-APROBADO.md`.
@@ -22,6 +22,7 @@ construir y cómo se comprueba. La lista y las fases salen de `../PLAN-APROBADO.
 | [CU-13](CU-13-color-en-modelo-3d.md) | Color en el modelo 3D del segundo Link | FALTA | F5 | alta | CU-02, CU-10 |
 | [CU-14](CU-14-historia-santuarios-teletransporte-entre-mapas.md) | Historia con los dos presentes, santuarios juntos, teletransporte entre mapas | FALTA (hay piezas) | F5 | alta | CU-03, CU-05, CU-06, CU-07, CU-08, CU-10 |
 | [CU-15](CU-15-amenaza-de-los-enemigos.md) | Amenaza: el enemigo se vuelve hacia quien más daño le hace (ADR-012) | PARCIAL (hoy: hacia el último que golpea) | F4 | media-alta | CU-03, F2 (`oa_enemies`), F3 (autoridad) |
+| [CU-16](CU-16-companero-en-el-minimapa.md) | El compañero en el minimapa: flecha dibujada encima (ADR-022, amplía ADR-011 decisión 41) | FALTA (minimapa sin medir) | F4 | media | CU-02, CU-10 (T425), T445 |
 
 "Dificultad" sale de las tablas de huecos de `../mapa/06-pr294-red-y-sesion.md` §9 y
 `../mapa/07-pr294-integracion-juego.md` §7.
