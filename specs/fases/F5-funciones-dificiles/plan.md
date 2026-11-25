@@ -19,7 +19,7 @@ Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`): `
    palabras propias. Nunca desensamblado ni pseudocódigo en el repo.
 5. Todo lo que cambie el comportamiento va tras una opción **apagada por defecto**.
 6. Las respuestas del dueño (`../../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
-   `ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md`) mandan sobre este plan. El
+   `ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md`, `ADR-011-respuestas-del-dueno-ronda-4.md`) mandan sobre este plan. El
    límite sigue en 2 jugadores: lo nuevo se diseña para N y se prueba con 2 (ADR-007, decisión 12).
 
 ## 1. A — Tinte 3D del segundo Link (CU-13)
@@ -76,7 +76,7 @@ es **nombre en color y marcador con forma** (lo que ya entrega F4), y eso **no b
 
 Si el color base no está en el objetivo 0 (T504), los caminos 1 y 2 necesitan que el traductor tiña otro objetivo:
 eso cambia el identificador del traductor e invalida las cachés de todos. Solo con aprobación expresa (la parte de
-P5-4 que sigue abierta); sin ella, se cierra por el camino 4.
+P5-4, resuelta por ADR-011, decisión 43: solo con aprobación del dueño, presentando antes el coste); sin ella, se cierra por el camino 4.
 
 ## 2. B — Teletransporte entre mapas (CU-14)
 
@@ -99,7 +99,9 @@ P5-4 que sigue abierta); sin ella, se cierra por el camino 4.
 
 `[DUEÑO]` (ADR-008, decisión 20): el camino 2 está **aceptado** tal cual, con su pantalla de carga y su guardado
 (en el perfil cooperativo de F4, nunca en la partida individual del invitado). Si la recarga corta la sesión, el
-sitio del jugador queda reservado 10 minutos (ADR-008, decisión 18), de sobra para volver a entrar.
+sitio del jugador queda reservado 10 minutos (ADR-008, decisión 18), de sobra para volver a entrar. **Eso vale solo
+para el invitado:** si viaja por recarga el **anfitrión**, su servidor se corta y la sesión termina sin traspaso
+(ADR-011, decisión 32); T512 lo pregunta y T513 lo trata (confirmación previa `[PROPUESTA]`, pendiente del dueño).
 
 Se construye el primero que resulte viable; el 3 queda siempre como mínimo. En todos, el destino es **la entrada del
 mapa**, no la posición exacta del compañero (un punto arbitrario dentro de un santuario puede estar tras una puerta
@@ -116,8 +118,8 @@ final.
 ### Hoy
 
 - Quien está en un santuario o en una Bestia Divina **no aparece** en el mundo de los demás (`docs/ONLINE.md`,
-  sección "Players on other maps"), y la tabla de huecos del mapa 07 dice de "Shrines/Divine Beasts together":
-  "Partial, untested, high". Lo que sigue en esta lista sale de leer la documentación y el código, no de haberlo
+  sección "Players on other maps"), y la tabla de huecos del mapa 07 (§7, fila "Santuarios y Bestias Divinas juntos") dice:
+  PARCIAL, "No probado", prioridad alta. Lo que sigue en esta lista sale de leer la documentación y el código, no de haberlo
   visto: por eso el bloque empieza con T540.
 
 - En el mismo santuario los jugadores se ven; sus bolas y cajas van como objetos del mundo (DOC:996-997).
@@ -155,7 +157,7 @@ final.
 - El runtime sabe si hay un evento activo y su nombre (`framepace_in_event`, `framepace_event_name`,
   `runtime/hle/framepace.c`), y registra `[event] <nombre>` una vez por evento (mapa 03 §1.5).
 - El progreso de un evento se propaga por flags aunque el otro no esté.
-- Existe `start_event` para lanzar un evento en el otro juego (OA:3703-3713), con riesgos conocidos (libera sus
+- Existe `start_event` para lanzar un evento en el otro juego (OA:3699-3714), con riesgos conocidos (libera sus
   metadatos justo después, mapa 07 M8; un evento fuera de contexto puede colgar, DOC:751-752).
 
 ### Reglas `[DUEÑO]`
@@ -302,7 +304,7 @@ turno de los dos juegos: no coincide con ninguna otra prueba en el juego.
 `[DUEÑO]` (ADR-008, decisión 20): **C va antes que A y que E**. El resto del orden es propuesta (lo que queda
 abierto de P5-5) y el dueño puede cambiarlo.
 
-1. **C — Santuarios juntos** (T540, luego T514 y T515). Empieza por la investigación T540, que solo necesita F1.
+1. **C — Santuarios juntos** (T540, luego T514, T541 —ADR que enmienda la regla 11— y T515). Empieza por la investigación T540, que solo necesita F1.
 2. **B — Teletransporte entre mapas** (T511-T513): completa el objetivo de los santuarios (llegar adonde está el
    compañero sin entrar andando). C no depende de B: a la matriz se entra andando.
 3. **H — Direcciones fijas** (T533-T537): baja el riesgo de todo lo demás y no depende de decisiones. T533 lleva
@@ -316,7 +318,10 @@ abierto de P5-5) y el dueño puede cambiarlo.
 
 Dependencias que cambian con este orden:
 
-- T514 depende ahora de T540. T515 y T516 siguen dependiendo de T514.
+- T514 depende ahora de T540. T515 y T516 siguen dependiendo de T514; T515 depende además de T541 (ADR firmado).
+- **Lotes de `GAMELIB_ID`:** los sitios de T513 (camino 1) y de T522 entran en los lotes abiertos del bloque H, no en lotes
+  propios; así F5 tiene como mucho 3 cambios de `GAMELIB_ID` en total (fila H.8).
+- **STATE y SKEL en un solo salto de protocolo:** T531 es un codificador puro previo; T530 cablea los dos formatos.
 - T518 y T520 dejan de depender de una decisión pendiente: T501 está resuelta.
 - Nada de C, B o E depende del bloque A.
 - `tasks.md` lista los bloques en este mismo orden; los identificadores de tarea no cambian.

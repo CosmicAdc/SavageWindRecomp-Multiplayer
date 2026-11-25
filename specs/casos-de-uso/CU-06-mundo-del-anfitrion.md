@@ -153,8 +153,8 @@ Lo que **no** es del anfitrión:
 - Riesgo: algunos efectos de un flag solo se ven tras una carga (DOC:441-442).
 - Preguntas ya contestadas por el dueño (Q-06-1 y Q-06-3): ver ADR-007 (decisiones 1, 5 y 9) en `../decisiones/`.
   Q-06-2 (¿debe el invitado "olvidar" su progreso propio?) deja de plantearse: el perfil cooperativo nace vacío.
-- **Pregunta al dueño** (Q-06-4, abierta; por defecto: sí): ¿el anfitrión es siempre la misma persona durante toda
-  la campaña?
+- **[DUEÑO] (ADR-011, decisión 29; Q-06-4)** El anfitrión es **siempre la misma persona** durante toda la campaña: otro
+  anfitrión es otro mundo. No se construye ningún traspaso de partida.
 
 ## Fase y dependencias
 

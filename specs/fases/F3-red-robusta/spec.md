@@ -13,11 +13,13 @@ Convenciones de este documento y de los otros tres de la fase:
 Decisiones del dueño que mandan sobre este documento (`../../decisiones/`):
 
 - **[DUEÑO] ADR-007, decisión 11.** ENet y miniupnpc están aceptadas como dependencias (código abierto, licencia
-  compatible con MIT, anotadas en `docs/third-party.md`). ADR-005 (TCP frente a UDP) sigue esperando medidas.
+  compatible con MIT, que deben quedar anotadas en `docs/third-party.md`). ADR-005 (TCP frente a UDP) sigue esperando medidas.
 - **[DUEÑO] ADR-007, decisión 12.** Límite de 2 jugadores por ahora (se diseña para N, se prueba con 2). Contraseña
   opcional, recomendada por internet. El código de invitación puede contener la IP del anfitrión.
 - **[DUEÑO] ADR-008, decisión 18.** El sitio del jugador caído se reserva **10 minutos**. Es independiente de la
   historia: el anfitrión puede continuar solo de inmediato, con confirmación (ADR-007, decisión 6).
+- **[DUEÑO] ADR-011, decisión 47 (dato de planificación).** F3 no se cierra sin la prueba con dos PC por Internet; si no hay
+  segundo PC, queda como pendiente explícito y no se sustituye por Docker. Decisiones 29, 31, 32, 44, 45 y 46 también valen aquí.
 - **[DUEÑO] ADR-009, decisión 23.** Si la conexión directa es imposible, el juego **no ofrece nada**: ni guía de red
   virtual (Tailscale, ZeroTier) ni servicio de presentación o perforación de NAT. Solo un mensaje de error claro.
 
@@ -207,7 +209,7 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 | 7 | STATE mide 3375 bytes: no cabe en un datagrama de ~1200 bytes | Si el ADR elige UDP, el plan debe incluir partir o reducir STATE; por eso F3 solo decide |
 | 8 | La reconexión aplica estado viejo (hallazgo T-1 del mapa 06) | Requisito previo: limpieza completa en `stop_all` (F1) y prueba específica |
 | 9 | El descubrimiento LAN abre un puerto UDP que responde a cualquiera de la red local | Respuesta de tamaño fijo, sin datos sensibles, con límite de tasa; se puede apagar |
-| 10 | Dos instancias en un PC comparten `online.ini` (se abre en el directorio de trabajo, `online.c:1506`) | Las pruebas usan `SAVAGEWIND_ONLINE_NAME` (que evita guardar, `online.c:1544-1545`) o raíces de datos distintas |
+| 10 | Dos instancias en un PC comparten `online.ini` (se abre en el directorio de trabajo, `online.c:1510`) | Las pruebas usan `SAVAGEWIND_ONLINE_NAME` (que evita guardar, `online.c:1544-1545`) o raíces de datos distintas |
 | 11 | Reservar la ranura 0 al anfitrión cambia un supuesto de `online_actors.c` (las reglas se leen de `pl[0]`, OA:2838-2840) | Hoy el supuesto ya existe sin garantía; F3 lo convierte en garantía y lo prueba |
 
 ## 7. Preguntas abiertas
@@ -217,5 +219,5 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 | P3-1 | ¿Plazo de gracia de reconexión? | **RESUELTA (ADR-008, decisión 18): 10 minutos** | — |
 | P3-2 | ¿La contraseña del invitado se recuerda entre sesiones? Propuesta: no, salvo casilla "recordar" | Dueño | T331 |
 | P3-3 | ¿Se comparan también los mods cargados (lista o suma) al conectar? | Dueño | T325 (campo opcional) |
-| P3-4 | ¿Qué hacer con `--server`? Propuesta: dejarlo como relé sin mundo y decirlo en la ayuda | Dueño | T339 |
+| P3-4 | ¿Qué hacer con `--server`? Propuesta: dejarlo como relé sin mundo y decirlo en la ayuda | Dueño (no bloquea: T339 se construye con la propuesta) | — |
 | P3-5 | ¿Se acepta incluir código de terceros (ENet, miniupnpc)? | **RESUELTA (ADR-007, decisión 11): sí**, con licencia compatible con MIT y anotadas en `docs/third-party.md`. T305 sigue esperando medidas, no permiso | — |

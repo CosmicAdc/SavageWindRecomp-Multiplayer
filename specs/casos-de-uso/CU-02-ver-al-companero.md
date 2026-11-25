@@ -117,10 +117,10 @@ En F2: mover este código a `oa_puppet` sin cambiar comportamiento (mapa 07 §8.
 - Riesgo: todas las direcciones de creación y de huesos son fijas de 1.9.0 (mapa 07 §3.3).
 - Riesgo: el coste de red por jugador es de unos 100 kB/s sin compresión (mapa 06 §2.5). Con 2 jugadores es
   asumible.
-- **Pregunta al dueño**: ¿el compañero debe verse también cuando está en pausa o en un menú (hoy depende de la regla
-  "los menús no pausan" del anfitrión)?
-- **Pregunta al dueño**: ¿hace falta que los jugadores se bloqueen el paso (colisión activada por defecto, como hoy)
-  o es mejor atravesarse para no estorbar en sitios estrechos?
+- **[DUEÑO] (ADR-011, decisión 44; Q-02-1)** Los menús **no pausan**: el mundo sigue y el Link del compañero se ve
+  quieto mientras el otro está en un menú (como hoy).
+- **[DUEÑO] (ADR-011, decisión 45; Q-02-2)** La colisión entre jugadores está **activada**; el anfitrión puede apagarla
+  (como hoy).
 
 ## Fase y dependencias
 

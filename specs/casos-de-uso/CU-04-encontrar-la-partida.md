@@ -103,7 +103,7 @@ puerto del router por sí solo. Hoy no existe nada de esto.
   se ofrece nada**: ni guía de red virtual (Tailscale, ZeroTier…) dentro del juego ni servicio de presentación o de
   perforación de NAT. El juego muestra solo un mensaje de error claro. Siguen en el alcance: descubrimiento en red
   local, apertura de puerto con miniupnpc, código de invitación e IPv6.
-- **[DUEÑO] (ADR-007, decisión 12)** Límite de 2 jugadores por ahora. La contraseña es **opcional**; al abrir el
+- **[DUEÑO] (ADR-007, decisión 12, con la aclaración de ADR-009)** Límite de 2 jugadores por ahora. La contraseña es **opcional**; al abrir el
   puerto a Internet la interfaz la **recomienda**, no la exige.
 - **[PROPUESTA]** La apertura automática de puerto va activada por defecto pero con un interruptor para apagarla.
 - **[PROPUESTA]** El anuncio en red local se puede apagar ("partida oculta").

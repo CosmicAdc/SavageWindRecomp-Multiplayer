@@ -51,7 +51,7 @@ se cuelga en `pthread_join`, en el hilo de UI. `BOT_FREEZE` no lo reproduce porq
    teniendo datos pendientes, `srv_drop`. Es la misma salida que la expulsión por silencio de hoy.
 5. `select() < 0` deja de hacer `continue` sin pausa (`online.c:356`): duerme 10 ms para no girar al 100 %.
 6. Cliente: cola de salida equivalente (más pequeña). `stop_all` cierra el socket para despertar al hilo y limita la
-   espera; si el hilo está dentro de `getaddrinfo` (no cancelable, `online.c:1134`), se le marca como huérfano y se
+   espera; si el hilo está dentro de `getaddrinfo` (no cancelable, `online.c:1132`), se le marca como huérfano y se
    deja terminar solo, sin `pthread_join` en el hilo de UI.
 
 **Reutiliza.** Estructura de dos colas con mutex de `runtime/control.c:282-285` y `:543-559`; el patrón "API que
@@ -367,7 +367,7 @@ Reglas:
 ## 6. Orden recomendado
 
 1. T301 (arnés) y T302 (bot) → sin ellos nada de lo demás tiene `verify`.
-2. En paralelo: T303-T304 (medidas), T306-T307 (spikes), T308 (protocolo), T320-T327 (módulos puros), T332 (i18n).
+2. En paralelo: T303-T304 (medidas), T306-T307 (spikes), T308 (protocolo, **después de T302**: los dos editan `tools/online_bot.c`), T320-T327 (módulos puros), T332 (i18n).
 3. Núcleo en serie: T309 → T310 → T311 → T312 → T313 → T314 → T315 → T316 → T317 → T318 → T319.
 4. UI en serie, según vayan llegando los módulos: T328 → T329 → T330 → T331.
-5. Cierre: T333 → T334 → T337 → T336 → T340 y T341 (dueño).
+5. Cierre: T333 → T334 → T337 → T336 → T341 (dueño, dos PC por Internet) → T340. **F3 no se cierra sin T341** (ADR-011, decisión 47); ningún paso de esta lista lo ejecuta un subagente (ADR-006): los ejecuta el orquestador.

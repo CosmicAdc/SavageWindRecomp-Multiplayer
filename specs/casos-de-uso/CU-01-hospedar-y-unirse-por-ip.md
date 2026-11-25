@@ -78,8 +78,10 @@ Más adelante (no bloquea este caso):
 
 - **[DUEÑO] D7**: conexión directa; un jugador hospeda. No hay servidor central ni cuentas.
 - **[DUEÑO] D1**: la sesión objetivo es de 2 jugadores. El límite técnico actual es 8 (`ONLINE_MAX`, NETH:17).
-- **[PROPUESTA]** Limitar la sesión a 2 jugadores por ahora (opción del anfitrión), para simplificar las pruebas y
-  la propiedad de enemigos (mapa 07 §7).
+- **[DUEÑO] (ADR-007, decisión 12; Q-01-1)** Límite de **2 jugadores por ahora** (se diseña para N y se prueba con 2),
+  para simplificar las pruebas y la propiedad de enemigos (mapa 07 §7).
+- **[DUEÑO] (ADR-007, decisión 12, con la aclaración de ADR-009; Q-01-2)** La contraseña es **opcional**, también con el
+  puerto abierto a Internet; la interfaz la recomienda, no la exige.
 - **[PROPUESTA]** El servidor dedicado (`--server`) queda fuera de alcance: hoy no tiene anfitrión con autoridad
   y el mundo compartido queda inerte (mapa 06 §1.1).
 
@@ -115,8 +117,8 @@ Más adelante (no bloquea este caso):
 - Riesgo: sin puerta de versión, un jugador con otra versión del juego salta a direcciones equivocadas (mapa 07 A1).
 - Riesgo: el borrado del CI en la rama del PR (mapa 06 §8.4) hace que nada compruebe estos flujos automáticamente
   hasta restaurarlo en F0.
-- **Pregunta al dueño**: ¿la sesión se limita a 2 jugadores desde el principio o se deja abierta a 8 como está?
-- **Pregunta al dueño**: ¿contraseña obligatoria cuando el puerto está abierto a Internet, o sigue siendo opcional?
+- Preguntas ya contestadas por el dueño (Q-01-1 y Q-01-2): ver ADR-007 (decisión 12) y la aclaración de ADR-009 en
+  `../decisiones/`.
 
 ## Fase y dependencias
 

@@ -80,8 +80,12 @@ quedan caminos de cuelgue conocidos.
   (PLAN-APROBADO, Contexto).
 - **[DUEÑO]** Un arreglo cuenta como hecho cuando se ha visto funcionar en el juego (PLAN-APROBADO, Reglas de
   trabajo).
-- **[PROPUESTA]** Definir un "recorrido de prueba" fijo y escrito (los pasos del flujo principal con lugares
-  concretos de `goto`) para que la medida sea repetible.
+- **[DUEÑO] (ADR-011, decisión 46; Q-03-1)** El recorrido de prueba de 30 minutos es el de la **Meseta de los Albores**:
+  campo, un campamento, un santuario, menús, una muerte, salir y volver a entrar. Se escribe fijo (con lugares concretos
+  de `goto`) para que la medida sea repetible.
+- **[DUEÑO] (ADR-011, decisión 47; Q-03-2)** F1 se cierra con **dos juegos en un mismo PC**. La prueba con dos PC por
+  Internet se hace **antes de cerrar F3** (el dueño tendrá un segundo PC más adelante; si no existe para entonces,
+  queda como pendiente explícito en la bitácora y no se sustituye por Docker).
 - **[PROPUESTA]** Criterio de congelación: ningún fotograma de más de 2 s atribuible a la red.
 
 ## Criterios de aceptación
@@ -127,10 +131,7 @@ quedan caminos de cuelgue conocidos.
   modo online. Anotar la memoria libre en cada prueba.
 - Riesgo: M3 y M8 del mapa 07 (vida de los `InstParamPack` y metadatos de evento) no están verificados y necesitan
   Ghidra.
-- **Pregunta al dueño**: ¿qué recorrido de 30 minutos representa "jugar normal" para ti (zonas, santuario concreto,
-  jefe sí o no)?
-- **Pregunta al dueño**: ¿el objetivo de 30 minutos vale también con los dos jugadores en PC distintos por
-  Internet, o basta con dos instancias en un PC para dar F1 por cerrada?
+- Preguntas ya contestadas por el dueño (Q-03-1 y Q-03-2): ver ADR-011 (decisiones 46 y 47) en `../decisiones/`.
 
 ## Fase y dependencias
 
