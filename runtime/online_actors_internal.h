@@ -215,6 +215,8 @@ enum { UI_PAUSE_LOAD = 0x200 };  // (the UI's pause state while a load runs: the
 // ---- The types of state shared that were anonymous: the variable is in its module (oa_check.py --modulos
 // puts the type back on it)
 
+// A remote player's puppet here: his Link and its pieces (the table, g_pup, is oa_puppet's; rt_online_frame works on
+// an entry through oa_pup. His runes: oa_runes' g_rune, g_ice)
 typedef struct {
     uint64_t link;  // OnlinePlayer; 0: none
     Watch link_w;
@@ -235,28 +237,6 @@ typedef struct {
     uint16_t fxev_seen;  // (his last effect played here, by its number)
     struct { uint64_t p; uint32_t id, pad; uint64_t t; char name[24]; } fxev[ONLINE_FX_EVENTS];  // (those playing)
     int kago_n;                    // (the ring's charges it was made for)
-    uint64_t grab;                 // what he holds with the Magnesis rune, here (0: none)
-    uint64_t released; uint64_t released_t;  // (what he let go of - Magnesis, Stasis - and when: his moves of it his)
-    Watch grab_w;
-    char grab_name[ONLINE_GRAB_NAME];
-    float grab_from[3];
-    int grab_wait;                 // (frames before looking for it again: not found)
-    struct { uint64_t p; uint32_t id, pad; } magne;  // the rune's glow on it (its handle)
-    struct { uint64_t p; uint32_t id, pad; } beam[MAGNE_BEAM];  // the rune's beam from his hand to it (MagneConnect)
-    Piece slate;                   // the slate in his hand while he uses a rune (OnlineSlate: Item_Conductor's ELink)
-    bool slate_shown;              // (its model drawn: while he holds)
-    Piece rune_fx;                 // what plays his runes' beam and chains here (OnlineRuneFx: ReactionHit's ELink)
-    Piece stop_fx;                 // (and his Stasis chains, on what he stopped)
-    Piece magnet_fx;               // the magnet over his hands while he holds (OnlineMagnetFx: Item_Magnetglove's ELink)
-    struct { uint64_t p; uint32_t id, pad; } magnet;  // (its effect: the key "Hand", the particles MagneHand)
-    uint8_t holder[0x140];         // (the beam's holder, as the rune's: +0x48 its handle, +0x50 its id, +0x13c 0)
-    uint64_t stop;                 // what he stopped with the Stasis rune, here (0: none)
-    Watch stop_w;
-    char stop_name[ONLINE_GRAB_NAME];
-    int stop_wait;
-    struct { uint64_t p; uint32_t id, pad; } chains;  // its chains (BitaLocked_Start)
-    bool chained;                  // (played once for what he stopped: the rune plays them as it stops it)
-    struct { Piece p; float m[12]; bool used, rose; } ice[3];  // his Cryonis pillars, here (OnlineIce)
     uint16_t boom_seen;              // (the last explosion played)
     char name[ONLINE_NAME_MAX];
     int anim;                                     // the one-clip AS played (no pose: ONLINE_A_*; -1 none yet)
@@ -264,7 +244,7 @@ typedef struct {
     int covered;                                  // the pieces whose cover is applied (a bit each; -1: none yet)
     int frames;                                   // frames since his Link was made
     bool skeleton;                                // his skeleton has come: his Link is posed by it, plays no AS
-} OaAct;
+} OaPup;
 
 typedef struct { uint16_t seq; uint8_t target; int16_t damage; } OaPvp;
 
@@ -293,7 +273,6 @@ Watch oa_watch(uint64_t actor);
 bool oa_alive(uint64_t actor, Watch w);
 bool oa_alive_rewatch(uint64_t actor, Watch *w);
 Handle *oa_new_handle(void);
-extern OaAct oa_g_act[ONLINE_MAX];
 extern bool oa_g_local_dead;
 extern uint32_t oa_g_aggro_id;
 extern uint16_t oa_g_aggro_seq;
@@ -382,12 +361,27 @@ void oa_booms_forget(void);
 void oa_booms_update(Cpu *c, uint64_t player);
 void oa_pose_link(Cpu *c, int i, const OnlinePlayer *p);
 void oa_pose_armor(Cpu *c, const Piece *p);
+OaPup *oa_pup(int i);
+uint64_t oa_puppet_link(int i);
+const char *oa_puppet_name(int i);
+void oa_puppet_pieces(Cpu *c, int i, void (*each)(Cpu *c, int i, Piece *p));
+void oa_puppet_drop(Cpu *c, int i);
+void oa_puppet_forget(void);
 
 // runtime/oa_runes.c
 uint64_t oa_magne_held(void);
 void oa_stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
 void oa_ice_update(Cpu *c, const OnlinePlayer *pl, int me);
 void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
+uint64_t oa_rune_grab(int i);
+uint64_t oa_rune_released(int i);
+uint64_t oa_rune_released_t(int i);
+bool oa_rune_holds(uint64_t a);
+bool oa_rune_stopped(uint64_t a);
+bool oa_rune_ice(uint64_t a);
+void oa_runes_pieces(Cpu *c, int i, void (*each)(Cpu *c, int i, Piece *p));
+void oa_runes_drop(int i);
+void oa_runes_forget(void);
 
 // runtime/oa_enemies.c
 extern Refused oa_g_refused_enemy, oa_g_refused_weapon, oa_g_refused_loot;

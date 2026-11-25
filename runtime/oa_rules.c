@@ -129,7 +129,7 @@ void oa_players_collide(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
             p->pose.horse[0] || !strncmp(p->pose.as[0], "Dead", 4))
             continue;
         float at[3] = {p->pos[0], p->pos[1], p->pos[2]};
-        uint64_t pa = oa_g_act[i].link;  // (where his puppet is shown)
+        uint64_t pa = oa_puppet_link(i);  // (where his puppet is shown)
         if (pa && oa_running(pa)) {
             const float *am = (const float *)(uintptr_t)(pa + 0x398);
             at[0] = am[3], at[1] = am[7], at[2] = am[11];

@@ -192,7 +192,7 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
                 if (g_obj_seen[s].a && g_obj_seen[s].hash == o->hash && g_obj_seen[s].trunk == trunk &&
                     oa_alive(g_obj_seen[s].a, g_obj_seen[s].w))
                     es = s;
-            bool thrown = es >= 0 && g_obj_seen[es].a == oa_g_act[i].released && now_t - oa_g_act[i].released_t < 4000000000ull;
+            bool thrown = es >= 0 && g_obj_seen[es].a == oa_rune_released(i) && now_t - oa_rune_released_t(i) < 4000000000ull;
             bool ours = false;
             if (es >= 0) {
                 if (now_t - g_obj_seen[es].his_seen_t > 500000000ull) g_obj_seen[es].his_start = now_t;  // (his began)
@@ -250,7 +250,7 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
         for (int t = 0; t < nt && !his; t++) his = theirs[t] == g_obj_seen[s].hash && theirs_trunk[t] == g_obj_seen[s].trunk;
         // (one another player holds with Magnesis or stopped with Stasis, moved here to his: his too - sent back as ours,
         // each game pulled the other's to where its own was)
-        for (int k = 0; k < ONLINE_MAX && !his; k++) his = oa_g_act[k].grab == g_obj_seen[s].a || oa_g_act[k].stop == g_obj_seen[s].a;
+        if (!his) his = oa_rune_holds(g_obj_seen[s].a);
         g_obj_seen[s].last[0] = m[3], g_obj_seen[s].last[1] = m[7], g_obj_seen[s].last[2] = m[11];
         bool was_sending = g_obj_seen[s].sending;
         g_obj_seen[s].sending = false;

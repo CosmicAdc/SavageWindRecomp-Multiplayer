@@ -693,7 +693,7 @@ void oa_sample_pose(Cpu *c, uint64_t pinfo) {
                     !VALID(*(uint64_t *)(uintptr_t)(a + 0x4e0)) || !oa_has_body(a))
                     continue;  // (a physical object with a model: no tag; the cheap checks first)
                 bool theirs = false;  // (one another player stopped, shown here: not ours)
-                for (int i = 0; i < ONLINE_MAX && !theirs; i++) theirs = oa_g_act[i].stop == a;
+                theirs = oa_rune_stopped(a);
                 if (theirs) continue;
                 const float *m = (const float *)(uintptr_t)(a + 0x398);
                 if ((m[3] - pm[3]) * (m[3] - pm[3]) + (m[11] - pm[11]) * (m[11] - pm[11]) > 60 * 60) continue;
@@ -724,8 +724,7 @@ void oa_sample_pose(Cpu *c, uint64_t pinfo) {
                 oa_actor_name_of(a, n);
                 if (strcmp(n, "Obj_IceMakerBlock")) continue;
                 bool theirs = false;
-                for (int i = 0; i < ONLINE_MAX && !theirs; i++)
-                    for (int q = 0; q < 3 && !theirs; q++) theirs = oa_g_act[i].ice[q].p.actor == a;
+                theirs = oa_rune_ice(a);
                 if (theirs) continue;
                 const float *m = (const float *)(uintptr_t)(a + 0x398);
                 if ((m[3] - pm[3]) * (m[3] - pm[3]) + (m[11] - pm[11]) * (m[11] - pm[11]) > 100 * 100) continue;

@@ -4,9 +4,47 @@
 
 static void animate(Cpu *c, int i, const OnlinePlayer *p);
 
+// A remote player in the world: his Link, his armour and his gear (his runes: oa_runes' g_rune, g_ice)
+static OaPup g_pup[ONLINE_MAX];
+
+// player i's puppet state (rt_online_frame's loop over the players works on it)
+OaPup *oa_pup(int i) { return &g_pup[i]; }
+
+// player i's Link here (0: none), as made: maybe deleted by the game since (oa_link_live checks)
+uint64_t oa_puppet_link(int i) { return g_pup[i].link; }
+
+// player i's name, as his Link was made with
+const char *oa_puppet_name(int i) { return g_pup[i].name; }
+
+// player i's puppet pieces, each to each(c, i, piece), in this order (oa_drop, forget_all: before his runes')
+void oa_puppet_pieces(Cpu *c, int i, void (*each)(Cpu *c, int i, Piece *p)) {
+    for (int k = 0; k < ARMOR; k++) each(c, i, &g_pup[i].armor[k]);
+    for (int k = 0; k < ONLINE_GEAR; k++) each(c, i, &g_pup[i].gear[k]);
+    each(c, i, &g_pup[i].horse);
+    each(c, i, &g_pup[i].tack[0]), each(c, i, &g_pup[i].tack[1]);
+    for (int k = 0; k < ONLINE_SHOTS; k++) each(c, i, &g_pup[i].shot[k]);
+    for (int k = 0; k < ONLINE_HELD; k++) each(c, i, &g_pup[i].held[k]);
+    each(c, i, &g_pup[i].nock);
+}
+
+// player i gone (oa_drop): his Link deleted and his puppet forgotten (his pieces already handed on with
+// oa_puppet_pieces)
+void oa_puppet_drop(Cpu *c, int i) {
+    if (oa_alive(g_pup[i].link, g_pup[i].link_w)) oa_call(c, FN_DELETE, g_pup[i].link, 0, 0, 0, 0, 0);
+    LOG("[online] removed %s's Link\n", g_pup[i].name);
+    memset(&g_pup[i], 0, sizeof g_pup[i]);
+    g_pup[i].anim = -1, g_pup[i].covered = -1;
+}
+
+// a load (forget_all): every player's puppet forgotten (their pieces already handed on with oa_puppet_pieces)
+void oa_puppet_forget(void) {
+    memset(g_pup, 0, sizeof g_pup);
+    for (int i = 0; i < ONLINE_MAX; i++) g_pup[i].anim = -1, g_pup[i].covered = -1;
+}
+
 // a player's Link here, if the game still has it (0: none, or deleted since the last frame - game over, a load - and
 // not forgotten yet: rt_online_frame finds that later in the frame). The runes' work on it goes through this
-uint64_t oa_link_live(int i) { return oa_g_act[i].link && oa_alive(oa_g_act[i].link, oa_g_act[i].link_w) ? oa_g_act[i].link : 0; }
+uint64_t oa_link_live(int i) { return g_pup[i].link && oa_alive(g_pup[i].link, g_pup[i].link_w) ? g_pup[i].link : 0; }
 
 // tools/online_mod.py ANIMS: the AS names of OnlinePlayer's one-clip animations, in ONLINE_A_* order
 static const char *const k_anims[ONLINE_A_COUNT] = {
@@ -19,8 +57,8 @@ OaBlast oa_g_blast[4];  // (the others' bombs gone off lately: pvp_update)
 void oa_cover(Cpu *c, int i) {
     uint64_t x0 = *(uint64_t *)(uintptr_t)P_HIDE_GROUPS_X0;
     x0 = x0 ? *(uint64_t *)(uintptr_t)x0 : 0;
-    uint64_t part[1 + ARMOR] = {oa_g_act[i].link};
-    for (int k = 0; k < ARMOR; k++) part[1 + k] = oa_g_act[i].armor[k].actor;
+    uint64_t part[1 + ARMOR] = {g_pup[i].link};
+    for (int k = 0; k < ARMOR; k++) part[1 + k] = g_pup[i].armor[k].actor;
     for (int k = 0; k < 1 + ARMOR; k++) {
         uint64_t model = part[k] ? *(uint64_t *)(uintptr_t)(part[k] + 0x4e0) : 0;
         if (!model) continue;
@@ -124,21 +162,21 @@ static int g_pose_n;  // (its Link bones; 0: none this frame)
 void oa_pose_link(Cpu *c, int i, const OnlinePlayer *p) {
     float (*q)[4] = g_pose_q, (*t)[3] = g_pose_t;
     int n = 0, nbow = 0, nb = 0, nbb = 0;
-    oa_g_act[i].frames++;
+    g_pup[i].frames++;
     g_pose_n = 0;
     // (none lately: paused, in a menu - the last one he sent kept; his armour posed by it too)
     static struct { float q[ONLINE_BONES][4], t[ONLINE_BONES][3]; int n, nbow; } last[ONLINE_MAX];
     bool fresh = online_skeleton(i, &n, &nbow, q, t);
     if (fresh) memcpy(last[i].q, q, sizeof last[i].q), memcpy(last[i].t, t, sizeof last[i].t), last[i].n = n, last[i].nbow = nbow;
-    else if (oa_g_act[i].skeleton && last[i].n)
+    else if (g_pup[i].skeleton && last[i].n)
         memcpy(q, last[i].q, sizeof last[i].q), memcpy(t, last[i].t, sizeof last[i].t), n = last[i].n, nbow = last[i].nbow;
-    if (fresh || (oa_g_act[i].skeleton && last[i].n)) {
+    if (fresh || (g_pup[i].skeleton && last[i].n)) {
         g_pose_n = n;
-        uint64_t unit = oa_skel_unit(c, oa_g_act[i].link, &nb);
+        uint64_t unit = oa_skel_unit(c, g_pup[i].link, &nb);
         // his bow (its string drawn) when the one he carries is the one posed
-        Piece *bp = &oa_g_act[i].gear[2];
+        Piece *bp = &g_pup[i].gear[2];
         uint64_t bow_unit = nbow && oa_alive(bp->actor, bp->w) ? oa_first_unit(bp->actor, &nbb) : 0;
-        oa_g_act[i].skeleton = true;
+        g_pup[i].skeleton = true;
         for (int b = 0; b < n + nbow; b++) {
             uint64_t u = b < n ? unit : bow_unit;
             int k = b < n ? b : b - n;
@@ -150,9 +188,9 @@ void oa_pose_link(Cpu *c, int i, const OnlinePlayer *p) {
         }
         return;
     }
-    if (!oa_g_act[i].skeleton && oa_g_act[i].frames > 60) animate(c, i, p);  // (a second for his skeleton to come first)
+    if (!g_pup[i].skeleton && g_pup[i].frames > 60) animate(c, i, p);  // (a second for his skeleton to come first)
     // (his armour posed as his Link stands then: his own bones, as his AS left them)
-    uint64_t unit = oa_skel_unit(c, oa_g_act[i].link, &nb);
+    uint64_t unit = oa_skel_unit(c, g_pup[i].link, &nb);
     if (!unit || nb <= 0) return;
     if (nb > ONLINE_BONES) nb = ONLINE_BONES;
     for (int b = 0; b < nb; b++) {
@@ -192,17 +230,17 @@ void oa_pose_armor(Cpu *c, const Piece *p) {
 // the remote Link plays what his player's Link plays: the player's own AS on each channel (a channel that went
 // quiet keeps its last one: its bank is played over by the others), or without a pose the one-clip AS of anim
 static void animate(Cpu *c, int i, const OnlinePlayer *p) {
-    uint64_t link = oa_g_act[i].link;
+    uint64_t link = g_pup[i].link;
     if (!p->pose.valid) {
-        if (p->anim < ONLINE_A_COUNT && p->anim != oa_g_act[i].anim && oa_play_as(c, link, k_anims[p->anim], 0, 0, 6.0f, true))
-            oa_g_act[i].anim = p->anim;
+        if (p->anim < ONLINE_A_COUNT && p->anim != g_pup[i].anim && oa_play_as(c, link, k_anims[p->anim], 0, 0, 6.0f, true))
+            g_pup[i].anim = p->anim;
         return;
     }
     for (int ch = 0; ch < ONLINE_AS_CHANNELS; ch++) {
         const char *want = p->pose.as[ch];
-        if (!want[0] || !strcmp(oa_g_act[i].as[ch], want)) continue;
+        if (!want[0] || !strcmp(g_pup[i].as[ch], want)) continue;
         oa_play_as(c, link, want, oa_k_channel[ch][0], oa_k_channel[ch][1], -1.0f, true);
-        snprintf(oa_g_act[i].as[ch], ONLINE_AS_MAX, "%s", want);  // (once, played or not: an AS it lacks isn't asked again)
+        snprintf(g_pup[i].as[ch], ONLINE_AS_MAX, "%s", want);  // (once, played or not: an AS it lacks isn't asked again)
     }
-    oa_g_act[i].anim = -1;
+    g_pup[i].anim = -1;
 }
