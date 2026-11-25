@@ -463,61 +463,61 @@ oa_sample.c:g_rf_next                        partida   índice
 oa_sample.c:g_rf_taken                       partida   índice leído
 oa_sample.c:rt_online_xlink_emit:all         permitir  variable de entorno FX_ALL leída una vez
 oa_sample.c:rt_game_fmt:on                   permitir  variable de entorno EFF_ERR_LOG leída una vez
-oa_sample.c:rt_game_fmt:n                    partida   contador de log
+oa_sample.c:n                                partida   contador de log
 oa_sample.c:continuous_sound:known           permitir  tabla constante
-oa_sample.c:continuous_sound:seen            partida   sonidos vistos (hash, hora)
-oa_sample.c:continuous_sound:next            partida   índice
-oa_sample.c:oa_fx_update:rf_tick             partida   contador
-oa_sample.c:oa_fx_update:rf_was              partida   posición anterior
+oa_sample.c:continuous_sound_seen            partida   sonidos vistos (hash, hora)
+oa_sample.c:next                             partida   índice
+oa_sample.c:rf_tick                          partida   contador
+oa_sample.c:rf_was                           partida   posición anterior
 oa_sample.c:oa_fx_update:rf_log              permitir  variable de entorno RF_LOG leída una vez
-oa_sample.c:oa_fx_update:rf_last             partida   última reacción
-oa_sample.c:oa_fx_update:rf_last_t           partida   su hora
+oa_sample.c:rf_last                          partida   última reacción
+oa_sample.c:rf_last_t                        partida   su hora
 oa_sample.c:oa_fx_update:who                 permitir  tabla constante
 oa_sample.c:g_elem_seen                      partida   elementos vistos por disparo
-oa_sample.c:sample_shots:tr                  puntero   disparos seguidos (actor, Watch)
-oa_sample.c:sample_shots:next_id             partida   siguiente id de disparo (1 al empezar)
-oa_sample.c:sample_shots:boom_seq            partida   número de explosión
-oa_sample.c:sample_shots:booms               partida   explosiones recientes
-oa_sample.c:sample_shots:bomb_seen           puntero   bombas ya vistas (direcciones de actores)
-oa_sample.c:sample_shots:seen                puntero   flechas ya vistas (direcciones de actores)
-oa_sample.c:sample_shots:not_his             puntero   flechas que no son suyas (actor)
-oa_sample.c:sample_shots:not_his_next        partida   índice
-oa_sample.c:sample_shots:bow_t               partida   hora del arco
-oa_sample.c:sample_shots:shoot_t             partida   hora del disparo
-oa_sample.c:sample_held:tr                   puntero   lo que lleva (actor, Watch)
-oa_sample.c:sample_held:tick                 partida   contador
+oa_sample.c:sample_shots_tr                  puntero   disparos seguidos (actor, Watch)
+oa_sample.c:next_id                          partida   siguiente id de disparo (1 al empezar)
+oa_sample.c:boom_seq                         partida   número de explosión
+oa_sample.c:booms                            partida   explosiones recientes
+oa_sample.c:bomb_seen                        puntero   bombas ya vistas (direcciones de actores)
+oa_sample.c:sample_shots_seen                puntero   flechas ya vistas (direcciones de actores)
+oa_sample.c:not_his                          puntero   flechas que no son suyas (actor)
+oa_sample.c:not_his_next                     partida   índice
+oa_sample.c:bow_t                            partida   hora del arco
+oa_sample.c:shoot_t                          partida   hora del disparo
+oa_sample.c:sample_held_tr                   puntero   lo que lleva (actor, Watch)
+oa_sample.c:sample_held_tick                 partida   contador
 oa_sample.c:oa_g_map                         partida   mapa actual
-oa_sample.c:oa_sample_pose:held              puntero   arma en la mano (actor)
-oa_sample.c:oa_sample_pose:thrown            puntero   arma lanzada (actor)
-oa_sample.c:oa_sample_pose:listed_at         partida   hora
-oa_sample.c:oa_sample_pose:hw                puntero   Watch de held
-oa_sample.c:oa_sample_pose:tw                puntero   Watch de thrown
-oa_sample.c:oa_sample_pose:last              partida   última posición del arma lanzada
-oa_sample.c:oa_sample_pose:still_since       partida   hora
-oa_sample.c:oa_sample_pose:had               puntero   escudo y arco que tenía (actores)
-oa_sample.c:oa_sample_pose:let_go            puntero   los que soltó (actores)
-oa_sample.c:oa_sample_pose:since             partida   hora
-oa_sample.c:oa_sample_pose:hw2               puntero   Watch de had
-oa_sample.c:oa_sample_pose:lw                puntero   Watch de let_go
-oa_sample.c:oa_sample_pose:last_bone         partida   último hueso de cada pieza
-oa_sample.c:oa_sample_pose:logged            partida   log hecho
-oa_sample.c:oa_sample_pose:was               partida   pose válida el fotograma anterior (-1 al empezar)
+oa_sample.c:oa_sample_pose_held              puntero   arma en la mano (actor)
+oa_sample.c:thrown                           puntero   arma lanzada (actor)
+oa_sample.c:listed_at                        partida   hora
+oa_sample.c:oa_sample_pose_hw                puntero   Watch de held
+oa_sample.c:oa_sample_pose_tw                puntero   Watch de thrown
+oa_sample.c:oa_sample_pose_last              partida   última posición del arma lanzada
+oa_sample.c:still_since                      partida   hora
+oa_sample.c:had                              puntero   escudo y arco que tenía (actores)
+oa_sample.c:let_go                           puntero   los que soltó (actores)
+oa_sample.c:since                            partida   hora
+oa_sample.c:hw2                              puntero   Watch de had
+oa_sample.c:lw                               puntero   Watch de let_go
+oa_sample.c:last_bone                        partida   último hueso de cada pieza
+oa_sample.c:logged                           partida   log hecho
+oa_sample.c:was                              partida   pose válida el fotograma anterior (-1 al empezar)
 oa_sample.c:oa_sample_pose:pedestals         permitir  tabla constante
-oa_sample.c:oa_sample_pose:held#2            puntero   lo que sostiene con Magnesis (actor)
-oa_sample.c:oa_sample_pose:from              partida   de dónde lo cogió
-oa_sample.c:oa_sample_pose:stopped           puntero   lo que paró con Stasis (actor)
-oa_sample.c:oa_sample_pose:sw                puntero   su Watch
-oa_sample.c:oa_sample_pose:from#2            partida   de dónde
-oa_sample.c:oa_sample_pose:tick              partida   contador
-oa_sample.c:oa_sample_pose:last#2            partida   matrices de sus pilares de hielo
-oa_sample.c:oa_sample_pose:n_last            partida   cuántos
-oa_sample.c:oa_sample_pose:tick#2            partida   contador
-oa_sample.c:oa_sample_pose:horse             puntero   caballo que monta (actor)
-oa_sample.c:oa_sample_pose:tack              puntero   sus arreos (actores)
-oa_sample.c:oa_sample_pose:hw#2              puntero   Watch del caballo
-oa_sample.c:oa_sample_pose:tw#2              puntero   Watch de los arreos
-oa_sample.c:oa_sample_pose:tick#3            partida   contador
-oa_sample.c:oa_sample_pose:last#3            partida   última pose registrada (POSE_LOG)
+oa_sample.c:oa_sample_pose_held_2            puntero   lo que sostiene con Magnesis (actor)
+oa_sample.c:oa_sample_pose_from              partida   de dónde lo cogió
+oa_sample.c:stopped                          puntero   lo que paró con Stasis (actor)
+oa_sample.c:sw                               puntero   su Watch
+oa_sample.c:oa_sample_pose_from_2            partida   de dónde
+oa_sample.c:oa_sample_pose_tick              partida   contador
+oa_sample.c:oa_sample_pose_last_2            partida   matrices de sus pilares de hielo
+oa_sample.c:n_last                           partida   cuántos
+oa_sample.c:oa_sample_pose_tick_2            partida   contador
+oa_sample.c:horse                            puntero   caballo que monta (actor)
+oa_sample.c:tack                             puntero   sus arreos (actores)
+oa_sample.c:oa_sample_pose_hw_2              puntero   Watch del caballo
+oa_sample.c:oa_sample_pose_tw_2              puntero   Watch de los arreos
+oa_sample.c:oa_sample_pose_tick_3            partida   contador
+oa_sample.c:oa_sample_pose_last_3            partida   última pose registrada (POSE_LOG)
 oa_sample.c:oa_sample_skeleton:q             permitir  búfer de trabajo: se escribe hueso a hueso antes de enviarlo
 oa_sample.c:oa_sample_skeleton:t             permitir  búfer de trabajo: como q
 oa_sample.c:why                              partida   por qué no se muestrea (-1 al empezar)
