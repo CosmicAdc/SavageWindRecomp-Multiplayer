@@ -910,7 +910,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no cambies cómo se elige el blanco ni el daño declarado (T434); no toques `rt_link_life`.
   modelo sugerido: medio
 
-- [ ] T449 [investigación] Dormir y esperar con el anfitrión como dueño de la hora (ADR-025 n.º 3 y 4; HE-07).
+- [x] T449 [investigación] Dormir y esperar con el anfitrión como dueño de la hora (ADR-025 n.º 3 y 4; HE-07).
+  hecha: agente Sonnet ag-t449 (integrada) — `specs/bitacora/F4-T449-dormir-y-hora.md`; propone T456 y T457 (ya) y T449-d/e tras medir PE-T449-1..6 en el juego
   files: `specs/bitacora/F4-T449-dormir-y-hora.md`
   verify: la bitácora responde las preguntas del paso 1 con `fichero:línea` y una propuesta de diseño y tareas; `git diff --check`
   depende de: —
@@ -995,3 +996,25 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     1. Renombrar la de `oa_control.c` a `bloodmoonflags` y documentarla.
   hecho cuando: `verify` cumplido.
   modelo sugerido: bajo
+
+- [ ] T456 [hora] No difundir la hora sin mundo (ADR-025 n.º 4; T449-a).
+  files: `runtime/oa_frame.c`, `runtime/online.c`
+  verify: `make -j8`; en juego, con A en el título o cargando, B.log no tiene líneas `[online] the host's time` nuevas y el reloj de B sigue
+  depende de: T212 (el reinicio de `g_local_hour` va en su `RT_ON_RESET`)
+  quién: agente
+  contexto: Bitácora de T449: sin mundo, el paso 7 de `rt_online_frame` no corre y `g_local_hour` se queda con el último valor, que `srv_loop` sigue emitiendo cada 2 s. El servidor ya omite el envío con `hour < 0`.
+  pasos:
+    1. `online_set_local_hour(-1)` cuando no hay mundo (y durante eventos del anfitrión que no son dormir, según la bitácora).
+  hecho cuando: `verify` cumplido.
+  modelo sugerido: medio
+
+- [ ] T457 [hora] El invitado no aplica la hora del anfitrión dentro de sus propios eventos que no son dormir (T449-b).
+  files: `runtime/oa_flags.c` (o donde se aplique la hora)
+  verify: `make -j8`; en juego (PE-T449-3), con B en una escena, la hora de A no salta a mitad de la escena
+  depende de: T456
+  quién: agente
+  contexto: Bitácora de T449, sección de propuestas.
+  pasos:
+    1. Aplazar la hora del anfitrión mientras el invitado está en un evento que no es dormir; aplicarla al acabar.
+  hecho cuando: `verify` cumplido.
+  modelo sugerido: medio
