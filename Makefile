@@ -981,3 +981,15 @@ test-online-names: $(B)/test_online_names
 	$(B)/test_online_names $(B)/test_online_names.d
 
 .PHONY: test-online-names
+
+# The online wire (runtime/online.c) without the game or a network: how a byte stream is cut into messages and how
+# SKEL packs a bone
+$(B)/test_online_wire: tools/test_online_wire.c runtime/online.c runtime/online_wire.h $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -O1 -g -fno-strict-aliasing -Wall -Wno-unused-function $(OSFLAGS) -Iruntime -o $@ tools/test_online_wire.c \
+	    -lpthread -lm $(if $(filter windows,$(PLATFORM)),-lws2_32)
+
+test-online-wire: $(B)/test_online_wire
+	$(B)/test_online_wire
+
+.PHONY: test-online-wire
