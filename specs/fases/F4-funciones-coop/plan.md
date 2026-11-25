@@ -385,6 +385,42 @@ hoy), mantener o pasar a otro (líder claro: 1,5 veces la segunda amenaza). Inte
 sustituye el traspaso "al último que golpea"; los traspasos por amenaza respetan `hold`. Protocolo: HIT con ranura de
 origen (T409). Detalle y preguntas Q-15-1 a Q-15-4 en `../../casos-de-uso/CU-15-amenaza-de-los-enemigos.md`.
 
+### O. El compañero en el minimapa (CU-16)
+
+**Hoy.** No existe nada sobre el minimapa. El runtime solo sabe reconocer el modo de la pantalla del mapa
+(`ui_layout_map_mode`, `runtime/ui_layout.c`: 1 mapa grande, 0 minimapa, -1 animando; solo 1.9.0) y ajusta su sitio y
+tamaño con `hud_size` y `hud_edges` (`runtime/nvn/hud_scale.h`). No se conoce dónde cae el minimapa ni cuántos metros
+cubre. ADR-011, decisión 41 dijo "no hay marcador en el mapa del juego en F4"; ADR-022 la **amplía** (el minimapa sí,
+encima; el mapa grande no).
+
+**Reglas.** `[DUEÑO]` ADR-022: opción A (dibujado encima por la capa de UI, sin tocar el layout ni el guardado); flecha
+pequeña con el color y forma del compañero (los 8 de CU-10) que apunta hacia donde mira; fuera de alcance, marca
+pegada al borde con la distancia al lado; medir ya, programar en F4 junto a CU-10; mapa grande (B) para después, pines
+del juego (C) descartados.
+
+**Diseño.**
+
+1. **Medir (T445, investigación, adelantada).** Antes de escribir código de dibujo: centro y radio del círculo,
+   metros por radio, si gira con la cámara o va con el norte arriba, en 16:9 y en ultrawide, con `hud_size` y
+   `hud_edges` por defecto y alterados, y cuándo está oculto o animando. Los agentes leen el código; el orquestador
+   mide en el juego con capturas de ventana (el overlay no sale en el `shot` del control).
+2. **Módulo puro `runtime/coop_minimap.c/.h` (T446).** Convierte la diferencia de posición y el rumbo en píxeles del
+   círculo y **recorta al borde** lo que queda fuera de alcance: entrada = posición y rumbo de los dos jugadores,
+   rumbo de cámara, parámetros medidos; salida = {dentro, x, y, ángulo} o {fuera, x de borde, y de borde, ángulo,
+   distancia}. Sin punteros del juego, sin ImGui, sin reloj. Prueba `tests/test_coop_minimap.c`.
+3. **Datos del minimapa.** Constantes por proporción de pantalla (fracción del ancho y del alto), una por formato
+   medido; si T445 muestra que el layout los expone, se leen de ahí y las constantes quedan de reserva. Si no hay
+   medida fiable para el formato actual, no se dibuja.
+4. **Dibujo (T446), en la capa de UI de CU-10**, no en una nueva: función en `runtime/ui/coop_hud.mm` llamada desde
+   `online_overlay_draw`, con la forma y color de T425 (`coop_shape_draw`) y un triángulo orientado. Solo cuando
+   `ui_layout_map_mode == 0`, el HUD y el ajuste "Show partner on minimap" están activos, no hay menú abierto y los
+   datos del compañero y de la cámara son recientes (0,5 s). El modo del mapa y los ajustes del HUD se publican como
+   una instantánea desde el hilo del juego o del render (como `online_camera_set`); el dibujo no los lee del juego.
+5. **Sitio en la cadena de UI (§5).** T446 edita `coop_hud.mm`, `online_ui.mm` y `textos-nuevos.txt`: entra en la
+   cadena única, **después de T429** (que cierra el overlay del compañero con la vida) y antes de T442.
+6. **Mapa grande (T447, después, prioridad baja).** Investigar si se pueden leer desplazamiento y zoom del mapa de
+   pausa para colocar al compañero. Sin fecha; no bloquea el cierre.
+
 ## 2. Ingeniería inversa necesaria (tareas de investigación para el dueño)
 
 Cada una se hace con Ghidra sobre la copia del dueño (`tools/ghidra/README.md`, `tools/ghidra/gq.py`). La respuesta
@@ -409,13 +445,14 @@ juego (~15 min). **Se agrupan en una sola entrega.**
 | Carril | Ficheros (dueño único) | Tareas |
 |---|---|---|
 | **Protocolo** | `runtime/online.h`, `PROTOCOL`, cabecera compartida con el bot, tabla de autoridad de F3 | T409 |
-| **Lógica pura** (paralelo) | `runtime/coop_flags.*`, `coop_world.*`, `coop_rewards.*`, `coop_tp.*`, `coop_give.*`, `coop_palette.*`, `coop_revive.*`, `coop_pvp.*`, `coop_threat.*` + `tests/test_coop_*.c` | T410, T412, T415, T418, T424, T430, T433, T443 (T420: segunda entrega) |
+| **Lógica pura** (paralelo) | `runtime/coop_flags.*`, `coop_world.*`, `coop_rewards.*`, `coop_tp.*`, `coop_give.*`, `coop_palette.*`, `coop_revive.*`, `coop_pvp.*`, `coop_threat.*`, `coop_minimap.*` + `tests/test_coop_*.c` | T410, T412, T415, T418, T424, T430, T433, T443, T446 (solo la parte pura; el dibujo va en la cadena) (T420: segunda entrega) |
 | **Mundo** (serie, en la cadena única de §5) | módulo de flags de `online_actors` (`oa_flags` / `oa_gamedata`), guardados (`runtime/save_backup.c`, `runtime/services/save_profiles.*`), parte de `online.c` que guarda los QUEST | T411, T413, T414, T416, T442 (T417: aplazada) |
 | **Reglas** (serie) | módulo de reglas (`oa_rules`), `runtime/control_game.c`, `runtime/control_tp.c`, `runtime/items.c` | T419, T423, T431, T434 (segunda entrega y posteriores: T421, T422, T432) |
-| **UI** (serie, en la cadena única de §5) | `runtime/ui/online_ui.mm`, `runtime/ui/coop_hud.mm` (nuevo) | T425-T429, T435 |
+| **UI** (serie, en la cadena única de §5) | `runtime/ui/online_ui.mm`, `runtime/ui/coop_hud.mm` (nuevo) | T425-T429, T446, T435 |
 | **Enemigos** (fuera de la cadena: ninguna otra tarea de F4 toca su fichero) | `runtime/oa_enemies.c`, `tools/coop/threat_run.sh` | T444 |
 | **Entrada** | `runtime/hle/input.c`, `runtime/hle/bindings.c` | T436 |
 | **i18n** | `runtime/ui/i18n/*.inc` | T437 |
+| **Investigación** (solo bitácora y herramientas de medida) | `specs/bitacora/`, `tools/coop/minimapa_medir.py` | T445, T447 |
 | **Parches** (una entrega) | `tools/patches.py`, `tools/game_sites.py`, `runtime/game_sites.h` | lo que salga de T404-T406 |
 | **Integrador** | orquestador de fotograma (`oa_frame`), `Makefile`, `runtime/launch_flags_table.c` (generado), `runtime/ui/menu.mm` y `runtime/settings.*` solo si hiciera falta | T439 |
 
@@ -454,14 +491,17 @@ Los ajustes nuevos van a `online.ini` (como en F3), no a `savagewind.ini`: así 
    (agentes). Pueden empezar durante F3 porque solo escriben bitácora; todo lo que edite `runtime/online.c` espera al
    bloque 3 de F3 (T413) y T409 a F3 completa.
 2. T409 (protocolo), y **justo después** T438 (modos de bot y escenarios de F4).
-3. En paralelo, toda la lógica pura: T410, T412, T415, T418, T424, T430, T433. T415, T418 y T430 ya no esperan
+3. En paralelo, toda la lógica pura: T410, T412, T415, T418, T424, T430, T433. T445 (medir el minimapa) corre desde
+   ya, sola, y bloquea a T446. T415, T418 y T430 ya no esperan
    ninguna decisión del dueño.
 4. **Cadena única** (serie; los tres carriles comparten `online.c`, `coop_hud.mm` y `online_ui.mm`):
-   T413 → T411 → T414 → T416 → T436 → T425 → T426 → T427 → T428 → T429 → T442 → T419 → T423 → T431 → T434 → T435.
-   Dependencias que la justifican: T436 antes de T426 y T427 (sus acciones); T423 después de T426 (cola de MARK) y
+   T413 → T411 → T414 → T416 → T436 → T425 → T426 → T427 → T428 → T429 → T446 → T442 → T419 → T423 → T431 → T434 → T435.
+   Dependencias que la justifican: T446 después de T425 (capa de marcadores, color y forma) y de T445 (medidas), y
+   antes de T442 por compartir `coop_hud.mm`; T436 antes de T426 y T427 (sus acciones); T423 después de T426 (cola de MARK) y
    T428; T419, T431 y T442 después de T428 (avisos por identificador).
 5. Los carriles Mundo, Reglas y UI son agrupaciones de esa cadena, no hilos paralelos. T444 (amenaza) va aparte,
    tras T409, T438 y T443, porque solo toca `oa_enemies.c`; T439 la espera.
 6. Cierre: T437 → T439 → T440 → T441 (T438 ya se hizo tras T409).
 7. Después del cierre, por este orden de prioridad y solo si el dueño lo pide: envío directo (T404 → T420 → T421 →
-   T422), revisión de cofres (T408 → T417), rescate manual (T406 → T432), armas (T405 y su ventana de protocolo).
+   T422), revisión de cofres (T408 → T417), rescate manual (T406 → T432), armas (T405 y su ventana de protocolo), mapa grande
+   con el compañero (T447, sin fecha).
