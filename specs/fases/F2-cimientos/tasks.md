@@ -28,6 +28,22 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ---
 
+- [ ] T222 [net] Validación por entrada en STATE y cotas que faltan (revisión de F2: I-1, I-2, I-3, C-1, C-2).
+  files: `runtime/online_validate.h`, `runtime/online_validate.c`, `runtime/online.c` (`sample_local` y el `case` de STATE), `tools/test_online_validate.c`, `specs/contratos/validacion-red.md`
+  verify: `make test-online-validate test-online-wire test-online-net` en 0; casos nuevos: (a) un STATE con una entrada mala en cada lista se acepta con esa entrada anulada y el resto intacto; (b) un STATE con `pos` o `yaw` malos se descarta entero; (c) `bloody_moon = 5000` se acepta; (d) `fx_anim[k]` y `dye[k]` fuera de cota anulan su entrada; `make -j8` compila; recorrido completo sin `dropped a STATE` en los logs; con `SAVAGEWIND_ONLINE_BM_TEST=5000` en A, B sigue viendo moverse a A
+  depende de: T213
+  quién: agente
+  contexto: Revisión independiente de F2 (`specs/bitacora/2026-11-25-F2-revision-independiente.md`). **ADR-025 n.º 1** decide I-2: STATE se descarta solo por los campos núcleo; una entrada mala de una lista se anula y el resto se aplica (como ENEMIES y LOOTS). I-1: `bloody_moon` > 4000 tira hoy el STATE entero (`online_validate.h:119-120`) aunque el consumidor (`oa_flags.c:46`) ya lo ignora. I-3: `sample_local` (`online.c:788-790`) deja `pos` no finita al devolver falso y el STATE con LOADING se descarta en el receptor. C-1/C-2: `fx_anim` y `dye` sin cota superior llegan al juego.
+  pasos:
+    1. Separar en `online_validate` los campos núcleo (`pos`, `yaw`, `flags`, `anim`, `as`, reglas de sesión) de las listas. Núcleo malo → falso (se descarta el mensaje). Entrada mala de una lista → se anula esa entrada **en la copia local** (la marca de vacío que ya use ese campo: `n` reducido, nombre vacío o `-1`) y se cuenta; nunca se corrige su valor.
+    2. `bloody_moon`: solo finito y `|x| ≤ ONLINE_V_LIMIT` (la ventana 0..4000 la aplica el consumidor).
+    3. `fx_anim[k]`: cota alta conservadora (escribir en la bitácora de dónde sale); fuera de cota → `-1`. `dye[k]`: la cota que usa el emisor para los colores reales; fuera → `-1`. `fx_props` y `ground_props` de tipo `float`: finitos, o la entrada se anula.
+    4. `sample_local`: poner `w->pos` (y `yaw`) a cero antes de cada `return false`, para que el STATE con LOADING llegue.
+    5. Actualizar `specs/contratos/validacion-red.md` con la regla nueva (núcleo / por entrada).
+  hecho cuando: `verify` cumplido; la bitácora dice que **sí** cambia comportamiento (antes se tiraba el STATE entero).
+  no hagas: no cambies el formato de ningún mensaje ni `PROTOCOL`; no cortes la conexión por un dato inválido; no quites las comprobaciones `isfinite` de `oa_*`.
+  modelo sugerido: alto
+
 ## FASE 0 — Cadena OA, primer paso (antes de tocar nada)
 
 - [~] T201 [oa] Firma de comportamiento de referencia.
@@ -184,7 +200,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies el orden en que se olvidan o borran las piezas; no cambies qué se limpia; no conviertas campos en punteros ni cambies sus tipos.
   modelo sugerido: alto
 
-- [ ] T209 [oa] Orden explícito en `rt_online_frame`.
+- [~] T209 [oa] Orden explícito en `rt_online_frame`.
+  reclamada: agente Opus oa-t209 (integrada en `69fa86c`) — compila (1 aviso previo), online_players 8/8, pruebas de red en 0; FALTA pasada de dos juegos y firma
   files: `runtime/oa_frame.c`, y una función `oa_<módulo>_frame` en cada `runtime/oa_*.c` que tenga un paso; `runtime/online_actors_internal.h`
   verify: `rt_online_frame` cabe en una pantalla (menos de 80 líneas) y consiste en llamadas en el orden de `plan.md` §3.6, con ese orden en un comentario encima; `make -j8` compila; `firma_log.py --comparar` en 0 tras el recorrido completo; el número de llamadas a `online_players` por fotograma no cambia (`grep -c "online_players(" runtime/oa_*.c` igual que antes de la tarea)
   depende de: T208
@@ -231,7 +248,7 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 - [ ] T212 [oa] `RT_ON_RESET` en todos los módulos (cambio de comportamiento en el reinicio).
   files: `runtime/oa_*.c`, `runtime/online.c` (solo si el inventario lo pide), `tools/coop/oa_statics_permitidas.txt`
-  verify: `$PY tools/coop/oa_statics.py` termina con 0; `make -j8` compila; en juego, con sesión activa: "Quit to start screen" → Continuar, tres veces en cada juego, sin cuelgue, y el compañero vuelve a verse; el log muestra una línea `[online] reset` por reinicio; recorrido completo pasa
+  verify: `$PY tools/coop/oa_statics.py` termina con 0; `make -j8` compila; en juego, con sesión activa: "Quit to start screen" → Continuar, tres veces en cada juego, sin cuelgue; el compañero ve LEAVE y la sesión queda cerrada en los dos (ADR-025); el log muestra una línea `[online] reset` por reinicio; recorrido completo pasa
   depende de: T211
   quién: agente
   contexto: `RT_ON_RESET(fn) { ... }` (`runtime/hle.h:40`) registra una función que se ejecuta en el reinicio en caliente, con los hilos del juego ya parados y antes de borrar su memoria. Ejemplo a copiar: `RT_ON_RESET(items_reset)` en `runtime/items.c:337-341`. La macro usa `__LINE__` para nombrar su entrada: un `RT_ON_RESET` por línea. `forget_all` hoy limpia solo parte del estado y **encola huérfanos** para borrarlos después; tras un reinicio esos punteros apuntan a memoria de otro arranque.
@@ -242,8 +259,9 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
     4. Valores iniciales que no son cero (por ejemplo `anim = -1`, `covered = -1`, cachés que empiezan en -1): restaurar ese valor, no cero.
     5. Un `LOG("[online] reset\n")` en el reset de `oa_frame`.
     6. Ir módulo a módulo: compilar, `oa_statics.py`, recorrido corto. Un commit por módulo.
+    7. **ADR-025 n.º 2 (Q-EST-1): el reinicio cierra la sesión.** `online.c` registra su `RT_ON_RESET` que manda LEAVE y cierra la sesión limpiamente (como "Leave" del menú), y el juego empieza como recién arrancado. El compañero ve "left", no un cierre de TCP.
   hecho cuando: `verify` cumplido.
-  no hagas: no llames a `call(c, ...)`, `FN_DELETE`, `delete_piece` ni a nada que entre en el juego desde un reset; no cierres la conexión de red en el reset (la sesión sobrevive al reinicio por diseño); no limpies las tablas de los `.txt` ni los mutex.
+  no hagas: no llames a `call(c, ...)`, `FN_DELETE`, `delete_piece` ni a nada que entre en el juego desde un reset; no cierres el socket desde el reset de `oa_*` (eso lo hace `online.c`, ver paso 7); no limpies las tablas de los `.txt` ni los mutex.
   modelo sugerido: alto
 
 ## Puerta de la fase 0
