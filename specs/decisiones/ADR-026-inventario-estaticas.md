@@ -525,27 +525,27 @@ oa_sample.c:why                              partida   por qué no se muestrea (
 oa_world.c:g_break_test_t                    partida   cuándo cortó su árbol la prueba BREAK_TEST
 oa_world.c:g_obj_seen                        puntero   objetos del mundo seguidos (actor, Watch)
 oa_world.c:obj_kind:fixed                    permitir  tabla constante
-oa_world.c:obj_find:last                     partida   hora de la última búsqueda
-oa_world.c:oa_objs_update:tick               partida   contador
+oa_world.c:last                              partida   hora de la última búsqueda
+oa_world.c:oa_objs_update_tick               partida   contador
 oa_world.c:oa_objs_update:ot                 permitir  variable de entorno OBJ_TEST leída una vez
-oa_world.c:oa_objs_update:t0                 partida   prueba OBJ_TEST
-oa_world.c:oa_objs_update:held               partida   prueba OBJ_TEST (-1 al empezar)
-oa_world.c:oa_objs_update:told               partida   log hecho
-oa_world.c:oa_objs_update:to                 partida   prueba OBJ_TEST: destino
+oa_world.c:oa_objs_update_t0                 partida   prueba OBJ_TEST
+oa_world.c:oa_objs_update_held               partida   prueba OBJ_TEST (-1 al empezar)
+oa_world.c:oa_objs_update_told               partida   log hecho
+oa_world.c:to                                partida   prueba OBJ_TEST: destino
 oa_world.c:oa_objs_update:theirs             permitir  búfer de trabajo: se llena en esta llamada antes de leerlo (nt)
 oa_world.c:oa_objs_update:theirs_trunk       permitir  búfer de trabajo: como theirs
-oa_world.c:oa_objs_update:told#2             partida   contador de log
-oa_world.c:oa_objs_update:logged             partida   contador de log
+oa_world.c:oa_objs_update_told_2             partida   contador de log
+oa_world.c:logged                            partida   contador de log
 oa_world.c:g_mv                              puntero   mecanismos seguidos (actor, Watch)
 oa_world.c:mover_kind:kinds                  permitir  tabla constante
-oa_world.c:oa_movers_update:tick             partida   contador
+oa_world.c:oa_movers_update_tick             partida   contador
 oa_world.c:oa_movers_update:log_on           permitir  variable de entorno MOVER_LOG leída una vez
-oa_world.c:oa_movers_update:rescan           partida   volver a buscar
+oa_world.c:rescan                            partida   volver a buscar
 oa_world.c:oa_movers_update:mt               permitir  variable de entorno MOVER_TEST leída una vez
-oa_world.c:oa_movers_update:t0               partida   prueba MOVER_TEST
-oa_world.c:oa_movers_update:held             partida   prueba MOVER_TEST (-1 al empezar)
-oa_world.c:oa_movers_update:from             partida   prueba MOVER_TEST
-oa_world.c:oa_movers_update:held_h           partida   prueba MOVER_TEST
+oa_world.c:oa_movers_update_t0               partida   prueba MOVER_TEST
+oa_world.c:oa_movers_update_held             partida   prueba MOVER_TEST (-1 al empezar)
+oa_world.c:from                              partida   prueba MOVER_TEST
+oa_world.c:held_h                            partida   prueba MOVER_TEST
 oa_world.c:g_brk                             puntero   lo que se puede romper cerca (actor, Watch)
 oa_world.c:g_our_cut                         puntero   nuestros cortes (tronco: actor, Watch)
 oa_world.c:g_spawn                           puntero   peticiones en curso (Handle)
@@ -557,17 +557,17 @@ oa_world.c:g_world                           puntero   lo roto en el mundo (Hash
 oa_world.c:g_nworld                          partida   su longitud
 oa_world.c:g_widx                            partida   su índice por HashId
 oa_world.c:g_broken_new_t                    partida   hora de la última rotura
-oa_world.c:world_rotate:next                 partida   siguiente a enviar
-oa_world.c:world_rotate:at                   partida   hora
-oa_world.c:oa_breaks_update:tick             partida   contador
-oa_world.c:oa_breaks_update:was              partida   posición anterior
-oa_world.c:oa_breaks_update:told             partida   HashIds ya avisados
-oa_world.c:oa_breaks_update:ntold            partida   índice
-oa_world.c:oa_breaks_update:d0               partida   prueba DROP_TEST
-oa_world.c:oa_breaks_update:dropped          partida   prueba DROP_TEST
-oa_world.c:oa_breaks_update:t0               partida   prueba BREAK_TEST
-oa_world.c:oa_breaks_update:tested           partida   prueba BREAK_TEST
-oa_world.c:oa_breaks_update:told#2           partida   log hecho
+oa_world.c:next                              partida   siguiente a enviar
+oa_world.c:at                                partida   hora
+oa_world.c:oa_breaks_update_tick             partida   contador
+oa_world.c:was                               partida   posición anterior
+oa_world.c:oa_breaks_update_told             partida   HashIds ya avisados
+oa_world.c:ntold                             partida   índice
+oa_world.c:d0                                partida   prueba DROP_TEST
+oa_world.c:dropped                           partida   prueba DROP_TEST
+oa_world.c:oa_breaks_update_t0               partida   prueba BREAK_TEST
+oa_world.c:tested                            partida   prueba BREAK_TEST
+oa_world.c:oa_breaks_update_told_2           partida   log hecho
 # online.c (hilos: juego = rt_online_frame y oa_*; red-c = cl_thread; red-s = srv_thread; menú = online_ui.mm y main.c; control = oa_control; render = vulkan/exec.c)
 online.c:g_local_hour                        partida   hora local (-1 al empezar). Hilos: juego escribe (online_set_local_hour), red-s lee (srv_loop)
 online.c:g_online                            permitir  ajustes del jugador (fichero de ajustes; hle.h: los ajustes se quedan). Hilos: menú, red-c, juego (oa_rules)
