@@ -263,7 +263,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no uses la carpeta de guardado real del dueño; no lances la ventana bajo `timeout` de MSYS; no guardes el log dentro del repositorio.
   modelo sugerido: medio
 
-- [ ] T015 [juego] Arranque con ventana, visto por el dueño.
+- [x] T015 [juego] Arranque con ventana, visto por el dueño.
+  reclamada: dueño + orquestador, 2026-11-24 — el dueño jugó con ventana: se ve y juega bien; pestaña Online completa en español. Log: 59,6 fps de media tras calentar (mín 35,9), RTX 3060 Laptop, Vulkan 1.4, DLSS apagado (sin la librería); salida 0. Nota: el nombre por defecto del jugador es el usuario de Windows ("DELL"), que viaja por la red → F4
   files: ninguno
   verify: observación del dueño anotada en la bitácora (FPS, GPU y controlador, ajustes, qué se vio)
   depende de: T014
