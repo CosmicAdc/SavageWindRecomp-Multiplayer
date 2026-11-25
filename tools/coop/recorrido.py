@@ -27,6 +27,11 @@ DOS_JUEGOS = AQUI / "dos_juegos.sh"
 
 # Posiciones y recetas de docs/ONLINE.md y del plan (sin verificar en este equipo).
 CAMPAMENTO = (-1203.0, 198.0, 1641.0)  # campamento del acantilado ("Recipes that found the bugs above")
+# Punto de encuentro: donde SAVAGEWIND_TEST_WARP=plateau pone a Link al cargar (runtime/services/test_warp.c), suelo
+# firme (A.log y B.log tras cargar: "[place] swr:1 x=-1041.60 y=250.20 z=1812.10"). No es la torre 7: `goto tower 7`
+# apunta a la CIMA de la torre (y 247,4) y en el guardado de prueba Link cae unos 52 m hasta el pie (y 195, o 178
+# dentro de la estructura, donde se queda atascado). Ver specs/bitacora/2026-11-25-goto-investigacion.md.
+ENCUENTRO = (-1041.6, 250.2, 1812.1)
 
 LOG_UNION = r"joined \(slot \d+\)"
 LOG_TRASPASO = r"slot \d+'s now \(was"
@@ -118,8 +123,9 @@ class Ctx:
         return len(re.findall(patron, self.log(x)))
 
     # -- movimiento ------------------------------------------------------------------------------------------
-    def esperar_quieto(self, x, minimo=10, maximo=120):
-        """Espera a que `pos` responda, termine el teletransporte y Link deje de moverse."""
+    def esperar_quieto(self, x, minimo=10, maximo=120, tp=False):
+        """Espera a que `pos` responda, termine el teletransporte y Link deje de moverse. Con tp=True (se acaba de
+        lanzar un goto o teleport), un `teleport status` = failed es una falla y no un "ya esta quieto"."""
         ini = time.monotonic()
         time.sleep(minimo)
         previa = None
@@ -130,6 +136,8 @@ class Ctx:
                 previa = None
                 time.sleep(3)
                 continue
+            if tp and cod_tp == 0 and d_tp and str(d_tp.get("state", "")).lower() == "failed":
+                raise Falla(f"{x}: el teletransporte fallo ({d_tp.get('message', 'sin mensaje')})")
             cod, d, _ = self.sw(x, "pos", timeout=8)
             if cod == 0 and d:
                 p = (float(d["x"]), float(d["y"]), float(d["z"]))
@@ -139,9 +147,31 @@ class Ctx:
             time.sleep(3)
         raise Falla(f"{x}: Link no quedo quieto en {maximo}s tras moverlo")
 
+    def mover(self, x, *orden):
+        """Lanza un goto o teleport. Devuelve si hay que mirar `teleport status` despues: no cuando goto responde
+        already_there, porque entonces no empieza ningun salto y el estado es el del anterior."""
+        d = self.ok(x, *orden)
+        return str(d.get("state", "")).lower() != "already_there"
+
     def ir(self, x, *destino):
-        self.ok(x, *destino)
-        return self.esperar_quieto(x)
+        tp = self.mover(x, *destino)
+        return self.esperar_quieto(x, tp=tp)
+
+    def llegar(self, xs, destino, margen_xz=3.0, margen_y=10.0):
+        """goto a unas coordenadas en los juegos `xs` a la vez; espera a que cada uno quede quieto y comprueba que
+        esta alli. `teleport status` = done solo mira x y z (control_tp.c:near_pos), asi que un destino sin suelo
+        debajo tambien dice "Arrived" aunque Link caiga decenas de metros."""
+        tp = {x: self.mover(x, "goto", *destino) for x in xs}
+        res = {}
+        for x in xs:
+            p = self.esperar_quieto(x, tp=tp[x])
+            dxz = math.hypot(p[0] - destino[0], p[2] - destino[2])
+            dy = destino[1] - p[1]
+            if dxz > margen_xz or abs(dy) > margen_y:
+                raise Falla(f"{x}: quedo en {p[0]:.1f} {p[1]:.1f} {p[2]:.1f}, a {dxz:.1f} m del destino en x z "
+                            f"y {dy:.1f} m por debajo")
+            res[x] = p
+        return res
 
     def esperar_actor(self, x, texto, cantidad_min=1, maximo=60):
         ini = time.monotonic()
@@ -209,14 +239,11 @@ def _en_mundo(c, x, maximo=240):
 
 
 def paso2(c):
-    """goto tower 7 en ambos (CU-02): cada juego ve un OnlinePlayer."""
+    """goto al punto de encuentro en ambos (CU-02): cada juego ve un OnlinePlayer."""
     for x in ("A", "B"):
         _en_mundo(c, x)
         c.god(x, True)
-    for x in ("A", "B"):
-        c.ok(x, "goto", "tower", "7")
-    for x in ("A", "B"):
-        c.esperar_quieto(x)
+    c.llegar(("A", "B"), ENCUENTRO)
     res = []
     for x in ("A", "B"):
         n = len(c.esperar_actor(x, "OnlinePlayer", 1, 60))
@@ -256,7 +283,7 @@ def paso4(c):
     for x in ("A", "B"):
         c.ok(x, "teleport", *CAMPAMENTO)
     for x in ("A", "B"):
-        c.esperar_quieto(x)
+        c.esperar_quieto(x, tp=True)
     time.sleep(60)
     c.comprobar_ambos()
     n = c.cuenta("A", LOG_TRASPASO) + c.cuenta("B", LOG_TRASPASO) - antes
@@ -271,8 +298,8 @@ def paso5(c):
     if not c.esperar_ausencia("A", "OnlinePlayer", 60):
         raise Falla("A sigue viendo a OnlinePlayer con B a mas de 400 m")
     c.comprobar_ambos()
-    c.ir("A", "goto", "tower", "7")
-    c.ir("B", "goto", "tower", "7")
+    c.llegar(("A",), ENCUENTRO)
+    c.llegar(("B",), ENCUENTRO)
     if not c.esperar_actor("A", "OnlinePlayer", 1, 60):
         raise Falla("A no recreo a OnlinePlayer al volver B")
     return "desaparece y vuelve (cargas en log: %d)" % (c.cuenta("A", LOG_CARGA) + c.cuenta("B", LOG_CARGA))
@@ -304,10 +331,9 @@ def paso7(c):
 def paso8(c):
     """Ambos saltan lejos a la vez (CU-03): carga en los dos, actores rehechos."""
     antes = c.cuenta("A", LOG_CARGA) + c.cuenta("B", LOG_CARGA)
-    c.ok("A", "goto", "hateno")
-    c.ok("B", "goto", "hateno")
+    tp = {x: c.mover(x, "goto", "hateno") for x in ("A", "B")}
     for x in ("A", "B"):
-        c.esperar_quieto(x, minimo=15, maximo=150)
+        c.esperar_quieto(x, minimo=15, maximo=150, tp=tp[x])
     for x in ("A", "B"):
         if not c.esperar_actor(x, "OnlinePlayer", 1, 90):
             raise Falla(f"{x} no ve a OnlinePlayer tras la carga")
@@ -341,10 +367,7 @@ def paso10(c):
         time.sleep(3)
     if c.cuenta("A", LOG_UNION) <= antes:
         raise Falla("A.log no tiene una nueva linea 'joined (slot N)'")
-    c.ok("A", "goto", "tower", "7")
-    c.ok("B", "goto", "tower", "7")
-    for x in ("A", "B"):
-        c.esperar_quieto(x)
+    c.llegar(("A", "B"), ENCUENTRO)
     if not c.esperar_actor("A", "OnlinePlayer", 1, 60):
         raise Falla("A no ve a OnlinePlayer tras volver B")
     return "B vuelve a unirse y A lo ve"
@@ -353,7 +376,7 @@ def paso10(c):
 # (numero, titulo, funcion, comprueba a los dos juegos al final)
 PASOS = [
     (1, "Arrancar A y B (CU-01)", paso1, True),
-    (2, "goto tower 7 en ambos (CU-02)", paso2, True),
+    (2, "goto al punto de encuentro en ambos (CU-02)", paso2, True),
     (3, "B camina (CU-02)", paso3, True),
     (4, "Campamento del acantilado (CU-03)", paso4, True),
     (5, "B se aleja >400 m y vuelve (CU-02, CU-03)", paso5, True),
@@ -370,14 +393,14 @@ PASOS = [
 def enemigos(c, campamento=CAMPAMENTO):
     """Funcion separada, NO es uno de los 10 pasos. Devuelve [(letra, PASA|FALLA, detalle)] para (a), (b), (c).
 
-    A se queda en la torre (>60 m de B); B va al campamento. (a) los enemigos pasan a B y se acercan a B;
+    A se queda en el punto de encuentro (ENCUENTRO, unos 235 m del campamento); B va al campamento. (a) los enemigos pasan a B y se acercan a B;
     (b) con A junto a B y sin god_mode, A recibe un golpe; (c) con B a >40 m de un enemigo y A 10 m mas cerca,
     el enemigo pasa a A. Dueno = lineas de traspaso '[online] <enemigo> <id>: slot N's now' (docs/ONLINE.md,
     'Owners'); el golpe, la linea '[online] <enemigo> hit us:'."""
     res = []
     c.god("A", True)
     c.god("B", True)
-    c.ir("A", "goto", "tower", "7")
+    c.llegar(("A",), ENCUENTRO)
     c.ir("B", "teleport", *campamento)
     pa, pb = c.pos("A"), c.pos("B")
     if math.dist(pa, pb) <= 60.0:
