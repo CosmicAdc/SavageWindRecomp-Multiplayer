@@ -952,7 +952,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no escribas código; no toques parches ni sitios.
   modelo sugerido: alto
 
-- [ ] T452 [reglas] amiibo bloqueados durante la sesión (ADR-025 n.º 9).
+- [~] T452 [reglas] amiibo bloqueados durante la sesión (ADR-025 n.º 9).
+  reclamada: agente Sonnet ag-t452 (integrada) — compila, i18n_check 0 missing; FALTA verlo en el juego con sesión (runa amiibo sin figura y aviso una vez)
   files: `runtime/services/nfp.c`, `runtime/online.h` (solo una consulta de "hay sesión"), textos en `runtime/ui/i18n/*.inc`
   verify: `make -j8` compila; `python3 tools/i18n_check.py` en 0; en juego con sesión: usar la runa amiibo no lee ninguna figura y sale el aviso una vez; sin sesión funciona como siempre
   depende de: —
