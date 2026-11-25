@@ -87,3 +87,15 @@ menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un a
 - B.log: 309 `made again` (HE-23, T453).
 - `recorrido.py`: el reintento de teletransporte (hasta 2, anotado como `aviso:`) cubre ahora todos los saltos
   (`ir`, `llegar`, paso 4 y paso 8). Prueba sintética: 2 fallos → llega; 3 fallos → Falla.
+
+## 2026-11-25 · PE-1 con el dueño (T212, build `dc16647`, dos ventanas)
+
+- B (invitado, el dueño) hace "Salir al inicio" → Continuar → Online → Join, **2 ciclos** (el dueño dio por buena la
+  prueba con dos). Cada vez: B.log `[reboot] requested (start screen)`, `[online] reset`, `[online] reboot: leaving the
+  session`, `[online] Not connected`, `game torn down in 795/993 ms (52 reset hooks)`; A.log `server: Client left`,
+  `removed Client's Link`, y al volver `Client joined` y `Client: OnlinePlayer`; B ve `Host: OnlinePlayer`. Ningún
+  cierre ni excepción. **El cierre `0xc0000409` al recargar (B1) no se reproduce**: criterio S7 cumplido para el
+  invitado (2 de 3 ciclos pedidos, por decisión del dueño).
+- Observado: B recibe "the host's time: 11.00" en bucle con A sin foco (la hora de A no avanza: ¿pausa por foco?).
+  Relacionado con HE-07 / T456.
+- El audio estaba a 0 por `dos_juegos.sh` (`SAVAGEWIND_AUDIO_GAIN=0`): el dueño lo notó.
