@@ -91,14 +91,18 @@ class Ctx:
         return float(d["x"]), float(d["y"]), float(d["z"])
 
     def actores(self, x, texto):
-        """Lista de (nombre, x, y, z, distancia) de `actors <texto>` (campo `actors`: 'nombre x y z distm; ...')."""
+        """Lista de (nombre, x, y, z, distancia) de `actors <texto>`.
+
+        Cada fila del campo `actors` es 'nombre x y z <dist>m <dirección>' (p. ej. 'OnlinePlayer -1043.8 250.0 1811.7
+        2m 72ec37c948'), separadas por '; '. Antes se leían las cinco últimas palabras y float('2m') fallaba: la lista
+        salía siempre vacía (pasos 2, 3 y 5 de la línea base; diagnóstico de T208)."""
         d = self.ok(x, "actors", texto)
         lista = []
         for fila in str(d.get("actors", "")).split(";"):
             p = fila.split()
             if len(p) >= 5:
                 try:
-                    lista.append((p[-5], *(float(v) for v in p[-4:])))
+                    lista.append((p[0], float(p[1]), float(p[2]), float(p[3]), float(p[4].rstrip("m"))))
                 except ValueError:
                     pass
         return lista
