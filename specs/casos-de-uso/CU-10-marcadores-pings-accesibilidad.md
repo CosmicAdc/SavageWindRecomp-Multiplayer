@@ -20,15 +20,17 @@ la distancia y la flecha de borde; lo demás falta.
 
 ## Flujo principal
 
-1. Sobre el compañero se ve su **nombre, su forma y su color**, la distancia y una barra o fila de **corazones**.
+1. Sobre el compañero se ve su **nombre, su forma y su color**, la distancia y una fila pequeña de **corazones**,
+   siempre visible y destacada cuando su vida baja del 25 %.
 2. Si el compañero queda fuera de la pantalla, una flecha en el borde apunta hacia él con nombre y distancia.
 3. En la lista de jugadores (izquierda, bajo los corazones) se ve su estado: jugando, en pausa, cargando, en otro
    mapa (cuál), en una escena, caído.
 4. El jugador pulsa el botón de **ping**: aparece una marca en el punto al que mira, visible para los dos durante
    unos segundos, con un sonido.
-5. El jugador abre la rueda de **frases rápidas** y elige una ("Ven aquí", "Espera", "Necesito ayuda", "Gracias"…):
-   el compañero la ve en pantalla en su idioma.
-6. En Opciones se puede cambiar tamaño del texto, elegir color y forma propios, y activar avisos sonoros.
+5. El jugador abre la rueda de **frases rápidas** y elige una de las ocho ("Ven aquí", "Espera", "Necesito ayuda",
+   "Gracias", "Sí", "No", "Vamos", "Mira esto"): el compañero la ve en pantalla en su idioma.
+6. El color y la forma de cada jugador se asignan solos por orden de entrada. En Opciones se pueden cambiar, y
+   también el tamaño del texto y los avisos sonoros.
 
 ## Flujos alternativos y de error
 
@@ -85,19 +87,26 @@ el menú cerrado debe añadirse a `menu_draws()` (`runtime/ui/menu.mm:2500`).
    corazón). Fuente en el emisor: la vida que ya lee el PR en `player + 0x848` (`ENEMY_LIFE`, usada en OA:2907);
    la máxima [sin verificar: mapa 03 §1.1 cita los flags `MaxHartValue` / `CurrentHart`; hay que decidir la fuente].
    Cambia el protocolo: lo hace el dueño de `online.h`.
-2. **Marcador ampliado**: junto al nombre (UI:273-287), dibujar forma + corazones. Formas por sitio: círculo,
-   triángulo, cuadrado, rombo… en la lista (UI:229) y en el marcador.
+2. **Marcador ampliado**: junto al nombre (UI:273-287), dibujar forma + corazones. La vida del compañero se ve
+   **siempre, en pequeño**, y se destaca (tamaño, contorno o parpadeo, no solo color) por debajo del 25 %
+   (ADR-009, decisión 27). Formas por orden de entrada: círculo, triángulo, cuadrado, rombo… en la lista (UI:229)
+   y en el marcador.
 3. **Estado en la lista**: usar `pose.map` (NETH:93) para "en <mapa>", `ONLINE_E_DEMO` y un bit nuevo "en evento"
    (de `framepace_in_event`), AS `Dead*` para "caído".
 4. **Ping**: mensaje nuevo `MARK {tipo, pos[3]}` con relé a los demás; al recibir, validar que es finito y está a
    menos de 3000 m; dibujarlo con `project()` (UI:135) y la misma flecha de borde. Punto de destino, primera versión:
    un punto a D metros delante de la cámara o la posición de Link [PROPUESTA]; un trazado de rayo real contra el
    terreno necesita ingeniería inversa (mapa 07 §7).
-5. **Frases rápidas**: lista cerrada de identificadores (no texto libre) enviada como `QUICK {id}`; cada juego la
-   muestra traducida con `tr()`. Entrada con una rueda o menú rápido en el overlay; elegir un botón libre
-   [sin verificar: qué combinación de botones no usa el juego; revisar `runtime/hle/input.c` y `docs/controls.md`].
-6. **Color y forma elegibles**: ajuste en `online.ini` (`NET:1506-1554`) enviado en el HELLO o en el estado; el
-   servidor resuelve duplicados. Paleta comprobada para daltonismo.
+5. **Frases rápidas**: lista cerrada de **ocho** identificadores (no texto libre) enviada como `QUICK {id}`, en
+   este orden: "Ven aquí", "Espera", "Necesito ayuda", "Gracias", "Sí", "No", "Vamos", "Mira esto" (ADR-009,
+   decisión 28). Cada juego la muestra traducida con `tr()`. Entrada con una rueda o menú rápido en el overlay.
+5b. **Botón del ping y de la rueda (Q-10-5, lo único abierto)**: tarea de investigación, no de diseño. Revisar en
+   `docs/controls.md` y `runtime/input_bind.h` (y `runtime/hle/input.c`) qué botones y teclas están libres y
+   proponer una combinación al dueño. Hasta su respuesta, el ping y la rueda se lanzan solo desde la pestaña Online
+   o por comando de control.
+6. **Color y forma**: se asignan por orden de entrada y cada jugador puede cambiarlos en Opciones (ADR-009,
+   decisión 26). El ajuste va en `online.ini` (`NET:1506-1554`) y se envía en el HELLO o en el estado; el servidor
+   resuelve duplicados. Paleta comprobada para daltonismo.
 7. **Accesibilidad**: tamaño de marcador y texto configurable; contorno oscuro en todo texto (ya lo hace `label`,
    UI:173); aviso sonoro opcional en unión, salida, ping y caída [sin verificar: cómo reproducir un sonido desde el
    runtime sin usar recursos del juego]; avisos en pantalla para lo que hoy solo va al registro.
@@ -107,8 +116,16 @@ el menú cerrado debe añadirse a `menu_draws()` (`runtime/ui/menu.mm:2500`).
 ## Reglas y decisiones de diseño
 
 - **[DUEÑO] D2**: lo que distingue a los jugadores es el color.
-- **[PROPUESTA] P1**: marcador del compañero en pantalla y en el mapa con distancia y vida.
-- **[PROPUESTA] P2**: pings. **[PROPUESTA] P7**: frases rápidas. **[PROPUESTA] P8**: formas además de colores.
+- **[DUEÑO] (ADR-009, decisión 26; Q-10-2; P8)** El color y la forma del marcador **se asignan por orden de
+  entrada y se pueden cambiar en Opciones**.
+- **[DUEÑO] (ADR-009, decisión 27; Q-10-4; P1)** La vida del compañero está **siempre visible, pequeña**, y
+  destacada por debajo del 25 %.
+- **[DUEÑO] (ADR-009, decisión 28; Q-10-1; P7)** Las frases rápidas son **ocho**: "Ven aquí", "Espera", "Necesito
+  ayuda", "Gracias", "Sí", "No", "Vamos", "Mira esto".
+- **[DUEÑO] (ADR-009, decisión 22)** El nombre en color y el marcador con forma de este caso son la **salida
+  aceptada** si el tinte 3D de CU-13 no resulta viable. Por eso este caso no puede depender de CU-13.
+- **[PROPUESTA] P1**: marcador del compañero también en el mapa del juego (ver última propuesta: no entra en F4).
+- **[PROPUESTA] P2**: pings.
 - **[PROPUESTA]** Las frases rápidas son una lista cerrada traducible, no texto libre (funciona entre idiomas y no
   necesita teclado).
 - **[PROPUESTA]** Ningún dato se comunica solo por color: siempre color + forma + texto.
@@ -137,6 +154,13 @@ que el overlay dibujaría (nombre, distancia, vida, forma, pings activos); es pa
 - **CA-8** `python tools/i18n_check.py` termina sin errores con las cadenas nuevas.
 - **CA-9** Dado B en un santuario y A fuera, entonces la lista de A muestra a B "en <mapa>" y no hay marcador de B en
   el mundo.
+- **CA-10** Dado A con la vida completa, entonces `coop overlay` en B la lista como visible y no destacada; cuando
+  la vida de A baja del 25 %, entonces en menos de 1 s la lista como destacada.
+- **CA-11** La rueda ofrece exactamente las ocho frases de la decisión 28, en ese orden, y las ocho tienen
+  traducción en los 13 ficheros de `runtime/ui/i18n/*.inc`.
+- **CA-12** Dado un anfitrión y un invitado que no han tocado Opciones, entonces el anfitrión tiene el primer color
+  y la primera forma y el invitado los segundos; cuando el invitado elige otros en Opciones, entonces A lo ve
+  cambiado en menos de 2 s y la elección sigue ahí en la sesión siguiente.
 
 ## Qué NO hacer
 
@@ -156,11 +180,12 @@ que el overlay dibujaría (nombre, distancia, vida, forma, pings activos); es pa
   fotogramas (mapa 04 §6, riesgo 5).
 - Riesgo: ImGui siempre se dibuja encima del HUD del juego; un marcador puede tapar corazones o diálogos.
 - Riesgo: cada campo nuevo en el estado sube la versión de protocolo y hay que repetirlo en el bot.
-- **Pregunta al dueño**: ¿qué frases rápidas quieres (lista inicial de 8)?
-- **Pregunta al dueño**: ¿cada jugador elige su color y forma, o se asignan por orden de entrada?
-- **Pregunta al dueño**: ¿el marcador en el mapa del juego es imprescindible, o basta con la flecha y la distancia?
-- **Pregunta al dueño**: ¿quieres ver la vida del compañero siempre o solo cuando está baja?
-- **Pregunta al dueño**: ¿con qué botón se lanza el ping y se abre la rueda de frases?
+- Preguntas ya contestadas por el dueño (Q-10-1, Q-10-2 y Q-10-4): ver ADR-009 (decisiones 26, 27 y 28) en
+  `../decisiones/`.
+- **Pregunta al dueño** (Q-10-3, abierta; por defecto: no es imprescindible en F4): ¿el marcador en el mapa del
+  juego es imprescindible, o basta con la flecha y la distancia?
+- **Q-10-5 (abierta, no es de diseño)**: ¿con qué botón se lanza el ping y se abre la rueda? Hay que revisar qué
+  botones están libres (punto 5b) y proponer una combinación al dueño.
 
 ## Fase y dependencias
 

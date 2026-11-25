@@ -6,9 +6,11 @@ una tarea mientras la pregunta siga abierta.
 
 Cómo se usa:
 
-- Los grupos están ordenados por **cuánto trabajo bloquean** (primero lo que frena más casos y fases).
-- Identificador `Q-<caso>-<n>`. Estado: `ABIERTA` hasta que el dueño conteste; entonces se anota la respuesta aquí,
-  se convierte en regla `[DUEÑO]` en el caso y, si cambia el diseño, se escribe un ADR en `../decisiones/`.
+- Los grupos conservan el orden original, por **cuánto trabajo bloqueaban** antes de las respuestas del dueño.
+- Identificador `Q-<caso>-<n>`. Estado: `ABIERTA` hasta que el dueño conteste; entonces se anota la respuesta aquí
+  como `RESUELTA (ADR-00x, decisión n)`, se convierte en regla `[DUEÑO]` en el caso y, si cambia el diseño, se
+  escribe un ADR en `../decisiones/`. En una fila resuelta, la columna "Por qué" conserva el razonamiento del valor
+  por defecto original, solo como contexto: **manda la respuesta del dueño**.
 - "Bloquea" indica qué no se puede cerrar sin la respuesta. Con el valor por defecto se puede **empezar**, no cerrar.
 
 
@@ -31,137 +33,160 @@ santuarios juntos sube de prioridad en F5.
 Cambian dos valores por defecto: Q-04-3 (si la conexión directa es imposible no se ofrece nada: sin guía de red
 virtual ni servicio de presentación) y Q-09-2 (no se envían armas hasta que viajen durabilidad y bonificaciones).
 
-**Sigue abierta solo Q-10-5** (botón del ping y de la rueda): requiere revisar qué botones están libres.
+De las preguntas que el dueño tenía delante en las tres rondas, **sigue abierta solo Q-10-5** (botón del ping y de
+la rueda): requiere revisar qué botones están libres. Además quedan abiertas, con su valor por defecto, las
+preguntas de detalle que ninguna ronda llegó a tratar; están listadas abajo.
 
-## Las diez que más bloquean
+## Lo que sigue abierto (antes: "Las diez que más bloquean")
 
-| # | Pregunta | Por defecto | Bloquea |
-|---|---|---|---|
-| 1 | Q-06-1 ¿Qué se lleva el invitado a su propia partida al terminar? | Nada: juega en un perfil de guardado cooperativo aparte | CU-06, CU-07, CU-05, CU-14 |
-| 2 | Q-07-1 ¿Orbes, contenedores de corazón y habilidades de campeón son para los dos? | Sí, para los dos, si los dos están en la sesión cuando se consiguen | CU-07, CU-14b |
-| 3 | Q-14-1 ¿Qué cuenta como "momento de historia"? | Lista corta: piedra, primera torre, monje de cada santuario, final de cada Bestia, recuerdos, jefes finales | CU-14a entero |
-| 4 | Q-06-2 Si el invitado va más avanzado, ¿ve el mundo exactamente como el anfitrión? | Basta con no volcar su progreso; no se le "borra" nada en F4 | CU-06 |
-| 5 | Q-07-4 ¿Con qué inventario entra el invitado y dónde se guarda entre sesiones? | Primera vez: copia de su partida; después, el del perfil cooperativo | CU-07, CU-09 |
-| 6 | Q-14-2 ¿Qué significa "presente"? | Mismo mapa y a menos de 30 m | CU-14a |
-| 7 | Q-11-1 ¿Vale como primera versión la reanimación automática mientras el compañero siga vivo? | Sí (entrega 1); el rescate manual se decide después de probarla | CU-11 |
-| 8 | Q-14-4 Si el compañero no puede venir, ¿se puede seguir solo? | Sí, tras 5 minutos desconectado, solo el anfitrión | CU-14a, CU-05 |
-| 9 | Q-06-3 ¿Las conversaciones y recados con NPC avanzan para los dos? | Los flags de mundo sí (como hoy); cada uno puede repetir la conversación | CU-06, CU-14a |
-| 10 | Q-13-1 ¿"Solo cambia el color" es un tinte sobre todo el Link o el color de una prenda? | Tinte suave sobre todo el Link del compañero | CU-13 |
+Las diez preguntas que más bloqueaban (Q-06-1, Q-07-1, Q-14-1, Q-06-2, Q-07-4, Q-14-2, Q-11-1, Q-14-4, Q-06-3 y
+Q-13-1) están resueltas o han dejado de plantearse. **Ninguna pregunta abierta bloquea ya el arranque de una
+fase.** Lo que queda:
+
+**Pendiente de una comprobación, no de una decisión de diseño**
+
+| Pregunta | Qué falta | Afecta a |
+|---|---|---|
+| Q-10-5 ¿Con qué botón se lanza el ping y se abre la rueda de chat rápido? | Revisar en `docs/controls.md` y `runtime/input_bind.h` qué botones y teclas están libres y proponer una combinación al dueño (ADR-009, "Lo único que sigue abierto") | CU-10 |
+
+**Confirmadas por el dueño en ADR-011** (el valor de la columna "Por defecto" es ya la regla `[DUEÑO]`)
+
+| Pregunta | Por defecto | Afecta a |
+|---|---|---|
+| Q-06-4 ¿El anfitrión es siempre la misma persona durante toda la campaña? | Sí | CU-06 |
+| Q-07-3 Semillas Kolog: ¿una por jugador o solo para quien la encuentra? | Una para cada uno, como hoy | CU-07 |
+| Q-14-5 Si uno se salta la escena, ¿se salta para los dos? | No aplica en la versión 1 (solo uno la ve) | CU-14a |
+| Q-11-3 ¿Qué pasa si el contador se agota? (solo rescate manual) | Revive solo en el sitio con 3 corazones | CU-11, entrega 2 |
+| Q-11-4 ¿Con cuántos corazones se vuelve y hay límite? | Entrega 1: lo que da el hada del juego, sin límite | CU-11 |
+| Q-11-5 ¿Revivir cuesta algo al rescatador? (solo rescate manual) | Nada | CU-11, entrega 2 |
+| Q-05-3 Lo que el invitado hizo en el mundo durante el corte, ¿se pierde? | Sí; conserva solo su inventario | CU-05 |
+| Q-05-4 Si cae el anfitrión, ¿termina la sesión? | Sí; el invitado puede reintentar | CU-05 |
+| Q-08-2 ¿El teletransporte debe costar algo? | Nada (solo la espera de 30 s ya decidida) | CU-08 |
+| Q-08-4 ¿Se permite viajar hacia un compañero en plena escena o diálogo? | Sí; no se le interrumpe | CU-08 |
+| Q-09-4 ¿El receptor confirma antes de recibir? (solo envío directo) | No; llega con aviso y, si no cabe, se devuelve | CU-09 |
+| Q-12-2 Al morir en un duelo, ¿qué pasa? | El duelo se apaga y se aplica la reanimación normal | CU-12 |
+| Q-12-4 ¿Hay zonas sin duelo? | No se puede abrir en santuarios ni durante escenas | CU-12 |
+| Q-10-3 ¿El marcador en el mapa del juego es imprescindible? | No en F4 | CU-10 |
+| Q-13-4 ¿Aceptas un cambio que obligue a todos a recompilar sombreadores una vez? | Solo con ADR aprobado | CU-13 |
+| Q-03-1, Q-03-2, Q-02-1, Q-02-2 (base: recorrido de 30 minutos, cierre de F1 con un PC, compañero visible en menús, colisión) | Los de la sección 12 | CU-01 a CU-03 |
+
+Q-06-2 no aparece: ha dejado de plantearse (el perfil cooperativo nace vacío; ADR-007, decisiones 1 y 5).
 
 ---
 
-## 1. CU-06 · El mundo del anfitrión (bloquea CU-05, CU-07, CU-14)
+## 1. CU-06 · El mundo del anfitrión
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-06-1 | Al terminar la sesión, ¿qué se lleva el invitado a su propia partida: nada, o todo lo hecho juntos? | Nada. El invitado juega en un perfil de guardado "cooperativo con <anfitrión>" separado | Hoy el progreso se escribe en el guardado de todos de forma irreversible (OA:3851-3999). Separar perfiles es lo único que no puede estropear una partida |
-| Q-06-2 | Si el invitado tiene una partida más avanzada, ¿debe ver el mundo exactamente como el anfitrión (olvidar su progreso), o basta con no volcarlo? | Basta con no volcarlo. Con el perfil cooperativo nuevo de Q-06-1 el problema desaparece solo | "Desactivar" flags en un juego en marcha no está probado y algunos efectos solo se ven tras una carga (DOC:441-442) |
-| Q-06-3 | Las conversaciones y recados con NPC (D5), ¿avanzan para los dos cuando uno habla, o cada uno lleva las suyas? | Avanzan los flags de mundo, como hoy (`Npc*` son compartidos, DOC:990-993); ninguna conversación normal se bloquea | Separarlos exige clasificar miles de flags a mano |
-| Q-06-4 | ¿El anfitrión es siempre la misma persona durante toda la campaña? | Sí | Cambiar de anfitrión significa cambiar de mundo; no hay migración |
+| Q-06-1 | Al terminar la sesión, ¿qué se lleva el invitado a su propia partida: nada, o todo lo hecho juntos? | **RESUELTA (ADR-007, decisión 1).** Nada. Juega con un perfil cooperativo aparte, ligado al mundo del anfitrión; su partida individual no se toca | Hoy el progreso se escribe en el guardado de todos de forma irreversible (OA:3851-3999). Separar perfiles es lo único que no puede estropear una partida |
+| Q-06-2 | Si el invitado tiene una partida más avanzada, ¿debe ver el mundo exactamente como el anfitrión (olvidar su progreso), o basta con no volcarlo? | **SIN OBJETO** tras ADR-007 (decisiones 1 y 5): el perfil cooperativo nace vacío, así que el invitado no trae progreso propio que olvidar | "Desactivar" flags en un juego en marcha no está probado y algunos efectos solo se ven tras una carga (DOC:441-442) |
+| Q-06-3 | Las conversaciones y recados con NPC (D5), ¿avanzan para los dos cuando uno habla, o cada uno lleva las suyas? | **RESUELTA (ADR-007, decisión 9).** Progreso común: lo que uno avanza queda hecho en el mundo; cada uno puede repetir la conversación | Separarlos exige clasificar miles de flags a mano |
+| Q-06-4 | ¿El anfitrión es siempre la misma persona durante toda la campaña? | RESUELTA (ADR-011, confirma el valor por defecto): Sí | Cambiar de anfitrión significa cambiar de mundo; no hay migración |
 
-## 2. CU-07 · Inventario y corazones propios (bloquea CU-09, CU-14b)
+## 2. CU-07 · Inventario y corazones propios
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-07-1 | Los orbes espirituales: ¿para los dos, solo para los presentes en el santuario, o solo para quien lo completa? | Para los dos, siempre que los dos estén en la sesión cuando se completa | Es lo que hace hoy el código (OA:3994) y evita que el invitado se quede débil. Deja de regalar por diferencias de partida previa gracias a CU-06 |
-| Q-07-2 | Contenedores de corazón de las Bestias y habilidades de campeón: ¿para los dos? | Sí, misma regla que Q-07-1 | Coherencia; ya existe (`give_heart`, OA:3997) |
-| Q-07-3 | Semillas Kolog: ¿una por jugador o solo para quien lo encuentra? | Una para cada uno (como hoy, OA:3993) | Ya funciona y está probado por los autores |
-| Q-07-4 | ¿Con qué inventario entra el invitado la primera vez y dónde se guarda entre sesiones? | Primera sesión: el perfil cooperativo se crea como copia de su partida; después persiste en ese perfil | Respeta D4 sin tocar su partida propia |
-| Q-07-5 | ¿Las rupias son de cada uno o hay monedero común? | De cada uno | Nada las comparte hoy; D4 |
-| Q-07-6 | El contenido de un cofre: ¿solo para quien lo abre o copia para los dos (P4)? | Solo para quien lo abre en F4; revisar tras probar | Dar copia exige interceptar la apertura del cofre: trabajo nuevo |
+| Q-07-1 | Los orbes espirituales: ¿para los dos, solo para los presentes en el santuario, o solo para quien lo completa? | **RESUELTA (ADR-007, decisión 2).** Para los dos, siempre. También quien se une más tarde recibe lo que el anfitrión ya tenía | Es lo que hace hoy el código (OA:3994) y evita que el invitado se quede débil. Deja de regalar por diferencias de partida previa gracias a CU-06 |
+| Q-07-2 | Contenedores de corazón de las Bestias y habilidades de campeón: ¿para los dos? | **RESUELTA (ADR-007, decisión 2).** Sí, para los dos, siempre (misma decisión que Q-07-1) | Coherencia; ya existe (`give_heart`, OA:3997) |
+| Q-07-3 | Semillas Kolog: ¿una por jugador o solo para quien lo encuentra? | RESUELTA (ADR-011, confirma el valor por defecto): Una para cada uno (como hoy, OA:3993) | Ya funciona y está probado por los autores |
+| Q-07-4 | ¿Con qué inventario entra el invitado la primera vez y dónde se guarda entre sesiones? | **RESUELTA (ADR-007, decisión 5).** Empieza de cero. Conserva lo que consiga en su perfil cooperativo, guardado en su PC | Respeta D4 sin tocar su partida propia |
+| Q-07-5 | ¿Las rupias son de cada uno o hay monedero común? | **RESUELTA (ADR-008, decisión 19).** De cada jugador | Nada las comparte hoy; D4 |
+| Q-07-7 | (Nace de ADR-007.) Al unirse a un mundo avanzado, ¿cómo recibe el invitado los corazones y la resistencia? | **RESUELTA (ADR-008, decisión 13).** Iguala al anfitrión: mismo número de contenedores de corazón y de mejoras de resistencia, más las habilidades de campeón ya ganadas | El invitado empieza de cero (decisión 5) pero recibe siempre las recompensas (decisión 2) |
+| Q-07-6 | El contenido de un cofre: ¿solo para quien lo abre o copia para los dos (P4)? | **RESUELTA (ADR-008, decisión 14).** Para quien lo abre. Puede soltarlo marcado para el compañero. Se revisa después de probarlo | Dar copia exige interceptar la apertura del cofre: trabajo nuevo |
 
-## 3. CU-14 · Historia, santuarios, teletransporte entre mapas (bloquea todo F5)
+## 3. CU-14 · Historia, santuarios, teletransporte entre mapas
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-14-1 | ¿Qué cuenta exactamente como "momento de historia"? | Lista cerrada: pedestal de la piedra, primera torre, monje al final de cada santuario, final de cada Bestia Divina, recuerdos, jefes finales. Misiones secundarias y diálogos normales, no | Cuanto más corta, menos riesgo; los dos primeros ya tienen soporte (OA:1629) |
-| Q-14-2 | ¿Qué significa "presente": a cuántos metros, o basta el mismo mapa? | Mismo mapa y a menos de 30 m | Es el radio que ya usa el bloqueo de A (OA:5988) |
-| Q-14-3 | ¿Los dos deben **ver** la escena, o basta con que el segundo esté allí y reciba el progreso? | Basta con estar allí (versión 1). Ver la misma escena, evento a evento, cuando se pruebe seguro | Lanzar eventos en el otro juego puede colgarlo (DOC:751-752) |
-| Q-14-4 | Si el compañero se desconecta o no puede venir, ¿se puede continuar solo tras un plazo? | Sí: tras 5 minutos desconectado, el anfitrión puede continuar | Sin válvula de escape la campaña puede quedar bloqueada |
-| Q-14-5 | Si uno se salta la escena, ¿se salta para los dos? | No aplica en versión 1 (solo uno la ve). En versión 2: cada uno la suya | Sincronizar el salto es trabajo adicional sin valor claro |
-| Q-14-6 | En un santuario, ¿tienen que entrar los dos para poder completarlo? | Sí para hablar con el monje (es momento de historia); el rompecabezas se puede empezar solo | Coherente con D6 y Q-14-1 |
-| Q-14-7 | ¿Aceptas que el teletransporte entre mapas pase, en su primera versión, por una pantalla de carga con guardado en el perfil cooperativo? | Sí | Es el único camino conocido que cambia de mapa (`runtime/services/test_warp.c:86-143`) |
+| Q-14-1 | ¿Qué cuenta exactamente como "momento de historia"? | **RESUELTA (ADR-007, decisión 3).** Lista corta: inicio (piedra y primera torre), final de cada Bestia Divina, recuerdos y jefes finales. Los santuarios no | Cuanto más corta, menos riesgo; los dos primeros ya tienen soporte (OA:1629) |
+| Q-14-2 | ¿Qué significa "presente": a cuántos metros, o basta el mismo mapa? | **RESUELTA (ADR-007, decisión 4).** Mismo mapa y a menos de 30 m. Si falta uno, el juego avisa y ofrece teletransportarlo | Es el radio que ya usa el bloqueo de A (OA:5988) |
+| Q-14-3 | ¿Los dos deben **ver** la escena, o basta con que el segundo esté allí y reciba el progreso? | **RESUELTA (ADR-009, decisión 21).** Basta con estar allí: uno ve la escena; el otro está presente y recibe el progreso. Verla a la vez se intenta más adelante | Lanzar eventos en el otro juego puede colgarlo (DOC:751-752) |
+| Q-14-4 | Si el compañero se desconecta o no puede venir, ¿se puede continuar solo tras un plazo? | **RESUELTA (ADR-007, decisión 6).** Sí, de inmediato, con una confirmación del anfitrión. Sin plazo | Sin válvula de escape la campaña puede quedar bloqueada |
+| Q-14-5 | Si uno se salta la escena, ¿se salta para los dos? | RESUELTA (ADR-011, confirma el valor por defecto): No aplica en versión 1 (solo uno la ve). En versión 2: cada uno la suya | Sincronizar el salto es trabajo adicional sin valor claro |
+| Q-14-6 | En un santuario, ¿tienen que entrar los dos para poder completarlo? | **RESUELTA (ADR-007, decisión 3).** No hace falta: el monje de un santuario no es momento de historia. Se pueden hacer juntos, no es obligatorio (ADR-008, consecuencias de la decisión 20) | Coherente con D6 y Q-14-1 |
+| Q-14-7 | ¿Aceptas que el teletransporte entre mapas pase, en su primera versión, por una pantalla de carga con guardado en el perfil cooperativo? | **RESUELTA (ADR-008, decisión 20).** Sí, con pantalla de carga y guardado. Requisito nuevo: que los dos puedan pasarse los santuarios juntos | Es el único camino conocido que cambia de mapa (`runtime/services/test_warp.c:86-143`) |
 
 ## 4. CU-11 · Revivir al compañero
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-11-1 | ¿Vale como primera versión la reanimación automática "mientras el compañero siga vivo", o quieres desde el principio que el compañero tenga que ir a levantarte? | Vale la automática (entrega 1) | El rescate manual necesita ingeniería inversa alrededor de la muerte, la zona con más cuelgues |
-| Q-11-2 | ¿Qué pasa si caen los dos? | Fin de partida normal para los dos | Mantiene algo de dificultad |
-| Q-11-3 | ¿Qué pasa si el contador se agota (entrega 2)? | Revive solo en el sitio con 3 corazones | No separa a los jugadores |
-| Q-11-4 | ¿Con cuántos corazones se vuelve y hay límite? | Entrega 1: lo que da el hada del juego, sin límite. Entrega 2: 3 corazones, espera de 60 s | No requiere tocar más código en la entrega 1 |
-| Q-11-5 | ¿Revivir cuesta algo al rescatador? | Nada | Simplicidad; D4 |
+| Q-11-1 | ¿Vale como primera versión la reanimación automática "mientras el compañero siga vivo", o quieres desde el principio que el compañero tenga que ir a levantarte? | **RESUELTA (ADR-007, decisión 7).** Automático en la primera entrega, como hace hoy el código. El rescate manual queda planificado para después | El rescate manual necesita ingeniería inversa alrededor de la muerte, la zona con más cuelgues |
+| Q-11-2 | ¿Qué pasa si caen los dos? | **RESUELTA (ADR-008, decisión 15).** Fin de partida normal: los dos recargan el último guardado | Mantiene algo de dificultad |
+| Q-11-3 | ¿Qué pasa si el contador se agota (entrega 2)? | RESUELTA (ADR-011, confirma el valor por defecto): Revive solo en el sitio con 3 corazones | No separa a los jugadores |
+| Q-11-4 | ¿Con cuántos corazones se vuelve y hay límite? | RESUELTA (ADR-011, confirma el valor por defecto): Entrega 1: lo que da el hada del juego, sin límite. Entrega 2: 3 corazones, espera de 60 s | No requiere tocar más código en la entrega 1 |
+| Q-11-5 | ¿Revivir cuesta algo al rescatador? | RESUELTA (ADR-011, confirma el valor por defecto): Nada | Simplicidad; D4 |
 
 ## 5. CU-05 · Reconexión
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-05-1 | ¿Cuánto tiempo se guarda el sitio del compañero? | 2 minutos | Cubre cortes de Wi-Fi y suspensiones cortas |
-| Q-05-2 | Mientras el compañero reconecta, ¿el anfitrión puede avanzar en la historia? | No en momentos de historia hasta agotar el plazo de Q-14-4; lo demás, sí | Coherente con D6 |
-| Q-05-3 | Lo que el invitado hizo en el mundo durante el corte, ¿se pierde? | Sí; conserva solo su inventario | D3: manda el mundo del anfitrión |
-| Q-05-4 | Si cae el anfitrión, ¿termina la sesión? | Sí; el invitado sigue solo en su copia y puede reintentar | No hay migración de anfitrión |
+| Q-05-1 | ¿Cuánto tiempo se guarda el sitio del compañero? | **RESUELTA (ADR-008, decisión 18).** 10 minutos | Cubre cortes de Wi-Fi y suspensiones cortas |
+| Q-05-2 | Mientras el compañero reconecta, ¿el anfitrión puede avanzar en la historia? | **RESUELTA (ADR-007, decisión 6).** Sí: el anfitrión puede continuar un momento de historia de inmediato, con confirmación. El plazo de reconexión es independiente de la historia | Coherente con D6 |
+| Q-05-3 | Lo que el invitado hizo en el mundo durante el corte, ¿se pierde? | RESUELTA (ADR-011, confirma el valor por defecto): Sí; conserva solo su inventario | D3: manda el mundo del anfitrión |
+| Q-05-4 | Si cae el anfitrión, ¿termina la sesión? | RESUELTA (ADR-011, confirma el valor por defecto): Sí; el invitado sigue solo en su copia y puede reintentar | No hay migración de anfitrión |
 
 ## 6. CU-08 · Teletransporte al compañero
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-08-1 | ¿Se puede usar en combate? | Sí, con 30 s de espera entre usos | Es una ayuda de accesibilidad (D9), no debe ser una huida gratis |
-| Q-08-2 | ¿Debe costar algo? | Nada | D9 |
-| Q-08-3 | ¿Quién puede invocar al otro (P5)? | Cualquiera, siempre con aceptación del invocado | Simetría entre jugadores |
-| Q-08-4 | ¿Se permite viajar hacia un compañero en plena escena o diálogo? | Sí; no se le interrumpe | El viajero solo aparece cerca |
+| Q-08-1 | ¿Se puede usar en combate? | **RESUELTA (ADR-008, decisión 16).** Sí: siempre disponible, también en combate, con 30 s de espera entre usos | Es una ayuda de accesibilidad (D9), no debe ser una huida gratis |
+| Q-08-2 | ¿Debe costar algo? | RESUELTA (ADR-011, confirma el valor por defecto): Nada | D9 |
+| Q-08-3 | ¿Quién puede invocar al otro (P5)? | **RESUELTA (ADR-008, decisión 16).** Invocar al otro requiere que acepte | Simetría entre jugadores |
+| Q-08-4 | ¿Se permite viajar hacia un compañero en plena escena o diálogo? | RESUELTA (ADR-011, confirma el valor por defecto): Sí; no se le interrumpe | El viajero solo aparece cerca |
 
 ## 7. CU-09 · Enviar o soltar objetos
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-09-1 | ¿Basta en F4 con "soltar marcado para el compañero" o el envío directo a la bolsa es imprescindible? | Basta con soltar marcado | Quitar materiales de la bolsa sin interfaz necesita ingeniería inversa |
-| Q-09-2 | ¿Aceptas armas que pierden durabilidad y modificadores al cambiar de manos mientras no se resuelva? | Sí, documentado como limitación | Hoy solo viaja el nombre (NETH:239) |
-| Q-09-3 | ¿Qué no se puede enviar? ¿Y rupias? | No: objetos clave, Espada Maestra, objetos con etiqueta `Important` o `NotDropFromPlayer`. Rupias: no | Es lo que ya protege el juego al soltar |
-| Q-09-4 | ¿El receptor confirma antes de recibir? | No; llega con aviso, y si no cabe se devuelve | Menos interrupciones |
+| Q-09-1 | ¿Basta en F4 con "soltar marcado para el compañero" o el envío directo a la bolsa es imprescindible? | **RESUELTA (ADR-007, decisión 10).** Soltar marcado para el compañero en la primera entrega. Envío directo, después | Quitar materiales de la bolsa sin interfaz necesita ingeniería inversa |
+| Q-09-2 | ¿Aceptas armas que pierden durabilidad y modificadores al cambiar de manos mientras no se resuelva? | **RESUELTA (ADR-009, decisión 24).** No. No se envían armas hasta que esté resuelto: solo materiales y comida | Hoy solo viaja el nombre (NETH:239) |
+| Q-09-3 | ¿Qué no se puede enviar? ¿Y rupias? | **RESUELTA (ADR-009, decisión 25).** No se envían los que el juego ya protege: objetos clave, Espada Maestra y lo que el juego impide soltar. Las rupias no se envían | Es lo que ya protege el juego al soltar |
+| Q-09-4 | ¿El receptor confirma antes de recibir? | RESUELTA (ADR-011, confirma el valor por defecto): No; llega con aviso, y si no cabe se devuelve | Menos interrupciones |
 
 ## 8. CU-12 · PvP
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-12-1 | ¿El anfitrión puede prohibir el PvP en su sesión? | Sí | Igual que las otras reglas de sesión |
-| Q-12-2 | Al morir en un duelo, ¿qué pasa? | El duelo se apaga y se aplica la reanimación normal (CU-11) | Sin reglas especiales |
-| Q-12-3 | ¿Flechas y bombas en el PvP? | Cuerpo a cuerpo y bombas (lo que hay); flechas no | Las flechas necesitan trabajo nuevo |
-| Q-12-4 | ¿Hay zonas sin duelo? | No se puede abrir en santuarios ni durante escenas | Menos riesgo en las zonas frágiles |
+| Q-12-1 | ¿El anfitrión puede prohibir el PvP en su sesión? | **RESUELTA (ADR-008, decisión 17).** Sí: el anfitrión puede prohibir el PvP en su sesión | Igual que las otras reglas de sesión |
+| Q-12-2 | Al morir en un duelo, ¿qué pasa? | RESUELTA (ADR-011, confirma el valor por defecto): El duelo se apaga y se aplica la reanimación normal (CU-11) | Sin reglas especiales |
+| Q-12-3 | ¿Flechas y bombas en el PvP? | **RESUELTA (ADR-008, decisión 17).** Cuerpo a cuerpo y bombas. Flechas y runas, fuera de la primera entrega. El daño lo valida el anfitrión | Las flechas necesitan trabajo nuevo |
+| Q-12-4 | ¿Hay zonas sin duelo? | RESUELTA (ADR-011, confirma el valor por defecto): No se puede abrir en santuarios ni durante escenas | Menos riesgo en las zonas frágiles |
 
 ## 9. CU-10 · Marcadores, pings, accesibilidad
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-10-1 | ¿Qué frases rápidas quieres? | "Ven aquí", "Espera", "Necesito ayuda", "Gracias", "Sí", "No", "Vamos", "Mira esto" | Ocho caben en una rueda |
-| Q-10-2 | ¿Cada jugador elige su color y forma, o se asignan por orden? | Se asignan por orden y se pueden cambiar en Opciones | Funciona sin configurar nada |
-| Q-10-3 | ¿El marcador en el mapa del juego es imprescindible? | No en F4: flecha, distancia y nombre del mapa en la lista | No hay mecanismo para dibujar en el mapa nativo (mapa 04 §4a) |
-| Q-10-4 | ¿La vida del compañero se ve siempre o solo cuando está baja? | Siempre, pequeña; destacada por debajo del 25 % | Accesibilidad |
-| Q-10-5 | ¿Con qué botón se lanza el ping y se abre la rueda? | Sin decidir: proponer una combinación libre tras revisar `docs/controls.md` | No verificado qué botones están libres |
+| Q-10-1 | ¿Qué frases rápidas quieres? | **RESUELTA (ADR-009, decisión 28).** Ocho: "Ven aquí", "Espera", "Necesito ayuda", "Gracias", "Sí", "No", "Vamos", "Mira esto" | Ocho caben en una rueda |
+| Q-10-2 | ¿Cada jugador elige su color y forma, o se asignan por orden? | **RESUELTA (ADR-009, decisión 26).** Se asignan por orden de entrada y se pueden cambiar en Opciones | Funciona sin configurar nada |
+| Q-10-3 | ¿El marcador en el mapa del juego es imprescindible? | RESUELTA (ADR-011, confirma el valor por defecto): No en F4: flecha, distancia y nombre del mapa en la lista | No hay mecanismo para dibujar en el mapa nativo (mapa 04 §4a) |
+| Q-10-4 | ¿La vida del compañero se ve siempre o solo cuando está baja? | **RESUELTA (ADR-009, decisión 27).** Siempre visible, pequeña; destacada por debajo del 25 % | Accesibilidad |
+| Q-10-5 | ¿Con qué botón se lanza el ping y se abre la rueda? | ABIERTA. Por defecto: Sin decidir: proponer una combinación libre tras revisar `docs/controls.md` | No verificado qué botones están libres |
 
 ## 10. CU-13 · Color en el modelo 3D
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-13-1 | ¿"Solo cambia el color" es un tinte sobre todo el Link o el color de una prenda? | Tinte suave sobre todo el Link del compañero | Es lo que permite el gancho existente (binding 19) |
-| Q-13-2 | ¿Cada jugador se ve a sí mismo con su color? | No: solo ve teñido al compañero | Teñir al Link local es mucho más difícil |
-| Q-13-3 | Si el experimento sale negativo, ¿aceptas quedarte con el color en nombre y marcador? | Sí, hasta nuevo aviso | Evita bloquear F5 |
-| Q-13-4 | ¿Aceptas un cambio que obligue a todos a recompilar sombreadores una vez? | Solo con ADR aprobado | Afecta a todos los usuarios del build |
+| Q-13-1 | ¿"Solo cambia el color" es un tinte sobre todo el Link o el color de una prenda? | **RESUELTA (ADR-007, decisión 8).** Tinte suave sobre todo el Link del compañero, acompañado de nombre y forma para accesibilidad | Es lo que permite el gancho existente (binding 19) |
+| Q-13-2 | ¿Cada jugador se ve a sí mismo con su color? | **RESUELTA (ADR-007, decisión 8).** No: el Link propio se ve normal | Teñir al Link local es mucho más difícil |
+| Q-13-3 | Si el experimento sale negativo, ¿aceptas quedarte con el color en nombre y marcador? | **RESUELTA (ADR-009, decisión 22).** Sí: nombre en color y marcador con forma. No bloquea el resto de F5 | Evita bloquear F5 |
+| Q-13-4 | ¿Aceptas un cambio que obligue a todos a recompilar sombreadores una vez? | RESUELTA (ADR-011, confirma el valor por defecto): Solo con ADR aprobado | Afecta a todos los usuarios del build |
 
 ## 11. CU-04 · Encontrar la partida
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-04-1 | ¿Aceptas que el código de invitación revele la IP pública del anfitrión? | Sí, con aviso en pantalla | Sin servidor central no hay otra forma (D7) |
-| Q-04-2 | ¿Aceptas una biblioteca de terceros para abrir el puerto (UPnP)? | Sí, si su licencia es compatible; con ADR | Escribirlo a mano es mucho trabajo y riesgo |
-| Q-04-3 | Si la conexión directa es imposible (CG-NAT), ¿basta con recomendar una red virtual? | Sí | Un relé propio contradice D7 |
+| Q-04-1 | ¿Aceptas que el código de invitación revele la IP pública del anfitrión? | **RESUELTA (ADR-007, decisión 12).** Sí: el código de invitación puede contener la IP del anfitrión | Sin servidor central no hay otra forma (D7) |
+| Q-04-2 | ¿Aceptas una biblioteca de terceros para abrir el puerto (UPnP)? | **RESUELTA (ADR-007, decisión 11).** Sí: miniupnpc, ENet y las que hagan falta, si son de código abierto con licencia compatible con MIT y quedan anotadas en `docs/third-party.md` | Escribirlo a mano es mucho trabajo y riesgo |
+| Q-04-3 | Si la conexión directa es imposible (CG-NAT), ¿basta con recomendar una red virtual? | **RESUELTA (ADR-009, decisión 23).** No se ofrece nada: ni guía de red virtual ni servicio de presentación. Solo un mensaje de error claro | Un relé propio contradice D7 |
 
 ## 12. CU-01, CU-02, CU-03 · Base
 
-| ID | Pregunta | Por defecto recomendado | Por qué |
+| ID | Pregunta | Estado y respuesta (o valor por defecto) | Por qué |
 |---|---|---|---|
-| Q-01-1 | ¿La sesión se limita a 2 jugadores desde el principio? | Sí, como opción del anfitrión con valor 2 | Simplifica pruebas y propiedad de enemigos |
-| Q-01-2 | ¿Contraseña obligatoria cuando el puerto está abierto a Internet? | Sí | El servidor no tiene cifrado ni límites (mapa 06 H-3, H-4) |
-| Q-03-1 | ¿Qué recorrido de 30 minutos representa "jugar normal"? | Meseta: campo, un campamento, un santuario, menús, una muerte, salir y volver a entrar | Es la zona que probaron los autores |
-| Q-03-2 | ¿F1 se cierra con dos instancias en un PC, o hace falta probar con dos PC por Internet? | Dos instancias en un PC cierran F1; dos PC, antes de cerrar F3 | Disponibilidad de hardware |
-| Q-02-1 | ¿El compañero debe verse cuando está en un menú? | Sí (regla "los menús no pausan" activada, como hoy) | Ya es el valor por defecto (NET:110) |
-| Q-02-2 | ¿Los jugadores se bloquean el paso? | Sí (colisión activada, como hoy); el anfitrión puede apagarla | Ya es el valor por defecto (NET:110) |
+| Q-01-1 | ¿La sesión se limita a 2 jugadores desde el principio? | **RESUELTA (ADR-007, decisión 12).** Sí: límite de 2 jugadores por ahora (se diseña para N, se prueba con 2) | Simplifica pruebas y propiedad de enemigos |
+| Q-01-2 | ¿Contraseña obligatoria cuando el puerto está abierto a Internet? | **RESUELTA (ADR-007, decisión 12).** No obligatoria: contraseña opcional, recomendada por internet | El servidor no tiene cifrado ni límites (mapa 06 H-3, H-4) |
+| Q-03-1 | ¿Qué recorrido de 30 minutos representa "jugar normal"? | RESUELTA (ADR-011, confirma el valor por defecto): Meseta: campo, un campamento, un santuario, menús, una muerte, salir y volver a entrar | Es la zona que probaron los autores |
+| Q-03-2 | ¿F1 se cierra con dos instancias en un PC, o hace falta probar con dos PC por Internet? | RESUELTA (ADR-011, confirma el valor por defecto): Dos instancias en un PC cierran F1; dos PC, antes de cerrar F3 | Disponibilidad de hardware |
+| Q-02-1 | ¿El compañero debe verse cuando está en un menú? | RESUELTA (ADR-011, confirma el valor por defecto): Sí (regla "los menús no pausan" activada, como hoy) | Ya es el valor por defecto (NET:110) |
+| Q-02-2 | ¿Los jugadores se bloquean el paso? | RESUELTA (ADR-011, confirma el valor por defecto): Sí (colisión activada, como hoy); el anfitrión puede apagarla | Ya es el valor por defecto (NET:110) |

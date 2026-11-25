@@ -25,8 +25,13 @@ construir y cómo se comprueba. La lista y las fases salen de `../PLAN-APROBADO.
 "Dificultad" sale de las tablas de huecos de `../mapa/06-pr294-red-y-sesion.md` §9 y
 `../mapa/07-pr294-integracion-juego.md` §7.
 
-Las preguntas que solo puede contestar el dueño están reunidas, con un valor por defecto recomendado, en
-[PREGUNTAS-ABIERTAS.md](PREGUNTAS-ABIERTAS.md).
+Las preguntas que solo puede contestar el dueño están reunidas en [PREGUNTAS-ABIERTAS.md](PREGUNTAS-ABIERTAS.md).
+El dueño ya ha contestado tres rondas (28 decisiones): están en `../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
+`ADR-008-respuestas-del-dueno-ronda-2.md` y `ADR-009-respuestas-del-dueno-ronda-3.md`, y **mandan** sobre cualquier
+texto de un caso que diga otra cosa. Las que siguen abiertas llevan su valor por defecto.
+
+Orden dentro de F5 (ADR-008, decisión 20): jugar los santuarios juntos (CU-14b) va antes que el tinte 3D (CU-13) y
+que la historia con los dos presentes (CU-14a).
 
 ## Estructura de cada caso (para quien ejecuta una tarea)
 
@@ -44,7 +49,8 @@ Reglas para quien ejecuta:
 
 - Haz solo lo que pide el paso asignado de "Qué hay que construir". Si un paso depende de una regla marcada
   `[PROPUESTA]` o de una pregunta abierta, usa el valor por defecto de `PREGUNTAS-ABIERTAS.md` y déjalo anotado; no
-  decidas otra cosa.
+  decidas otra cosa. Una regla `[DUEÑO]` que cita un ADR no se discute: si el texto del caso la contradice en
+  algún punto, vale el ADR y se avisa.
 - Una tarea está terminada cuando se cumplen sus `CA-n` y el resultado está anotado en `../bitacora/`.
 - Antes de editar, abre el `fichero:línea` citado y confirma que el código es el descrito. Los números de línea son
   del checkout `pr294-online` (HEAD `350c5f8`); en la rama `coop/main` se moverán. Si no coincide, busca la función
@@ -78,7 +84,8 @@ Nada de lo escrito aquí se ha ejecutado todavía: son lecturas de código. La p
 
 En cada caso, las reglas van marcadas así:
 
-- **[DUEÑO]**: decisión ya tomada por el dueño del proyecto. No se discute en la implementación.
+- **[DUEÑO]**: decisión ya tomada por el dueño del proyecto. No se discute en la implementación. Las que salen de
+  las rondas de respuestas se citan como `(ADR-00x, decisión n)`, con la pregunta que cierran.
 - **[PROPUESTA]**: idea aceptada como propuesta; hay que confirmarla antes de construirla.
 
 Decisiones del dueño (se citan por su código):
@@ -95,9 +102,25 @@ Decisiones del dueño (se citan por su código):
 | D8 | Cooperativo por defecto; el PvP se activa solo si los dos lo aceptan. |
 | D9 | Ayudas de juego: teletransporte al compañero, recoger lo que el compañero soltó y enviar objetos. |
 
-Propuestas por confirmar: marcador del compañero en mapa y pantalla con distancia y vida (P1), pings (P2),
-revivir al compañero caído (P3), recompensas de santuario y cofre para los dos (P4), invocar al compañero con su
-consentimiento (P5), reconexión (P6), frases rápidas (P7), formas además de colores (P8).
+Cómo quedan D1–D9 tras las respuestas del dueño (el detalle está en cada caso):
+
+| Código | Precisión | ADR y decisión |
+|---|---|---|
+| D1 | Límite de 2 jugadores por ahora; lo nuevo se diseña para N y se prueba con 2. Contraseña opcional | ADR-007, 12 |
+| D2 | Tinte suave sobre todo el Link del compañero; el propio se ve normal. Si no es viable: nombre en color y marcador con forma | ADR-007, 8; ADR-009, 22 |
+| D3 | El invitado juega con un perfil cooperativo aparte que nace vacío; su partida individual no se toca. Encargos y conversaciones con NPC: progreso común | ADR-007, 1, 5 y 9 |
+| D4 | Orbes, contenedores de corazón y habilidades de campeón: para los dos, siempre, también al unirse tarde; el invitado iguala los contenedores y las mejoras de resistencia del anfitrión. Cofres: para quien los abre. Rupias: de cada jugador | ADR-007, 2; ADR-008, 13, 14 y 19 |
+| D6 | Momentos de historia = lista corta (inicio: piedra y primera torre; final de cada Bestia Divina; recuerdos; jefes finales); los santuarios no. Presente = mismo mapa y a menos de 30 m, con oferta de teletransporte. El anfitrión puede continuar solo de inmediato tras confirmar. Versión 1: basta con estar allí | ADR-007, 3, 4 y 6; ADR-009, 21 |
+| D7 | Bibliotecas de terceros aceptadas (miniupnpc, ENet…) con licencia compatible con MIT y anotadas en `docs/third-party.md`. Si la conexión directa es imposible no se ofrece nada: solo un error claro. Reserva del sitio al desconectarse: 10 minutos | ADR-007, 11; ADR-009, 23; ADR-008, 18 |
+| D8 | PvP: cuerpo a cuerpo y bombas; el anfitrión puede prohibirlo y valida el daño | ADR-008, 17 |
+| D9 | Teletransporte al compañero siempre disponible, también en combate, con 30 s de espera; invocar al otro requiere que acepte; entre mapas, con pantalla de carga y guardado. Dar objetos: soltar marcado, solo materiales y comida; nunca objetos protegidos ni rupias; armas, cuando viajen durabilidad y bonificaciones | ADR-008, 16 y 20; ADR-007, 10; ADR-009, 24 y 25 |
+
+Propuestas P1–P8 tras las respuestas: ya son decisión del dueño la vida del compañero siempre visible (P1, ADR-009,
+27), revivir automático con rescate manual planificado para después (P3, ADR-007, 7; ADR-008, 15), recompensas de
+santuario para los dos y cofre para quien lo abre (P4), invocar con consentimiento (P5, ADR-008, 16), el plazo de
+reconexión (P6, ADR-008, 18), las ocho frases rápidas (P7, ADR-009, 28) y color y forma por orden de entrada,
+editables en Opciones (P8, ADR-009, 26). Siguen como propuesta: el marcador en el mapa del juego (resto de P1), los
+pings (P2) y los demás detalles de la reconexión (P6).
 
 ## Montaje común de prueba (dos juegos en un PC)
 

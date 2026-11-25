@@ -6,7 +6,8 @@ Abreviaturas de referencias y montaje común de prueba: ver [README](README.md).
 
 Los dos jugadores juegan en el mundo del anfitrión: sus misiones, santuarios, cofres, enemigos, hora y clima. Lo que
 cualquiera de los dos consigue durante la sesión avanza ese mundo, pero la partida previa del invitado no se vuelca
-en él. Hoy el progreso es la **unión** de lo que tiene cada jugador, escrita en el guardado de todos.
+en él: el invitado juega con un perfil cooperativo aparte que nace vacío y su partida individual no se toca
+(ADR-007, decisiones 1 y 5). Hoy el progreso es la **unión** de lo que tiene cada jugador, escrita en el guardado de todos.
 
 ## Actores
 
@@ -20,20 +21,22 @@ en él. Hoy el progreso es la **unión** de lo que tiene cada jugador, escrita e
 
 ## Flujo principal
 
-1. El invitado se une. Su juego recibe el progreso del anfitrión.
+1. El invitado se une con su perfil cooperativo (vacío la primera vez). Su juego recibe el progreso del anfitrión.
 2. El invitado ve el mundo como lo tiene el anfitrión: mismos enemigos, mismo botín en el suelo, misma hora y clima,
    mismos santuarios y torres activados, mismos cofres abiertos, mismas misiones.
 3. Cualquiera de los dos mata un enemigo, abre un cofre, activa una torre o avanza una misión: el cambio queda en el
    mundo del anfitrión y el otro lo ve.
 4. El anfitrión guarda su partida como siempre: es la partida de la campaña compartida.
-5. Al terminar la sesión, el mundo del anfitrión conserva todo lo que se hizo entre los dos.
+5. Al terminar la sesión, el mundo del anfitrión conserva todo lo que se hizo entre los dos. El invitado no se
+   lleva nada a su partida individual: lo suyo queda en su perfil cooperativo, en su PC.
 
 ## Flujos alternativos y de error
 
-- **El invitado tiene una partida más avanzada que el anfitrión**: su progreso anterior **no** pasa al anfitrión.
-  (Hoy sí pasa: ver estado actual.)
-- **El invitado tiene una partida menos avanzada**: recibe el progreso del anfitrión mientras dura la sesión; qué
-  pasa con su guardado al salir es una pregunta abierta.
+- **El invitado tiene una partida individual más avanzada que el anfitrión**: no interviene. La sesión usa el
+  perfil cooperativo, que nace vacío, así que su progreso anterior **no** pasa al anfitrión. (Hoy sí pasa: ver
+  estado actual.)
+- **El invitado tiene una partida individual menos avanzada**: tampoco interviene. Recibe el progreso del anfitrión
+  en el perfil cooperativo y su partida individual queda como estaba.
 - **El invitado está en otro mapa** (santuario, Bestia Divina): no posee enemigos del mundo y no se le crean los del
   anfitrión (OA:2367-2370); lo que haga allí sigue contando para el progreso.
 - **El anfitrión carga otra partida a mitad de sesión**: hoy se confunde con una Luna de Sangre (mapa 07 M7). Debe
@@ -78,8 +81,9 @@ Lo que **no** es del anfitrión:
 2. **Autoridad en el servidor** (F3): marcar la conexión del anfitrión; aceptar ENEMIES, LOOTS, QUESTS y TIME solo de
    él; encaminar HIT, ESTATE, LOOT_* y QUEST solo hacia él; comprobar longitudes (mapa 06 §9.1, punto 2).
 3. **Limpieza entre sesiones** de `g.quests`, `quests_have`, botín, enemigos y colas (CU-03).
-4. **Guardado del invitado**: jugar la sesión con un perfil de guardado dedicado para no contaminar su partida propia
-   (`runtime/save_profiles.c`; mapa 03 fila 26). Atención: la copia automática de seguridad se salta cuando se usa
+4. **Guardado del invitado**: jugar la sesión con un perfil de guardado cooperativo dedicado, ligado al mundo del
+   anfitrión, que **nace vacío** y vive solo en el PC del invitado. No se copia nada desde su partida individual ni
+   se escribe nada en ella (ADR-007, decisiones 1 y 5) (`runtime/save_profiles.c`; mapa 03 fila 26). Atención: la copia automática de seguridad se salta cuando se usa
    `SAVAGEWIND_SAVE_DIR` (`runtime/save_backup.c:57`, citado en mapa 02).
 5. **Carga de partida a mitad de sesión**: detectarla explícitamente en vez de por "faltan 64 flags" (OA:3913-3924).
 6. **Contrato** `contratos/autoridad-mundo.md` con la tabla "qué es del anfitrión / qué es de cada jugador".
@@ -89,18 +93,24 @@ Lo que **no** es del anfitrión:
 
 - **[DUEÑO] D3**: el mundo y el progreso son los del anfitrión, compartidos, y el anfitrión manda.
 - **[DUEÑO] D1**: los dos recorren la historia juntos; el progreso hecho por cualquiera durante la sesión cuenta.
-- **[DUEÑO] D5**: cada jugador habla con los NPC por su cuenta. Consecuencia a decidir: los flags de conversaciones
-  y recados (`Npc*`, hoy compartidos: DOC:990-993) ¿son del mundo o de cada jugador?
-- **[PROPUESTA]** El progreso previo del invitado nunca se vuelca al anfitrión.
-- **[PROPUESTA]** El invitado juega con un perfil de guardado "cooperativo con <anfitrión>" separado de su partida.
+- **[DUEÑO] D5**: cada jugador habla con los NPC por su cuenta.
+- **[DUEÑO] (ADR-007, decisión 9; Q-06-3)** Encargos y conversaciones con NPC: **progreso común**. Lo que uno
+  avanza queda hecho en el mundo (los flags `Npc*` siguen compartidos, DOC:990-993); cada uno puede repetir la
+  conversación.
+- **[DUEÑO] (ADR-007, decisión 1; Q-06-1)** El invitado no se lleva **nada** a su partida individual. Juega con un
+  perfil cooperativo aparte, ligado al mundo del anfitrión; su partida individual no se toca.
+- **[DUEÑO] (ADR-007, decisión 5)** El perfil cooperativo nace vacío y vive solo en el PC del invitado: no hay
+  copia de inventarios ni de progreso entre partidas. Por eso el progreso previo del invitado nunca puede volcarse
+  al anfitrión.
+- **[DUEÑO] (ADR-007, decisión 12)** Límite de 2 jugadores por ahora: lo nuevo se diseña para N y se prueba con 2.
 - **[PROPUESTA]** El clima pasa a ser siempre el del anfitrión cuando está a menos de 500 m, como hoy, y el del
   jugador más cercano si no; se revisa tras probar.
 - **[PROPUESTA]** Antes de la primera sesión real, copia de seguridad obligatoria del guardado de ambos.
 
 ## Criterios de aceptación
 
-- **CA-1** Dado el montaje común, con el guardado de B más avanzado que el de A (B tiene un flag F que A no tiene;
-  por ejemplo un `Clear_Dungeon*`), cuando B se une y pasan 30 s, entonces `swctl.py --port 7777 flag F` sigue dando
+- **CA-1** Dado el montaje común, con la partida individual de B más avanzada que la de A (B tiene un flag F que A no
+  tiene; por ejemplo un `Clear_Dungeon*`), cuando B se une con su perfil cooperativo y pasan 30 s, entonces `swctl.py --port 7777 flag F` sigue dando
   0 y A no ha recibido ningún objeto (registro de A sin `into the pouch`).
 - **CA-2** Dado A y B en sesión, cuando B consigue un flag de mundo durante la sesión
   (`swctl.py --port 7778 setflag <flag de prueba compartido>`), entonces `swctl.py --port 7777 flag` da 1 en menos de
@@ -117,6 +127,8 @@ Lo que **no** es del anfitrión:
   OA:2403-2406), entonces en B ese enemigo desaparece y su flag de muerto queda activado.
 - **CA-8** Dado un guardado de B copiado antes de la sesión, cuando termina la sesión con perfil dedicado, entonces
   el guardado propio de B es idéntico byte a byte al de antes.
+- **CA-9** Dado B que se une por primera vez a A, entonces su perfil cooperativo se crea vacío (sin objetos de su
+  partida individual) y ningún fichero de su partida individual se lee para rellenarlo ni se modifica.
 
 ## Qué NO hacer
 
@@ -128,6 +140,7 @@ Lo que **no** es del anfitrión:
 - No ampliar ni recortar `quests.txt` a mano: lo genera `tools/online_mod.py`.
 - No lanzar eventos del juego para "aplicar" progreso (riesgo de cuelgue, DOC:751-752).
 - No mezclar en este caso la decisión de recompensas personales: eso es CU-07.
+- No copiar nada de la partida individual del invitado al perfil cooperativo ni al revés (ADR-007, decisiones 1 y 5).
 - No cambiar el formato de QUEST / QUESTS sin el dueño de `online.h`.
 
 ## Riesgos y preguntas abiertas
@@ -138,13 +151,10 @@ Lo que **no** es del anfitrión:
   del usuario; dos jugadores con mods distintos pueden tener listas distintas, y la versión del `online_mod` no se
   compara al conectar (mapa 06 §2.2).
 - Riesgo: algunos efectos de un flag solo se ven tras una carga (DOC:441-442).
-- **Pregunta al dueño**: al terminar la sesión, ¿qué se lleva el invitado a su propia partida: nada del progreso del
-  mundo (perfil separado), o todo lo que se hizo juntos?
-- **Pregunta al dueño**: si el invitado tiene una partida propia más avanzada, ¿debe "olvidar" ese progreso mientras
-  juega en el mundo del anfitrión (ver el mundo exactamente como el anfitrión) o basta con no volcarlo?
-- **Pregunta al dueño**: las conversaciones y recados con NPC (D5), ¿avanzan para los dos cuando uno habla, o cada
-  uno lleva las suyas?
-- **Pregunta al dueño**: ¿el anfitrión es siempre la misma persona durante toda la campaña?
+- Preguntas ya contestadas por el dueño (Q-06-1 y Q-06-3): ver ADR-007 (decisiones 1, 5 y 9) en `../decisiones/`.
+  Q-06-2 (¿debe el invitado "olvidar" su progreso propio?) deja de plantearse: el perfil cooperativo nace vacío.
+- **Pregunta al dueño** (Q-06-4, abierta; por defecto: sí): ¿el anfitrión es siempre la misma persona durante toda
+  la campaña?
 
 ## Fase y dependencias
 

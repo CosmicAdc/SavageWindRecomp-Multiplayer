@@ -5,7 +5,8 @@ Abreviaturas de referencias y montaje común de prueba: ver [README](README.md).
 ## Resumen
 
 Un jugador pulsa una opción y aparece junto a su compañero, siempre que los dos estén en el mismo mapa. Es una ayuda
-para no perderse y para reunirse rápido. No existe en el PR, pero las piezas ya están en la base del proyecto.
+para no perderse y para reunirse rápido: está siempre disponible, también en combate, con 30 s de espera entre usos
+(ADR-008, decisión 16). No existe en el PR, pero las piezas ya están en la base del proyecto.
 
 ## Actores
 
@@ -26,7 +27,7 @@ para no perderse y para reunirse rápido. No existe en el PR, pero las piezas ya
 4. Si el destino está lejos, hay una espera corta mientras carga el terreno ("Cargando el suelo en el destino…").
 5. Los dos se ven y siguen jugando.
 
-**Variante P5 (invocar al compañero)**: el anfitrión elige "Traer a <nombre>"; al compañero le aparece una petición
+**Variante P5 (invocar al compañero)**: cualquiera de los dos elige "Traer a <nombre>"; al compañero le aparece una petición
 "<nombre> quiere traerte. ¿Aceptar?"; si acepta, es él quien ejecuta el flujo anterior hacia quien le llamó.
 
 ## Flujos alternativos y de error
@@ -39,7 +40,8 @@ para no perderse y para reunirse rápido. No existe en el PR, pero las piezas ya
 | Compañero muerto o caído | Se permite, para poder revivirlo (CU-11) |
 | Compañero en el aire, trepando, nadando o sobre lava | El viajero aparece en la última posición segura conocida del compañero (en suelo), no en el aire |
 | Viajero montado, en escena, cargando o muerto | Deshabilitado con el motivo |
-| Viajero en combate | Permitido [PROPUESTA], con un tiempo de espera entre usos para que no sea una huida gratis |
+| Viajero en combate | Permitido (ADR-008, decisión 16). Entre un uso y el siguiente pasan 30 s, para que no sea una huida gratis |
+| Viajero que lo pide antes de que pasen 30 s desde su último viaje | Deshabilitado, con los segundos que faltan |
 | Ya hay un teletransporte en curso | La petición se rechaza (`control_tp_request` devuelve `false`) |
 | El terreno no termina de cargar | La máquina de teletransporte agota su plazo (120 s) y da fallo; se informa |
 | Se corta la conexión durante el viaje | El viaje termina en el destino pedido; después aplica CU-05 |
@@ -77,16 +79,20 @@ para no perderse y para reunirse rápido. No existe en el PR, pero las piezas ya
    [sin verificar: cómo saber de forma fiable que Link está en suelo firme; hoy solo se conocen los nombres de AS.]
 5. **Validar el destino**: coordenadas finitas y dentro de límites razonables antes de llamar (viene de la red).
 6. **Invocación con consentimiento (P5)**: mensaje nuevo de petición y respuesta; diálogo en el overlay; plazo.
-7. **Tiempo de espera entre usos** configurable por el anfitrión (regla de sesión, como `collide`/`revive`).
+7. **Tiempo de espera de 30 s entre usos** (ADR-008, decisión 16), contado en el juego del viajero. No hay
+   bloqueo por combate ni interruptor del anfitrión que lo apague: la ayuda está siempre disponible.
 8. Textos traducidos; ajuste en `online.ini`.
 
 ## Reglas y decisiones de diseño
 
 - **[DUEÑO] D9**: el teletransporte al compañero es una ayuda de juego que debe existir.
-- **[PROPUESTA] P5**: invocar al compañero, siempre con su consentimiento. Nunca se mueve a un jugador sin que acepte.
-- **[PROPUESTA]** Solo dentro del mismo mapa en F4; entre mapas en F5 (CU-14).
-- **[PROPUESTA]** Permitido en combate, con un tiempo de espera de 30 s entre usos.
-- **[PROPUESTA]** Disponible para los dos jugadores por igual, y el anfitrión puede desactivarlo para la sesión.
+- **[DUEÑO] (ADR-008, decisión 16; Q-08-1)** El teletransporte al compañero está **siempre disponible, también en
+  combate, con 30 s de espera** entre usos.
+- **[DUEÑO] (ADR-008, decisión 16; Q-08-3; P5)** Invocar al otro **requiere que acepte**. Lo puede pedir
+  cualquiera de los dos. Nunca se mueve a un jugador sin que acepte.
+- **[DUEÑO] (ADR-008, decisión 20)** El viaje hacia un compañero en otro mapa está aceptado con pantalla de carga y
+  guardado; se construye en F5 (CU-14). En F4, solo dentro del mismo mapa.
+- **[PROPUESTA]** Disponible para los dos jugadores por igual.
 - **[PROPUESTA]** El viajero no arrastra su caballo ni objetos que sostenga.
 
 ## Criterios de aceptación
@@ -108,6 +114,10 @@ para no perderse y para reunirse rápido. No existe en el PR, pero las piezas ya
   CA-1 para B.
 - **CA-8** Dado un bot que publica una posición con NaN o a 1e9 m, cuando el jugador pide viajar hacia él, entonces
   se rechaza.
+- **CA-9** Dado B que acaba de viajar, cuando lo pide otra vez antes de 30 s, entonces se rechaza con el tiempo que
+  falta; pasados 30 s, funciona.
+- **CA-10** Dado B con enemigos atacándole, cuando pide viajar, entonces el viaje se hace igual (no hay bloqueo por
+  combate).
 
 ## Qué NO hacer
 
@@ -129,10 +139,11 @@ para no perderse y para reunirse rápido. No existe en el PR, pero las piezas ya
 - Riesgo: teletransportarse durante una escena del propio viajero puede romperla; por eso se bloquea.
 - Riesgo: abrir la máquina de teletransporte fuera del modo desarrollador toca código de la base (`control_game.c`),
   que puede chocar con cambios de upstream.
-- **Pregunta al dueño**: ¿se puede usar en combate y cuántas veces (sin límite, con espera, o solo fuera de combate)?
-- **Pregunta al dueño**: ¿debe costar algo (nada, un tiempo de espera, un objeto)?
-- **Pregunta al dueño**: ¿la invocación (traer al otro) la puede pedir cualquiera o solo el anfitrión?
-- **Pregunta al dueño**: ¿se permite viajar hacia un compañero que está en plena escena o diálogo?
+- Preguntas ya contestadas por el dueño (Q-08-1 y Q-08-3): ver ADR-008 (decisión 16) en `../decisiones/`.
+- **Pregunta al dueño** (Q-08-2, abierta; por defecto: no cuesta nada más que la espera de 30 s): ¿debe costar algo
+  (un objeto, por ejemplo)?
+- **Pregunta al dueño** (Q-08-4, abierta; por defecto: sí, sin interrumpirle): ¿se permite viajar hacia un
+  compañero que está en plena escena o diálogo?
 
 ## Fase y dependencias
 

@@ -26,7 +26,14 @@ adivinar, para y pregunta: no inventes.
   Nunca escribas rutas absolutas ni nombres de usuario en código, pruebas o documentos.
 - Las líneas `fichero:línea` son del PR #294 original (HEAD `350c5f8`). Si F2 movió el código, busca la función por
   su nombre con `grep -n`.
-- No edites `generated/`, `extracted/`, `online_mod/` ni nada de `third_party/`. No subas ficheros del juego.
+- No edites `generated/`, `extracted/`, `online_mod/` ni nada de `third_party/` (única excepción: añadir miniupnpc
+  como diga el ADR de T306). No subas ficheros del juego.
+- Decisiones del dueño que mandan sobre cualquier tarea (`specs/decisiones/`): ENet y miniupnpc aceptadas, con
+  licencia compatible con MIT y anotadas en `docs/third-party.md` (ADR-007, decisión 11); límite de 2 jugadores por
+  ahora (diseña para N, prueba con 2), contraseña opcional y el código de invitación puede contener la IP (ADR-007,
+  decisión 12); plazo de gracia de reconexión de 10 minutos (ADR-008, decisión 18); si la conexión directa falla, el
+  juego solo muestra un error claro: sin guía de red virtual (Tailscale, ZeroTier) ni servicio de presentación o
+  perforación de NAT (ADR-009, decisión 23).
 - No toques `tools/patches.py` ni `tools/game_sites.py` en F3 (cambian `GAMELIB_ID` y obligan a recompilar el juego).
 - No cambies estructuras de cable, números de mensaje ni `PROTOCOL` salvo que la tarea diga "dueño del protocolo".
 - No bloquees nunca el hilo del juego ni el de presentación: nada de `recv`, `send`, `connect`, `getaddrinfo`, UPnP
@@ -100,7 +107,7 @@ adivinar, para y pregunta: no inventes.
   verify: `sh tools/nettest/measure.sh udp` sale con 0 y escribe `build/nettest/udp/resumen.csv` con las mismas columnas que T303
   depende de: T303
   quién: agente
-  contexto: Pregunta a responder: con los mismos tamaños y ritmos de mensaje, ¿cuánto mejoran los atascos y la edad del estado usando un canal no fiable para el estado continuo y uno fiable para los eventos? ENet (licencia MIT) ofrece canales fiables y no fiables sobre UDP. Esto es un banco aparte: no se integra en el juego.
+  contexto: Pregunta a responder: con los mismos tamaños y ritmos de mensaje, ¿cuánto mejoran los atascos y la edad del estado usando un canal no fiable para el estado continuo y uno fiable para los eventos? ENet (licencia MIT) ofrece canales fiables y no fiables sobre UDP y está aceptada por el dueño como dependencia (ADR-007, decisión 11): esta tarea no espera ningún permiso. Esto es un banco aparte: no se integra en el juego.
   pasos:
     1. Crea un programa emisor y uno receptor en `tools/netbench/` que usen ENet con 2 canales: 0 no fiable secuenciado, 1 fiable.
     2. El emisor imita a un jugador: 3375 bytes a 20 Hz y 1600 bytes a 20 Hz por el canal 0; un evento de 120 bytes por segundo por el canal 1.
@@ -109,7 +116,7 @@ adivinar, para y pregunta: no inventes.
     5. Descarga ENet dentro de `build/` en el contenedor (no lo añadas al repositorio en esta tarea).
     6. Bitácora con la tabla comparada con T303.
   hecho cuando: hay dos CSV comparables (TCP y UDP) y la bitácora dice, por perfil, cuál gana y por cuánto.
-  no hagas: no toques `runtime/`; no añadas ENet a `third_party/` ni al `Makefile`; no saques conclusiones: la decisión es de T305.
+  no hagas: no toques `runtime/`; no añadas ENet a `third_party/` ni al `Makefile` (eso solo ocurre si T305 decide migrar); no saques conclusiones: la decisión es de T305.
   modelo sugerido: medio
 
 - [ ] T305 [decisión] ADR: seguir con TCP o migrar el estado continuo a UDP
@@ -117,7 +124,7 @@ adivinar, para y pregunta: no inventes.
   verify: el fichero existe, contiene la tabla de T303 y T304, la decisión y la firma del dueño (`Decidido por: <nombre>, <fecha>`); `git diff --check` sin errores
   depende de: T303, T304, T309
   quién: dueño (el agente redacta el borrador)
-  contexto: F3 mide y decide; no migra. Regla propuesta en `plan.md` §L: migrar si en el perfil `wifi` TCP con colas no bloqueantes da más de 2 atascos por minuto o p99 > 200 ms y UDP da menos de la mitad.
+  contexto: F3 mide y decide; no migra. Usar ENet ya está permitido (ADR-007, decisión 11): la decisión depende solo de las medidas, y es la que cierra ADR-005. Regla propuesta en `plan.md` §L: migrar si en el perfil `wifi` TCP con colas no bloqueantes da más de 2 atascos por minuto o p99 > 200 ms y UDP da menos de la mitad.
   pasos:
     1. Repite T303 después de T309 (colas no bloqueantes) y añade esa tercera columna.
     2. Redacta: contexto, opciones (TCP con colas; UDP con ENet; UDP propio), medidas, coste de cada opción (dependencia nueva en tres plataformas, partir STATE), recomendación.
@@ -126,19 +133,19 @@ adivinar, para y pregunta: no inventes.
   no hagas: no decidas por el dueño; no ocultes los perfiles donde tu opción preferida pierde.
   modelo sugerido: alto
 
-- [ ] T306 [P] [investigación] Spike: apertura automática de puerto, código propio o biblioteca
+- [ ] T306 [P] [investigación] Spike: apertura automática de puerto con miniupnpc
   files: tools/netbench/upnp_probe.c, specs/decisiones/ADR-upnp.md, specs/bitacora/F3-T306-upnp.md
   verify: `sh tools/nettest/run.sh upnp_probe` sale con 0 (la sonda abre y cierra una redirección contra `miniupnpd` en un contenedor)
   depende de: T301
   quién: agente (la prueba contra el router real la hace el dueño)
-  contexto: Hoy no hay UPnP ni NAT-PMP; la pestaña Online solo dice que se redirija el puerto (`runtime/ui/online_ui.mm:57-59`). Añadir una biblioteca enlazada es caro en este proyecto (tres plataformas, script de instalación, CI, `docs/third-party.md`).
+  contexto: Hoy no hay UPnP ni NAT-PMP; la pestaña Online solo dice que se redirija el puerto (`runtime/ui/online_ui.mm:57-59`). El dueño ya aceptó miniupnpc (ADR-007, decisión 11): no hay que elegir entre código propio y biblioteca ni pedir permiso. Lo que queda por saber es si funciona y cómo se incluye, porque una biblioteca enlazada es cara en este proyecto (tres plataformas, script de instalación, CI, `docs/third-party.md`).
   pasos:
-    1. Pregunta exacta: ¿basta un cliente propio mínimo (descubrimiento SSDP, `AddPortMapping`, `GetExternalIPAddress`, `DeletePortMapping`, y NAT-PMP) o hay que incluir una biblioteca?
-    2. Escribe `upnp_probe.c` (programa suelto, un solo fichero, sockets del sistema) que haga esa secuencia con plazo total de 5 s e imprima cada paso.
+    1. Pregunta exacta: ¿miniupnpc hace la secuencia completa (descubrimiento SSDP, `AddPortMapping`, `GetExternalIPAddress`, `DeletePortMapping`, y NAT-PMP si lo cubre) y cómo conviene incluirla: fuente en `third_party/` o paquete del sistema en cada plataforma?
+    2. Escribe `upnp_probe.c` (programa suelto, un solo fichero) que haga esa secuencia con miniupnpc, con plazo total de 5 s, e imprima cada paso. Descarga miniupnpc dentro de `build/` en el contenedor; no la añadas al repositorio en esta tarea.
     3. Añade al compose un contenedor con `miniupnpd` como puerta de enlace de prueba y el escenario `upnp_probe`.
     4. Pide al dueño que lo ejecute contra su router y pegue la salida en la bitácora.
-    5. Forma de la respuesta: ADR con tabla (opción, líneas de código, licencia, funcionó en Docker sí/no, funcionó en el router real sí/no, coste de integración) y recomendación.
-  hecho cuando: el ADR existe con las dos pruebas (Docker y router real) anotadas.
+    5. Forma de la respuesta: ADR con tabla (forma de incluirla, versión y licencia leída en su fichero de licencia, funcionó en Docker sí/no, funcionó en el router real sí/no, coste de integración en Windows, Linux y macOS) y recomendación, más el texto de la entrada que T324 añadirá a `docs/third-party.md`.
+  hecho cuando: el ADR existe con las dos pruebas (Docker y router real) anotadas y la licencia confirmada como compatible con MIT.
   no hagas: no integres nada en `runtime/` todavía; no analices XML con funciones sin límite de longitud; no confíes en la respuesta del router (tamaño máximo, plazo).
   modelo sugerido: alto
 
@@ -322,15 +329,15 @@ adivinar, para y pregunta: no inventes.
   quién: agente
   contexto: Cuando un cliente cae, `srv_drop` (`runtime/online.c:218-229`) libera su ranura y avisa LEAVE. Quien vuelve es un jugador nuevo en la primera ranura libre: no hay testigo de sesión.
   pasos:
-    1. En WELCOME envía un testigo aleatorio de 16 bytes por jugador y el plazo de gracia (por defecto 60 s; clave `grace` de `online.ini`).
+    1. En WELCOME envía un testigo aleatorio de 16 bytes por jugador y el plazo de gracia (por defecto 600 s = 10 minutos, decisión del dueño en ADR-008, decisión 18; clave `grace` de `online.ini`).
     2. Al perder a un cliente autenticado (no al anfitrión): estado "ausente"; conserva nombre, último STATE y EQUIP, testigo y hora límite; envía AWAY a los demás.
     3. Un HELLO con un testigo válido y dentro de plazo recupera esa ranura: WELCOME con la misma ranura, luego JOIN/STATE/EQUIP de todos, como en una entrada normal.
     4. Vencido el plazo: LEAVE y ranura libre.
     5. Una ranura "ausente" no cuenta como libre para jugadores nuevos mientras quede otra.
     6. El testigo se compara en tiempo constante y se invalida al usarlo (se emite uno nuevo en el WELCOME).
-    7. Escenario: bot con `BOT_DROP=10,5` recupera su ranura; con `BOT_DROP=10,70` entra como jugador nuevo.
+    7. Escenario (el servidor de prueba arranca con `grace = 60` para no esperar 10 minutos): bot con `BOT_DROP=10,5` recupera su ranura; con `BOT_DROP=10,70` entra como jugador nuevo.
   hecho cuando: la prueba pasa y los demás bots reciben AWAY y después ningún LEAVE cuando la reanudación tiene éxito.
-  no hagas: no reserves la ranura a una conexión que nunca se autenticó; no aceptes un testigo de otra sesión; no guardes testigos en disco.
+  no hagas: no reserves la ranura a una conexión que nunca se autenticó; no aceptes un testigo de otra sesión; no guardes testigos en disco; no ligues este plazo a la historia (el anfitrión puede continuar solo de inmediato, con confirmación: ADR-007, decisión 6).
   modelo sugerido: alto
 
 - [ ] T318 [núcleo] Reconexión, lado cliente: reintentos automáticos
@@ -435,19 +442,20 @@ adivinar, para y pregunta: no inventes.
   modelo sugerido: alto
 
 - [ ] T324 [P] [módulo] Apertura automática de puerto (UPnP y NAT-PMP)
-  files: runtime/online_upnp.c, runtime/online_upnp.h, tests/test_online_upnp.c
+  files: runtime/online_upnp.c, runtime/online_upnp.h, tests/test_online_upnp.c, docs/third-party.md (solo la entrada de miniupnpc), y la fuente de miniupnpc donde diga el ADR de T306
   verify: `sh tools/nettest/run.sh upnp` sale con 0 (abre, consulta la IP externa y cierra contra `miniupnpd`; y sin IGD devuelve "no disponible" en < 5 s)
-  depende de: T306 (ADR con el enfoque elegido)
+  depende de: T306 (ADR con la forma de incluir miniupnpc)
   quién: agente
-  contexto: No existe. El anfitrión debe abrir el puerto en el router a mano (`runtime/ui/online_ui.mm:57-59`). El ADR de T306 dice si se usa código propio o una biblioteca incluida.
+  contexto: No existe. El anfitrión debe abrir el puerto en el router a mano (`runtime/ui/online_ui.mm:57-59`). Se usa miniupnpc, aceptada por el dueño (ADR-007, decisión 11); el ADR de T306 dice cómo se incluye.
   pasos:
     1. API: `online_upnp_start(puerto)` lanza un hilo; `online_upnp_status(&estado, ip_externa, cap, motivo, cap2)` devuelve BUSCANDO / ABIERTO / NO_DISPONIBLE; `online_upnp_stop()` pide borrar la redirección con plazo de 2 s y no espera más.
     2. Secuencia con plazo total de 5 s: SSDP → `AddPortMapping` TCP con duración de 2 h (renovar cada hora) → `GetExternalIPAddress`; si falla, NAT-PMP contra la puerta de enlace.
     3. Clasifica la IP externa: si es privada (10/8, 172.16/12, 192.168/16) o de 100.64/10, estado ABIERTO con aviso "dirección compartida por el proveedor".
     4. Toda respuesta del router: tamaño máximo 16 KiB, plazo por operación, análisis de texto con longitudes comprobadas.
     5. Pruebas unitarias del análisis de respuestas con textos sintéticos (correcto, truncado, enorme, sin la etiqueta esperada).
-  hecho cuando: la prueba pasa y el dueño confirma en bitácora que abre el puerto en su router (T341).
-  no hagas: no llames a nada de esto desde el hilo del juego ni el de presentación; no sigas URL de control que apunten fuera de la red local; no dejes la redirección puesta al salir; no añadas una biblioteca si el ADR no lo aprobó.
+    6. Añade la entrada de miniupnpc a `docs/third-party.md` (nombre, versión, licencia, origen), con el texto preparado en T306.
+  hecho cuando: la prueba pasa, `docs/third-party.md` tiene la entrada y el dueño confirma en bitácora que abre el puerto en su router (T341).
+  no hagas: no llames a nada de esto desde el hilo del juego ni el de presentación; no sigas URL de control que apunten fuera de la red local; no dejes la redirección puesta al salir; no añadas ninguna otra biblioteca; no cambies `RT_SRC` ni `LDFLAGS` del `Makefile` (pásale al integrador, T337, lo que haga falta enlazar).
   modelo sugerido: alto
 
 - [ ] T325 [P] [módulo] Reunir la información de versión de este juego
@@ -508,12 +516,13 @@ adivinar, para y pregunta: no inventes.
     1. En "Join": botón "Search local network" que llama a `discovery_scan_start()`; debajo, la lista de `discovery_scan_results` (nombre, jugadores, candado si pide contraseña, aviso si la versión no coincide). Elegir una fila rellena la dirección.
     2. El campo de dirección acepta código, IP o nombre (usa `online_addr_parse`). Si el texto no se entiende, muestra "That is not an address or an invite code".
     3. En "Create session", con la sesión abierta: muestra el código de invitación (`online_invite_encode`) con botón "Copy", y el estado de `online_upnp_status` con los textos de `plan.md` §H.
+    3b. Sustituye el texto de ayuda actual (`:57-59`) por uno que no recomiende ninguna VPN ni red virtual: el juego no ofrece nada cuando la conexión directa es imposible (ADR-009, decisión 23).
     4. Texto fijo sobre el cortafuegos de Windows bajo el botón de crear.
     5. Interruptor "Visible on the local network".
     6. Usa los widgets existentes `opt_*` de `runtime/ui/option_rows.h` (traducen solos) y el teclado en pantalla que ya trae `opt_text`.
     7. Añade cada texto nuevo en inglés a `textos-nuevos.txt`, una línea por texto.
   hecho cuando: con un bot anfitrión en la red local, la lista lo muestra y unirse funciona con mando y con teclado.
-  no hagas: no llames a `getaddrinfo`, UPnP ni escaneo desde `online_tab_draw` (corre en el hilo de presentación): solo lee estados ya publicados; no muestres la contraseña; no edites `runtime/ui/menu.mm` ni los `.inc`.
+  no hagas: no llames a `getaddrinfo`, UPnP ni escaneo desde `online_tab_draw` (corre en el hilo de presentación): solo lee estados ya publicados; no muestres la contraseña; no edites `runtime/ui/menu.mm` ni los `.inc`; no nombres Tailscale, ZeroTier ni ningún servicio externo en ningún texto.
   modelo sugerido: medio
 
 - [ ] T329 [ui] Reconexión y motivos de rechazo en pantalla
@@ -527,8 +536,9 @@ adivinar, para y pregunta: no inventes.
     2. En la pestaña: botón "Cancel" que llama a `online_reconnect_cancel()`, y tras `ONLINE_FAILED` un botón "Reconnect" que repite el último `online_join`.
     3. Junto a un jugador "ausente" en la lista: texto "reconnecting".
     4. Muestra el motivo de rechazo completo (qué difiere, tu valor y el del anfitrión). El formato es un literal fijo; los valores son argumentos.
+    4b. Cuando un intento de unirse falla sin llegar al saludo (no hay respuesta, conexión rechazada): un mensaje de error claro que diga qué se intentó (dirección o código, puerto) y que no se pudo conectar. Nada más: ni guía de red virtual ni servicio de presentación (ADR-009, decisión 23).
     5. Añade los textos a `textos-nuevos.txt`.
-  hecho cuando: cada motivo de rechazo de T314 se lee entero en la pestaña y el aviso de reconexión aparece y desaparece solo.
+  hecho cuando: cada motivo de rechazo de T314 se lee entero en la pestaña, el aviso de reconexión aparece y desaparece solo, y unirse a una dirección que no responde muestra el error claro del paso 4b.
   no hagas: no uses cadenas de la red como formato de `printf`/`ImGui::Text` (usa `TextUnformatted` o `"%s"`); no pintes texto de red sin limitar su longitud.
   modelo sugerido: medio
 
@@ -558,7 +568,7 @@ adivinar, para y pregunta: no inventes.
     1. Claves nuevas: `password_salt`, `password_hash` (hexadecimal), `lan_visible`, `upnp`, `grace`, `show_quality`, `remember_password`.
     2. Migración: si al cargar existe `password = <texto>`, calcula sal y hash, y al guardar escribe solo las claves nuevas.
     3. El invitado guarda la contraseña de unión solo si `remember_password = 1`.
-    4. Valida rangos al cargar (`grace` 10..600; booleanos 0/1; hexadecimal de longitud exacta).
+    4. Valida rangos al cargar (`grace` 10..600, por defecto 600 = 10 minutos, ADR-008 decisión 18; booleanos 0/1; hexadecimal de longitud exacta).
     5. Escritura atómica: escribe a `online.ini.tmp` y renombra.
   hecho cuando: la prueba pasa y un `online.ini` antiguo sigue funcionando.
   no hagas: no muevas estos ajustes a `runtime/settings.c` (fichero caliente de otros carriles); no escribas nada si el nombre viene de `SAVAGEWIND_ONLINE_NAME` (comportamiento actual, `online.c:1544-1545`); no superes 127 caracteres por valor (límite de lectura).
@@ -575,7 +585,7 @@ adivinar, para y pregunta: no inventes.
   pasos:
     1. Por cada idioma: `tools/venv/Scripts/python.exe tools/i18n_check.py --missing <idioma>` imprime las líneas que faltan.
     2. Añade esas líneas al final del fichero del idioma, en un bloque con el comentario `// Online (co-op)`.
-    3. Traduce conservando los `%s`/`%d` en el mismo orden y los nombres propios (Tailscale, ZeroTier, Radmin VPN) sin traducir.
+    3. Traduce conservando los `%s`/`%d` en el mismo orden y los nombres propios sin traducir. El texto de ayuda que nombra Tailscale, ZeroTier y Radmin VPN lo retira T328 (ADR-009, decisión 23): tradúcelo solo si sigue en el código cuando hagas esta tarea.
     4. Usa la terminología del propio fichero para palabras ya traducidas (busca cómo tradujo "Settings", "Port", "Password").
     5. Ejecuta el comprobador.
   hecho cuando: `0 missing` en los 13 y `make runtime-objs` compila.
@@ -663,11 +673,11 @@ adivinar, para y pregunta: no inventes.
   quién: agente
   contexto: `docs/ONLINE.md:8-17` explica crear y unirse en seis líneas. Falta la escalera completa para alguien sin conocimientos de redes.
   pasos:
-    1. Escribe, en español llano, en este orden: misma casa (buscar en red local) → apertura automática y código de invitación → IPv6 → abrir el puerto a mano → red virtual (Tailscale, ZeroTier), con qué dirección usar en cada caso.
-    2. Sección "Si no funciona": aviso del cortafuegos de Windows, dirección compartida por el proveedor, versiones distintas (qué significa cada motivo de rechazo).
-    3. Sección "Seguridad": el tráfico no está cifrado; el código revela tu IP; pon contraseña si abres el puerto a Internet.
+    1. Escribe, en español llano, en este orden: misma casa (buscar en red local) → apertura automática y código de invitación → IPv6 → abrir el puerto a mano, con qué dirección usar en cada caso. La escalera termina ahí: la guía no recomienda redes virtuales (Tailscale, ZeroTier) ni servicios de presentación (ADR-009, decisión 23).
+    2. Sección "Si no funciona": aviso del cortafuegos de Windows, dirección compartida por el proveedor (sin IPv6 en los dos lados, con esa conexión no se puede hospedar: dilo tal cual), versiones distintas (qué significa cada motivo de rechazo) y qué quiere decir el mensaje de error de conexión.
+    3. Sección "Seguridad": el tráfico no está cifrado; el código revela tu IP; la contraseña es opcional pero recomendada si abres el puerto a Internet (ADR-007, decisión 12).
   hecho cuando: el dueño sigue la guía sin ayuda y conecta (anotado en bitácora).
-  no hagas: no expliques cómo obtener el juego; no incluyas IP reales, nombres de usuario ni rutas de tu máquina; no prometas cifrado.
+  no hagas: no expliques cómo obtener el juego; no incluyas IP reales, nombres de usuario ni rutas de tu máquina; no prometas cifrado; no nombres productos de red virtual ni des pasos para instalarlos.
   modelo sugerido: bajo
 
 - [ ] T339 [docs] Dejar claro qué hace y qué no hace `--server`

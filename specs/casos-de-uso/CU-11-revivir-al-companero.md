@@ -4,8 +4,10 @@ Abreviaturas de referencias y montaje común de prueba: ver [README](README.md).
 
 ## Resumen
 
-Cuando un jugador se queda sin corazones no hay "game over": queda caído y su compañero puede levantarlo. Hoy el PR
-hace otra cosa: una reanimación automática e instantánea por hada, sin que intervenga el compañero.
+Cuando un jugador se queda sin corazones y su compañero sigue vivo no hay "game over". En la **primera entrega**
+la reanimación es **automática**, como hace hoy el PR (reanimación instantánea por hada, sin que intervenga el
+compañero); si caen los dos, fin de partida normal. El **rescate manual** (quedar caído y que el compañero te
+levante) queda planificado para después, con prioridad baja (ADR-007, decisión 7; ADR-008, decisión 15).
 
 ## Actores
 
@@ -18,6 +20,15 @@ hace otra cosa: una reanimación automática e instantánea por hada, sin que in
 - Regla de sesión "revivir" activada por el anfitrión (hoy `revive`, activada por defecto: NET:110, UI:123-126).
 
 ## Flujo principal
+
+**Entrega 1 — reanimación automática (la que se construye ahora)**
+
+1. El jugador pierde su último corazón mientras su compañero sigue vivo en la sesión.
+2. En vez de la pantalla de fin de partida, se reanima solo en el sitio, con la animación del hada.
+3. El compañero recibe un aviso en pantalla de que ha caído y se ha levantado (CU-10).
+4. Si los dos caen a la vez, hay fin de partida normal: los dos recargan su último guardado.
+
+**Entrega 2 — rescate manual (planificada para después, prioridad baja)**
 
 1. El jugador pierde su último corazón.
 2. En vez de la pantalla de fin de partida, queda **caído** en el sitio. Ve un contador y el texto "Esperando a
@@ -33,7 +44,7 @@ hace otra cosa: una reanimación automática e instantánea por hada, sin que in
 |---|---|
 | El caído tiene un hada propia | Se usa primero, como en el juego normal (hoy ya es así: DOC:775-781) |
 | El contador llega a cero | [PROPUESTA] El caído revive solo en el sitio con poca vida. Alternativa: reaparece junto al compañero |
-| Los dos caen a la vez | [PROPUESTA] Fin de partida normal para los dos: cada juego carga su último guardado |
+| Los dos caen a la vez | Fin de partida normal para los dos: cada juego carga su último guardado (ADR-008, decisión 15) |
 | El rescatador suelta el botón o le golpean | El progreso de revivir se reinicia |
 | El rescatador está en otro mapa | No puede revivir; el contador sigue. El caído puede elegir "rendirse" |
 | El caído cae en lava, agua profunda o vacío | [sin verificar: el juego tiene muertes que recolocan a Link; hay que ver cuáles pasan por la pregunta del hada] |
@@ -63,8 +74,10 @@ hace otra cosa: una reanimación automática e instantánea por hada, sin que in
 
 ## Qué hay que construir
 
-Se propone en dos entregas, porque la segunda necesita ingeniería inversa (mapa 07 §7: "retener la muerte sin game
-over").
+Va en dos entregas, porque la segunda necesita ingeniería inversa (mapa 07 §7: "retener la muerte sin game
+over"). El dueño ha decidido que la primera sea la automática y que el rescate manual quede planificado para
+después (ADR-007, decisión 7): la investigación en Ghidra del "estado caído" no se elimina, pero pasa a prioridad
+baja y no bloquea el cierre de F4.
 
 **Entrega 1 — sin ingeniería inversa (F4)**
 
@@ -79,7 +92,7 @@ over").
    [sin verificar: la reanimación del hada repone la vida que decide el juego; para cambiarla habría que escribir la
    vida después, en `player + 0x848`, como hace PvP en OA:2907-2921].
 
-**Entrega 2 — caído real con rescate (F4 tardío o F5, requiere Ghidra)**
+**Entrega 2 — caído real con rescate (planificada para después, prioridad baja; requiere Ghidra)**
 
 5. Encontrar cómo mantener a Link caído sin que el juego avance al fin de partida ni lo borre (sitio nuevo en
    `tools/game_sites.py` + parche en `tools/patches.py`; obliga a recompilar a los dos jugadores).
@@ -93,12 +106,14 @@ over").
 
 ## Reglas y decisiones de diseño
 
-- **[PROPUESTA] P3**: revivir al compañero caído. Aceptada como propuesta; los detalles de abajo están por confirmar.
+- **[DUEÑO] (ADR-007, decisión 7; Q-11-1; P3)** Revivir es **automático en la primera entrega**, como hace hoy el
+  código. El **rescate manual queda planificado** para después, con prioridad baja.
+- **[DUEÑO] (ADR-008, decisión 15; Q-11-2)** Si caen los dos a la vez, **fin de partida normal**: los dos recargan
+  el último guardado.
 - **[DUEÑO] D4**: los corazones son de cada jugador: revivir no transfiere vida del rescatador.
 - **[DUEÑO] D8**: es un juego cooperativo por defecto; morir no debería separar a los jugadores.
-- **[PROPUESTA]** Contador de 30 s; revivir cuesta 3 s de botón mantenido; se vuelve con 3 corazones.
-- **[PROPUESTA]** Si caen los dos, fin de partida normal.
-- **[PROPUESTA]** La entrega 1 es suficiente para cerrar F4; la entrega 2 se decide tras probar la 1.
+- **[PROPUESTA]** (entrega 2) Contador de 30 s; revivir cuesta 3 s de botón mantenido; se vuelve con 3 corazones.
+- La entrega 1 es suficiente para cerrar F4 (consecuencia de la decisión 7).
 - **[PROPUESTA]** Un hada propia se sigue usando primero y no cuenta como reanimación del compañero.
 
 ## Criterios de aceptación
@@ -139,17 +154,19 @@ over").
 - Riesgo alto: la zona de código alrededor de la muerte es la que más cuelgues ha dado (DOC:732-734; mapa 07 A5).
 - Riesgo: la entrega 2 puede no ser viable sin mucha ingeniería inversa; por eso hay entrega 1.
 - Riesgo: reanimación ilimitada quita toda dificultad al juego.
-- **Pregunta al dueño**: ¿te vale como primera versión la reanimación automática "mientras el compañero siga vivo",
-  o quieres desde el principio que el compañero tenga que ir a levantarte?
-- **Pregunta al dueño**: ¿qué pasa si el contador se agota (revivir solo con poca vida, reaparecer junto al
-  compañero, o fin de partida)?
-- **Pregunta al dueño**: ¿qué pasa si caen los dos?
-- **Pregunta al dueño**: ¿con cuántos corazones se vuelve, y hay límite de reanimaciones o tiempo de espera?
-- **Pregunta al dueño**: ¿revivir cuesta algo al rescatador (un hada, comida, nada)?
+- Preguntas ya contestadas por el dueño (Q-11-1 y Q-11-2): ver ADR-007 (decisión 7) y ADR-008 (decisión 15) en
+  `../decisiones/`.
+- **Pregunta al dueño** (Q-11-3, abierta; solo afecta a la entrega 2; por defecto: revive solo en el sitio con 3
+  corazones): ¿qué pasa si el contador se agota?
+- **Pregunta al dueño** (Q-11-4, abierta; por defecto: entrega 1, lo que da el hada del juego y sin límite;
+  entrega 2, 3 corazones y espera de 60 s): ¿con cuántos corazones se vuelve, y hay límite de reanimaciones?
+- **Pregunta al dueño** (Q-11-5, abierta; solo afecta a la entrega 2; por defecto: nada): ¿revivir cuesta algo al
+  rescatador?
 
 ## Fase y dependencias
 
-- **Fase**: F4 (entrega 1). Entrega 2: F4 tardío o F5.
+- **Fase**: F4 (entrega 1, automática). Entrega 2 (rescate manual): planificada para después, con prioridad baja;
+  no bloquea el cierre de F4.
 - **Depende de**: CU-03 (estabilidad alrededor de la muerte), CU-10 (aviso y marcador, vida en el estado), CU-08
   (llegar al caído).
 - **Lo necesitan**: CU-12 (qué pasa al morir en PvP).

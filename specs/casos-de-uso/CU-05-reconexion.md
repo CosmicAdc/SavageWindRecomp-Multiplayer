@@ -32,7 +32,7 @@ hay que unirse a mano y se entra como jugador nuevo.
 
 ## Flujos alternativos y de error
 
-- **No vuelve dentro del plazo de reserva**: el anfitrión libera el sitio. El invitado ve "No se pudo reconectar" con
+- **No vuelve dentro del plazo de reserva (10 minutos)**: el anfitrión libera el sitio. El invitado ve "No se pudo reconectar" con
   un botón "Reintentar" y otro "Salir".
 - **El invitado cancela**: pulsa "Salir" durante los reintentos y queda fuera, sin congelar la interfaz.
 - **El anfitrión cierra la sesión mientras tanto**: los reintentos fallan; mensaje "El anfitrión terminó la sesión"
@@ -41,7 +41,8 @@ hay que unirse a mano y se entra como jugador nuevo.
   reintentar por si el anfitrión vuelve a crear la sesión en la misma dirección.
 - **Otro jugador intenta ocupar el sitio reservado**: se rechaza (identificador de sesión incorrecto).
 - **El invitado estaba en otro mapa, en una escena o muerto al cortarse**: al volver se aplica el estado actual sin
-  forzarle nada; un momento de historia que esperaba a los dos (CU-14) se considera en pausa mientras dura el corte.
+  forzarle nada. Un momento de historia que esperaba a los dos (CU-14) no queda bloqueado por el corte: el
+  anfitrión puede continuar solo de inmediato tras confirmarlo (ADR-007, decisión 6).
 - **El invitado cerró el juego entero**: al volver a arrancar es una unión normal (CU-01), no una reconexión
   [PROPUESTA: ofrecer "Volver a la última sesión"].
 - **Versión distinta al volver**: rechazo normal de versión.
@@ -65,7 +66,7 @@ hay que unirse a mano y se entra como jugador nuevo.
 
 1. **Identificador de sesión y de jugador**: el servidor entrega en WELCOME un identificador aleatorio; el cliente
    lo presenta en el HELLO al volver. Cambia el protocolo (`online.h`, dueño único).
-2. **Reserva de sitio** en el servidor durante un plazo (propuesta: 60 s), con el nombre y el color.
+2. **Reserva de sitio** en el servidor durante **10 minutos** (ADR-008, decisión 18), con el nombre y el color.
 3. **Reintento automático** en `cl_thread` (NET:1160-1320): estado nuevo "reconectando" además de los cuatro de
    NETH:22, con espera creciente entre intentos y cancelación inmediata (hoy `stop_all` puede bloquear hasta 6 s por
    dirección: NET:1128-1158).
@@ -75,7 +76,8 @@ hay que unirse a mano y se entra como jugador nuevo.
 5. **Interfaz**: aviso de reconexión con contador, botones Reintentar y Salir, aviso al compañero. Copiar el patrón
    de la línea de estado del overlay (UI:204-210).
 6. **Mensaje de despedida** del anfitrión al terminar la sesión, para distinguirlo de un corte.
-7. Pruebas en Docker con el bot y `tc netem` (cortes de 5, 30 y 150 s), como dice el plan.
+7. Pruebas en Docker con el bot y `tc netem`: cortes dentro del plazo (5, 30 y 150 s) y uno que supere el plazo
+   de reserva. El plazo debe poder acortarse **solo en pruebas** para no esperar 10 minutos reales en cada pasada.
 
 ## Reglas y decisiones de diseño
 
@@ -83,7 +85,13 @@ hay que unirse a mano y se entra como jugador nuevo.
 - **[DUEÑO] D3**: al volver manda el estado del anfitrión; lo que el invitado hizo en el mundo durante el corte no
   se vuelca al anfitrión (coherente con CU-06).
 - **[DUEÑO] D4**: lo que el invitado ganó en su inventario durante el corte es suyo y lo conserva.
-- **[PROPUESTA]** Plazo de reserva de 60 s y reintentos cada 1, 2, 4, 8… s hasta 15 s.
+- **[DUEÑO] (ADR-008, decisión 18; Q-05-1)** El sitio del compañero se reserva **10 minutos**.
+- **[DUEÑO] (ADR-007, decisión 6; Q-05-2)** El plazo de reconexión es independiente de la historia: mientras el
+  compañero reconecta, el anfitrión puede continuar un momento de historia de inmediato, con un diálogo de
+  confirmación. No hay temporizador de desconexión para la historia.
+- **[DUEÑO] (ADR-007, decisiones 1 y 5)** Lo que el invitado conserva tras un corte es su perfil cooperativo,
+  guardado en su PC; su partida individual no interviene.
+- **[PROPUESTA]** Reintentos cada 1, 2, 4, 8… s hasta 15 s entre intentos, durante todo el plazo de reserva.
 - **[PROPUESTA]** Sin migración de anfitrión: si cae el anfitrión, la sesión termina.
 - **[PROPUESTA]** Durante el corte, el invitado sigue jugando en solitario en su mundo (no se le congela).
 
@@ -93,7 +101,7 @@ hay que unirse a mano y se entra como jugador nuevo.
   cortafuegos, o `tc netem loss 100%` en Docker con el bot), entonces B vuelve solo, con el mismo número de jugador,
   y `swctl.py --port 7777 actors OnlinePlayer` vuelve a devolver 1 actor en menos de 10 s tras restablecer la red.
 - **CA-2** Dado el corte anterior, entonces A no tiene dos entradas de B en la lista de jugadores en ningún momento.
-- **CA-3** Dado un corte de más que el plazo de reserva, entonces B muestra el fallo con el botón Reintentar y A
+- **CA-3** Dado un corte de más que el plazo de reserva (10 minutos; en la prueba, el plazo acortado), entonces B muestra el fallo con el botón Reintentar y A
   muestra a B como ausente; al pulsar Reintentar, B entra como jugador nuevo sin cuelgue.
 - **CA-4** Dado B reconectando, cuando B pulsa Salir, entonces la interfaz responde en menos de 1 s.
 - **CA-5** Dado un cliente que presenta un identificador de sesión falso para el sitio reservado de B, entonces el
@@ -121,12 +129,14 @@ hay que unirse a mano y se entra como jugador nuevo.
 - Riesgo: lo que el invitado hizo en solitario durante el corte (enemigos muertos, cofres abiertos en su copia del
   mundo) diverge del mundo del anfitrión; hay que definir qué se descarta.
 - Riesgo: TCP tarda en detectar un par caído; el plazo de silencio actual es de 10 s (NET:46-48).
-- **Pregunta al dueño**: ¿cuánto tiempo se guarda el sitio del compañero (propuesta: 60 s)?
-- **Pregunta al dueño**: mientras el compañero reconecta, ¿el anfitrión puede seguir avanzando en la historia o los
-  momentos de historia quedan bloqueados hasta que vuelva (D6)?
-- **Pregunta al dueño**: lo que el invitado hizo en el mundo durante el corte, ¿se pierde siempre?
-- **Pregunta al dueño**: si cae el anfitrión, ¿basta con terminar la sesión o quieres que el invitado pueda seguir
-  solo con lo que tenía?
+- Riesgo nuevo: con 10 minutos de reserva el invitado puede divergir mucho más en su copia del mundo antes de
+  volver; la resincronización del punto 4 debe aguantar un corte así de largo.
+- Preguntas ya contestadas por el dueño (Q-05-1 y Q-05-2): ver ADR-008 (decisión 18) y ADR-007 (decisión 6) en
+  `../decisiones/`.
+- **Pregunta al dueño** (Q-05-3, abierta; por defecto: sí, conserva solo su inventario): lo que el invitado hizo en
+  el mundo durante el corte, ¿se pierde siempre?
+- **Pregunta al dueño** (Q-05-4, abierta; por defecto: la sesión termina y el invitado puede reintentar): si cae
+  el anfitrión, ¿basta con terminar la sesión o quieres que el invitado pueda seguir solo con lo que tenía?
 
 ## Fase y dependencias
 

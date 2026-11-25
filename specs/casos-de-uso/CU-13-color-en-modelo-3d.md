@@ -6,7 +6,9 @@ Abreviaturas de referencias y montaje común de prueba: ver [README](README.md).
 
 El Link del compañero se ve teñido de su color en el mundo 3D, no solo en el nombre y el marcador. No existe en el
 PR. El renderizador ya tiene un gancho de tinte por dibujo sin usar; lo difícil es saber qué dibujos pertenecen al
-Link remoto. Es un caso de investigación: primero un experimento corto, después la decisión.
+Link remoto. Es un caso de investigación: primero un experimento corto, después la decisión. Si el tinte no
+resulta viable, el dueño acepta quedarse con el nombre en color y el marcador con forma de CU-10, y eso no bloquea
+el resto de F5 (ADR-009, decisión 22).
 
 ## Actores
 
@@ -30,7 +32,8 @@ Link remoto. Es un caso de investigación: primero un experimento corto, despué
 ## Flujos alternativos y de error
 
 - **El tinte no se puede aplicar** (otro backend gráfico, grupo de sitios ausente, experimento negativo): el
-  compañero se ve sin tinte y queda la distinción 2D de CU-10. Nunca se cuelga por esto.
+  compañero se ve sin tinte y queda la distinción 2D de CU-10 (nombre en color y marcador con forma), que es la
+  salida aceptada por el dueño (ADR-009, decisión 22). Nunca se cuelga por esto.
 - **Compañero en otro mapa, cargando o lejos**: no hay Link remoto, no hay nada que teñir.
 - **Compañero cambia de armadura**: las piezas nuevas también salen teñidas.
 - **Modos de visión de color activados**: el tinte pasa por la misma corrección de imagen final; debe seguir
@@ -104,11 +107,12 @@ armadura no se ve, "the colour has to go on its materials" (DOC:1007-1008).
 ## Reglas y decisiones de diseño
 
 - **[DUEÑO] D2**: cada jugador es un Link completo; solo cambia el color.
-- **[PROPUESTA]** En cada pantalla se tiñe solo al compañero; el Link propio se ve normal. (Teñir al Link local es
-  más difícil: sus dibujos son los del jugador real y no hay actor aparte.)
-- **[PROPUESTA]** Tinte suave (se sigue viendo la ropa), con intensidad ajustable.
-- **[PROPUESTA]** Si el paso 0 es negativo, CU-13 se aparca y D2 se cumple con el color 2D de CU-10 hasta nuevo
-  aviso.
+- **[DUEÑO] (ADR-007, decisión 8; Q-13-1 y Q-13-2)** **Tinte suave sobre todo el Link del compañero** (se sigue
+  viendo la ropa). El **Link propio se ve normal**. Va acompañado de nombre y forma para accesibilidad (CU-10).
+  (Teñir al Link local sería además más difícil: sus dibujos son los del jugador real y no hay actor aparte.)
+- **[DUEÑO] (ADR-009, decisión 22; Q-13-3)** Si el tinte 3D no es viable (paso 0 negativo), CU-13 se aparca y D2
+  se cumple con el **nombre en color y el marcador con forma** de CU-10. **No bloquea el resto de F5.**
+- **[PROPUESTA]** Intensidad del tinte ajustable y apagable en Opciones.
 - **[PROPUESTA]** No se toca el traductor de sombreadores sin un ADR aprobado por el dueño.
 
 ## Criterios de aceptación
@@ -150,15 +154,14 @@ armadura no se ve, "the colour has to go on its materials" (DOC:1007-1008).
 - Riesgo: el destino 0 no es el albedo; el tinte puede dar un resultado sucio en materiales diferidos.
 - Riesgo: sombras, reflejos y otros pases dibujan el mismo modelo; teñirlos puede dar artefactos.
 - Riesgo: constantes ligadas a 1.9.0 y al backend Vulkan.
-- **Pregunta al dueño**: ¿"solo cambia el color" significa un tinte sobre todo el Link, o cambiar el color de una
-  prenda concreta (por ejemplo la túnica)?
-- **Pregunta al dueño**: ¿cada jugador debe verse a sí mismo también con su color, o basta con que vea teñido al
-  compañero?
-- **Pregunta al dueño**: si el experimento sale negativo, ¿aceptas quedarte con el color en nombre y marcador?
-- **Pregunta al dueño**: ¿aceptas un cambio que obligue a todos los usuarios a recompilar sombreadores una vez?
+- Preguntas ya contestadas por el dueño (Q-13-1, Q-13-2 y Q-13-3): ver ADR-007 (decisión 8) y ADR-009
+  (decisión 22) en `../decisiones/`.
+- **Pregunta al dueño** (Q-13-4, abierta; por defecto: solo con un ADR aprobado): ¿aceptas un cambio que obligue a
+  todos los usuarios a recompilar sombreadores una vez?
 
 ## Fase y dependencias
 
-- **Fase**: F5 (una a una, con ingeniería inversa). El paso 0 se puede hacer en F4 si hay tiempo.
+- **Fase**: F5 (una a una, con ingeniería inversa), **después** del bloque de jugar santuarios juntos de CU-14
+  (ADR-008, decisión 20). El paso 0 se puede hacer en F4 si hay tiempo.
 - **Depende de**: CU-02, CU-10 (color asignado por jugador).
 - **Lo necesitan**: ninguno.

@@ -10,6 +10,17 @@ Convenciones de este documento y de los otros tres de la fase:
 - "[sin verificar]" = no se pudo comprobar leyendo el código o los mapas; hay que comprobarlo antes de construir encima.
 - Nada de esta fase necesita ingeniería inversa del juego. Todo es código de red, UI y pruebas.
 
+Decisiones del dueño que mandan sobre este documento (`../../decisiones/`):
+
+- **[DUEÑO] ADR-007, decisión 11.** ENet y miniupnpc están aceptadas como dependencias (código abierto, licencia
+  compatible con MIT, anotadas en `docs/third-party.md`). ADR-005 (TCP frente a UDP) sigue esperando medidas.
+- **[DUEÑO] ADR-007, decisión 12.** Límite de 2 jugadores por ahora (se diseña para N, se prueba con 2). Contraseña
+  opcional, recomendada por internet. El código de invitación puede contener la IP del anfitrión.
+- **[DUEÑO] ADR-008, decisión 18.** El sitio del jugador caído se reserva **10 minutos**. Es independiente de la
+  historia: el anfitrión puede continuar solo de inmediato, con confirmación (ADR-007, decisión 6).
+- **[DUEÑO] ADR-009, decisión 23.** Si la conexión directa es imposible, el juego **no ofrece nada**: ni guía de red
+  virtual (Tailscale, ZeroTier) ni servicio de presentación o perforación de NAT. Solo un mensaje de error claro.
+
 ## 1. Objetivo
 
 Que dos jugadores puedan encontrarse, conectarse y seguir conectados sin conocimientos de redes, y que un par lento,
@@ -23,8 +34,8 @@ En una frase por bloque:
    se guarda ni viaja en claro.
 4. **Misma versión o nada**: se rechaza con un mensaje claro a quien tenga otro protocolo, otra compilación, otra
    versión del juego u otro estado de DLC.
-5. **Encontrarse**: descubrimiento en red local, código de invitación, apertura automática de puerto con mensajes de
-   alternativa, IPv6.
+5. **Encontrarse**: descubrimiento en red local, código de invitación, apertura automática de puerto con miniupnpc,
+   IPv6. Si la conexión directa falla, un mensaje de error claro y nada más (ADR-009, decisión 23).
 6. **Volver**: reconexión automática que conserva la ranura y la sesión.
 7. **Ver cómo va la red**: indicador de latencia y pérdida en pantalla.
 8. **Decidir el transporte con datos**: TCP actual frente a UDP con ENet, medido en Docker; decisión en un ADR.
@@ -35,7 +46,7 @@ En una frase por bloque:
 | CU | Qué aporta F3 |
 |---|---|
 | CU-03 (30 min sin crashes) | La parte de red: sin bloqueo global (H-1), sin agotamiento de ranuras (H-4), sin amplificación (H-5), sin suplantación del anfitrión (H-2a) |
-| CU-04 (encontrar la partida) | Lista de partidas en LAN, código de invitación, UPnP/NAT-PMP con mensajes de alternativa, IPv6, guía de Tailscale/ZeroTier |
+| CU-04 (encontrar la partida) | Lista de partidas en LAN, código de invitación, apertura automática de puerto (UPnP/NAT-PMP con miniupnpc), IPv6 y, si no se puede conectar, un mensaje de error claro. Sin guía de red virtual (ADR-009, decisión 23) |
 | CU-05 (reconectar) | Reintento automático con reanudación de sesión: misma ranura, mismo nombre, sin volver a escribir nada |
 
 Prepara además a CU-06 y CU-12 (F4): sin autoridad en el servidor no se puede hacer "mundo del anfitrión" ni "daño
@@ -64,7 +75,9 @@ validado".
 ### 3.2 Fuera
 
 - Cifrado del tráfico (TLS/DTLS/Noise). Se documenta el riesgo y se deja para un ADR posterior.
-- Servidor de encuentro (rendezvous) y perforación de NAT. Queda como último peldaño de la escalera, fuera de F3.
+- Servidor de encuentro o de presentación (rendezvous), perforación de NAT y guía de red virtual (Tailscale,
+  ZeroTier) dentro del juego. **[DUEÑO]** Eliminados del alcance del proyecto, no solo de F3 (ADR-009, decisión 23):
+  cuando la conexión directa falla, el juego dice qué se intentó y que no se pudo conectar.
 - Migración de anfitrión: si el anfitrión se va, la sesión termina.
 - Servidor dedicado con mundo compartido (`--server`): hoy no tiene autoridad (nadie es `g.hosting`). En F3 solo se
   documenta y se marca como "solo relé de posiciones"; no se arregla.
@@ -123,9 +136,14 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 - **R3-16** En la pestaña Online, "Buscar en red local" lista las partidas de la LAN en menos de 2 s con nombre del
   anfitrión, jugadores, si pide contraseña y si la versión coincide.
 - **R3-17** "Crear sesión" muestra un código de invitación que el otro pega en "Unirse". El código solo contiene
-  dirección y puerto (nunca la contraseña).
+  dirección y puerto (nunca la contraseña). **[DUEÑO]** Que el código revele la IP del anfitrión está aceptado
+  (ADR-007, decisión 12).
 - **R3-18** "Crear sesión" intenta abrir el puerto con UPnP y, si falla, NAT-PMP/PCP, en un hilo aparte con plazo.
-  El resultado se muestra con un texto concreto y la alternativa siguiente de la escalera.
+  El resultado se muestra con un texto concreto. Las únicas alternativas que nombra el juego son las de conexión
+  directa (abrir el puerto a mano, IPv6). **[DUEÑO]** Nunca recomienda redes virtuales ni servicios externos
+  (ADR-009, decisión 23).
+- **R3-18b** **[DUEÑO]** Cuando un intento de unirse falla, la UI muestra un mensaje de error claro: qué se intentó
+  (dirección o código, puerto) y que no se pudo conectar. Nada más (ADR-009, decisión 23).
 - **R3-19** IPv6 funciona de extremo a extremo: direcciones propias listadas, entrada `[dirección]:puerto`, código de
   invitación con IPv6.
 - **R3-20** Ni DNS, ni UPnP, ni el descubrimiento se ejecutan en el hilo del juego ni en el de presentación.
@@ -134,7 +152,8 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 
 - **R3-21** Si la conexión cae, el cliente reintenta solo con espera creciente durante un plazo configurable; la UI
   muestra "Reconectando…" y permite cancelar.
-- **R3-22** El servidor reserva la ranura del caído durante el plazo de gracia; al volver con su testigo de sesión
+- **R3-22** El servidor reserva la ranura del caído durante el plazo de gracia (**[DUEÑO]** 10 minutos por defecto,
+  ADR-008, decisión 18); al volver con su testigo de sesión
   recupera ranura y nombre y recibe de nuevo el estado inicial.
 - **R3-23** Durante la gracia, los demás ven al jugador como "reconectando" y sus actores no se destruyen y recrean.
 - **R3-24** Una reconexión nunca aplica estado de una sesión anterior (depende de la limpieza de `stop_all` de F1).
@@ -167,7 +186,7 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 | S7 | Versión | Matriz de 5 diferencias (protocolo, compilación, juego, overlay, DLC): cada una da su motivo y su texto |
 | S8 | LAN | En Docker, con anfitrión y cliente en la misma red, el cliente lista la partida en menos de 2 s; en redes distintas, no |
 | S9 | Código de invitación | Ida y vuelta IPv4 e IPv6 en prueba unitaria; un código con una letra cambiada se rechaza por la suma de control |
-| S10 | UPnP | Contra `miniupnpd` en Docker: abre y cierra la redirección; sin IGD: mensaje de alternativa en menos de 5 s y el juego no se detiene (sin saltos de frame mayores que la línea base) |
+| S10 | UPnP | Contra `miniupnpd` en Docker: abre y cierra la redirección; sin IGD: mensaje "no disponible" en menos de 5 s y el juego no se detiene (sin saltos de frame mayores que la línea base) |
 | S11 | Reconexión | Corte de 10 s con `tc netem loss 100%`: el cliente vuelve solo, misma ranura; el otro jugador ve "reconectando" y luego al compañero, sin crash |
 | S12 | Calidad de red | Con `netem delay 80ms loss 2%` el indicador muestra 150-190 ms de ida y vuelta y pérdida efectiva distinta de 0 |
 | S13 | ADR de transporte | `specs/decisiones/` contiene el ADR con la tabla de medidas y la decisión |
@@ -181,10 +200,10 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 |---|---|---|
 | 1 | Todo el trabajo de autoridad, colas, saludo y reconexión toca `runtime/online.c` | Un solo carril ("núcleo") con dueño único de ese fichero; la lógica nueva va en ficheros nuevos y puros que el núcleo solo llama |
 | 2 | Descartar STATE viejos cambia lo que ve el interpolador (anillo de 8 instantáneas, 100 ms de retraso) | R3-26 (hora del emisor) antes de activar el descarte; medir saltos en el experimento |
-| 3 | UPnP falla en muchos routers (CGNAT, IGD apagado, doble NAT) | Es un peldaño, no la solución: mensajes claros y siguiente alternativa; nunca bloquear "Crear sesión" por ello |
+| 3 | UPnP falla en muchos routers (CGNAT, IGD apagado, doble NAT) | Es un peldaño, no la solución: mensaje claro; nunca bloquear "Crear sesión" por ello. Con CGNAT y sin IPv6 no hay conexión posible y el juego lo dice sin ofrecer alternativa (ADR-009, decisión 23) |
 | 4 | El aviso del cortafuegos de Windows aparece al escuchar por primera vez y, si se niega, nadie de fuera entra | Texto de ayuda en la pestaña y en la guía; prueba manual obligatoria en la verificación |
 | 5 | Comparar `GAMELIB_ID` exacto puede rechazar a dos jugadores legítimos con CPU distinta (existe `GAMELIB_ID_COMPAT` para CPU sin AVX2/FMA, `runtime/gamelib.c:43-59`) | Tarea de investigación previa: qué identificador es igual entre dos compilaciones del mismo código fuente |
-| 6 | Una dependencia nueva (ENet, miniupnpc) cuesta mucho en este proyecto: tres plataformas, `tools/setup_windows.ps1`, flujos de CI y `docs/third-party.md` | Preferir código propio pequeño o fuente incluida en `third_party/` con licencia permisiva; decidir en los ADR |
+| 6 | Una dependencia nueva (ENet, miniupnpc) cuesta mucho en este proyecto: tres plataformas, `tools/setup_windows.ps1`, flujos de CI y `docs/third-party.md` | **[DUEÑO]** Las dos están aceptadas (ADR-007, decisión 11): código abierto, licencia compatible con MIT y anotadas en `docs/third-party.md`. El coste de integración sigue existiendo: T306 fija cómo se incluye miniupnpc; ENet solo entra en el juego si ADR-005 decide migrar |
 | 7 | STATE mide 3375 bytes: no cabe en un datagrama de ~1200 bytes | Si el ADR elige UDP, el plan debe incluir partir o reducir STATE; por eso F3 solo decide |
 | 8 | La reconexión aplica estado viejo (hallazgo T-1 del mapa 06) | Requisito previo: limpieza completa en `stop_all` (F1) y prueba específica |
 | 9 | El descubrimiento LAN abre un puerto UDP que responde a cualquiera de la red local | Respuesta de tamaño fijo, sin datos sensibles, con límite de tasa; se puede apagar |
@@ -195,8 +214,8 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 
 | # | Pregunta | Quién | Bloquea |
 |---|---|---|---|
-| P3-1 | ¿Plazo de gracia de reconexión? Propuesta: 60 s | Dueño | T317-T319 (valor por defecto) |
+| P3-1 | ¿Plazo de gracia de reconexión? | **RESUELTA (ADR-008, decisión 18): 10 minutos** | — |
 | P3-2 | ¿La contraseña del invitado se recuerda entre sesiones? Propuesta: no, salvo casilla "recordar" | Dueño | T331 |
 | P3-3 | ¿Se comparan también los mods cargados (lista o suma) al conectar? | Dueño | T325 (campo opcional) |
 | P3-4 | ¿Qué hacer con `--server`? Propuesta: dejarlo como relé sin mundo y decirlo en la ayuda | Dueño | T339 |
-| P3-5 | ¿Se acepta incluir código de terceros (ENet, miniupnpc) en `third_party/` si los spikes lo recomiendan? | Dueño | T305, T306 |
+| P3-5 | ¿Se acepta incluir código de terceros (ENet, miniupnpc)? | **RESUELTA (ADR-007, decisión 11): sí**, con licencia compatible con MIT y anotadas en `docs/third-party.md`. T305 sigue esperando medidas, no permiso | — |

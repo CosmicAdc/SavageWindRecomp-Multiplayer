@@ -34,8 +34,15 @@ Si un caso de uso o una tarea dice otra cosa, **vale este archivo**.
   sincronización de escenas queda como mejora posterior, sin tareas activas.
 - **Decisiones 26-28.** CU-10 queda sin preguntas de diseño, salvo el botón.
 
-## Lo único que sigue abierto
+## Lo que sigue abierto
 
 **Q-10-5 · Botón del ping y de la rueda de chat rápido.** No es una decisión de diseño sino una
 comprobación: hay que revisar en `docs/controls.md` y `runtime/input_bind.h` qué botones y teclas están
 libres y proponer una combinación al dueño. Queda como tarea de investigación dentro de CU-10.
+
+**Corrección (2026-11-24):** además de Q-10-5, quedan sin contestar 19 preguntas de detalle que las tres
+rondas no cubrieron. Están listadas con su valor por defecto en
+`../casos-de-uso/PREGUNTAS-ABIERTAS.md` y se construye con ese valor mientras el dueño no diga otra cosa.
+
+**Aclaración a la decisión 12 (ADR-007):** la contraseña es **opcional**, también con el puerto abierto a
+Internet. Eso cambia el valor por defecto de Q-01-2, que era "obligatoria".

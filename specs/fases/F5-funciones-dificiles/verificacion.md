@@ -3,6 +3,12 @@
 F5 se verifica **bloque a bloque** (tarea T539). Un bloque se cierra con OK, con FALLO (y tarea abierta) o con
 "no viable" (y un ADR que lo demuestre y dé la alternativa). Cada casilla necesita evidencia en `specs/bitacora/`.
 
+Las secciones siguen la letra de bloque. El **orden de trabajo** es el de `plan.md` §10: primero el bloque C
+(santuarios juntos, sección 3), que es el objetivo prioritario `[DUEÑO]` (ADR-008, decisión 20), y después B, H, E,
+A, G, F y D. Las reglas marcadas `[DUEÑO]` salen de `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
+`ADR-008-respuestas-del-dueno-ronda-2.md` y `ADR-009-respuestas-del-dueno-ronda-3.md`. Todo se prueba con 2
+jugadores salvo el bloque G (ADR-007, decisión 12).
+
 ## 0. Preparación
 
 ### 0.1 Sin juego
@@ -37,7 +43,9 @@ Conducir: `tools\venv\Scripts\python.exe tools\swctl.py --port <p> goto|teleport
 andando (o con lo que entregue el bloque B).
 
 Guardados que conviene preparar (copias): uno junto a un santuario sin completar de cada tipo de la matriz; uno a la
-entrada de una Bestia Divina; uno justo antes de cada momento de historia de la lista del ADR.
+entrada de una Bestia Divina; uno justo antes de cada momento de historia de la lista corta (ADR-007, decisión 3:
+piedra y primera torre, final de cada Bestia Divina, recuerdos, jefes finales). Para T540 basta el primero: una
+copia junto a un santuario sencillo sin completar.
 
 ### 0.3 Herramientas del renderizador (bloque A)
 
@@ -71,7 +79,7 @@ Los **dos** jugadores deben regenerar y recompilar; con identificadores distinto
 | A.2 | ADR | `specs/decisiones/ADR-tinte-3d.md` | Camino elegido y firma | ☐ |
 | A.3 | Lógica | `build/test_coop_tint` | Pasa | ☐ |
 | A.4 | Opción apagada = igual que antes | Captura de la misma escena antes del cambio y después con la opción apagada; `cmp` | Ficheros idénticos | ☐ |
-| A.5 | Opción encendida | Misma escena con la opción encendida | Solo cambian los píxeles del compañero (cuerpo y ropa); el Link local, igual | ☐ |
+| A.5 | Opción encendida | Misma escena con la opción encendida | Solo cambian los píxeles del compañero (cuerpo y ropa), con un tinte suave que deja reconocer el modelo; el Link local, igual `[DUEÑO]` (ADR-007, decisión 8) | ☐ |
 | A.6 | Varios contextos | De día, de noche, bajo la lluvia, en un santuario, en el menú con el mundo detrás | El tinte se ve en todos; anota donde no | ☐ |
 | A.7 | Sombras y reflejos | Mira la sombra del compañero y su reflejo en agua | Sin artefactos de color en la sombra | ☐ |
 | A.8 | Cambio de equipo | El compañero cambia de armadura y arma 10 veces | El tinte sigue a las piezas nuevas; ninguna pieza de otro actor se tiñe | ☐ |
@@ -81,8 +89,9 @@ Los **dos** jugadores deben regenerar y recompilar; con identificadores distinto
 | A.12 | Cachés | Si se tocó el traductor: aviso claro y aprobación del dueño en el ADR | Anotado | ☐ |
 | A.13 | Reinicio en caliente | "Quit to start screen" con el tinte activo y volver | Sin crash; el tinte vuelve | ☐ |
 
-Si el bloque se cierra como "no viable": ADR con las evidencias y confirmación de que el color y la forma del
-overlay (F4) son la solución final.
+Si el bloque se cierra como "no viable": ADR con las evidencias. La solución final es entonces el **nombre en
+color y el marcador con forma** del overlay (F4) `[DUEÑO]` (ADR-009, decisión 22); comprueba que siguen
+funcionando (fila A.10) y sigue con los demás bloques: este cierre no bloquea nada.
 
 ## 2. Bloque B — CU-14a: teletransporte entre mapas
 
@@ -94,16 +103,19 @@ overlay (F4) son la solución final.
 | B.4 | Santuario → campo | Al revés | B aparece junto a A en el campo | ☐ |
 | B.5 | 5 + 5 viajes | Repite B.3 y B.4 cinco veces cada uno, con santuarios distintos | 10 llegadas, 0 cuelgues | ☐ |
 | B.6 | Bestia | A dentro de una Bestia | Llega, o rechazo claro si no está soportado | ☐ |
-| B.7 | Aviso de recarga | Si se usa la recarga de guardado | Aviso antes de viajar: se cargará el último guardado | ☐ |
-| B.8 | La sesión sobrevive | Durante el viaje | El compañero ve "cargando" y luego al jugador; sin desconexión, o reconexión automática de F3 | ☐ |
+| B.7 | Aviso de recarga | Si se usa la recarga de guardado (aceptada: ADR-008, decisión 20) | Aviso antes de viajar: se cargará el último guardado. El invitado guarda en su perfil cooperativo; su partida individual no cambia | ☐ |
+| B.8 | La sesión sobrevive | Durante el viaje | El compañero ve "cargando" y luego al jugador; sin desconexión, o reconexión automática de F3 dentro del plazo de 10 minutos (ADR-008, decisión 18) | ☐ |
 | B.9 | Nombre de mapa falso | Bot que anuncia un mapa con caracteres raros o inexistente | El viaje se rechaza; sin crash | ☐ |
 | B.10 | Bloqueos | En evento, muerto, PvP activo | Rechazo con motivo | ☐ |
 | B.11 | Progreso | Tras 5 viajes, comprobar inventario y flags de muestra | Nada perdido salvo lo avisado en B.7 | ☐ |
 
-## 3. Bloque C — CU-14b: santuarios juntos
+## 3. Bloque C — CU-14b: santuarios juntos (primer bloque de la fase)
+
+`[DUEÑO]` (ADR-008, decisión 20): objetivo prioritario. Se verifica antes que A y que E.
 
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
+| C.0 | Investigación previa | Bitácora de T540 (dos instancias en un PC, los dos en el mismo santuario) | Tabla por fases con lo visto en cada juego y conclusión sobre qué funciona hoy | ☐ |
 | C.1 | Matriz | Bitácora de T514 con los 8 santuarios | Tabla completa | ☐ |
 | C.2 | Sin crashes | Suma de la matriz | 0 cuelgues en los 8 | ☐ |
 | C.3 | Verse | En cada santuario | Los dos se ven desde que el segundo entra | ☐ |
@@ -112,7 +124,9 @@ overlay (F4) son la solución final.
 | C.6 | Interruptor y puerta | Uno pisa el interruptor | La puerta se abre en los dos juegos | ☐ |
 | C.7 | Aparato de giroscopio | Uno lo maneja | El otro ve moverse el mecanismo | ☐ |
 | C.8 | Combate | Santuario de combate, con y sin el anfitrión dentro | Mismo enemigo, misma vida, un solo botín | ☐ |
-| C.9 | Recompensa | Al completar | Orbe para los dos según la política de F4; flag en el anfitrión | ☐ |
+| C.9 | Recompensa | Al completar | Orbe para los dos, siempre `[DUEÑO]` (ADR-007, decisión 2); flag en el anfitrión | ☐ |
+| C.9b | Recompensa de quien no estaba | Uno completa el santuario solo; el otro se une después a la sesión | El que se une queda igualado por la tarea de ponerse al día al entrar de F4 (mismos contenedores de corazón y mejoras de resistencia que el anfitrión: ADR-008, decisión 13) | ☐ |
+| C.9c | No es momento de historia | Uno habla con el monje con el compañero fuera del santuario, con "Story needs both players" activada | No hay espera ni aviso: el santuario se completa (ADR-007, decisión 3) | ☐ |
 | C.10 | Uno entra tarde | El segundo entra cuando el primero va por la mitad | Se anota qué ve (el rompecabezas no está en flags: es un límite conocido) | ☐ |
 | C.11 | Límites documentados | `docs/coop-jugar.md` | Lista lo que no se sincroniza | ☐ |
 
@@ -131,19 +145,23 @@ overlay (F4) son la solución final.
 
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
-| E.1 | Decisión | `specs/decisiones/ADR-momentos-de-historia.md` | Lista y reglas firmadas | ☐ |
+| E.1 | Decisión | ADR-007 (decisiones 3, 4 y 6) y ADR-009 (decisión 21) en `specs/decisiones/` | Ya decidido: T501 resuelta. La tabla de T518 no contiene más momentos que los de la lista corta | ☐ |
 | E.2 | Catálogo | Bitácora de T518 | Una fila por momento de la lista | ☐ |
 | E.3 | Lógica | `build/test_coop_story` | Pasa | ☐ |
 | E.4 | Opción apagada | "Story needs both players" desactivada | Comportamiento igual que antes de F5 | ☐ |
-| E.5 | Botón, compañero lejos | A junto a un punto de la tabla; B a más de la distancia fijada; A pulsa el botón | No empieza; A ve "Waiting for your partner"; B ve aviso y marca | ☐ |
-| E.6 | Botón, compañero cerca | B llega | A puede empezar; después B puede empezar el suyo; el progreso queda en el anfitrión | ☐ |
+| E.5 | Botón, compañero lejos | A junto a un punto de la tabla; B a más de 30 m; A pulsa el botón | No empieza; A ve "Waiting for your partner" y la oferta de traer a B; B ve aviso y marca | ☐ |
+| E.5b | Oferta de teletransporte | A elige traer a B; B acepta. Repite con B rechazando | Si acepta, B aparece junto a A y el evento puede empezar; si rechaza, B no se mueve (ADR-007, decisión 4; ADR-008, decisión 16) | ☐ |
+| E.6 | Botón, compañero cerca | B llega a menos de 30 m en el mismo mapa | A puede empezar. Solo A ve la escena; B está presente y recibe el progreso (flags de muestra en B y en el anfitrión). No se lanza la escena en el juego de B (ADR-009, decisión 21) | ☐ |
 | E.7 | 3 eventos de botón | Repite E.5 y E.6 con tres eventos distintos | Igual en los tres | ☐ |
 | E.8 | No estorba | Lejos de los puntos de la tabla | A funciona con normalidad (hablar, recoger, abrir cofres) | ☐ |
 | E.9 | Zona (si T522) | Evento que arranca al entrar en una zona, compañero lejos | No empieza; al llegar el compañero, empieza. 10 repeticiones sin cuelgue | ☐ |
-| E.10 | Compañero desconectado | B sale de la sesión | Según la decisión P5-2 | ☐ |
+| E.10 | Compañero desconectado | B sale de la sesión; A (anfitrión) junto a un punto de la tabla | A ve la espera y puede continuar solo tras confirmar, en ese momento; no hay que esperar al plazo de reconexión de 10 minutos (ADR-007, decisión 6; ADR-008, decisión 18) | ☐ |
+| E.10b | Continuar solo, compañero conectado | B conectado pero lejos; A (anfitrión) elige continuar y confirma. Repite cancelando el diálogo | Al confirmar, el evento empieza de inmediato y B recibe un aviso y el progreso; al cancelar, sigue la espera. Sin cuenta atrás | ☐ |
+| E.10c | El invitado no puede continuar solo | B (invitado) junto a un punto de la tabla, A lejos | B no tiene la acción de continuar solo; un STORY "continúa solo" enviado por un bot que no es anfitrión se rechaza | ☐ |
 | E.11 | Compañero en otro mapa | B dentro de un santuario | Cuenta como ausente | ☐ |
 | E.12 | Fin de sesión | Salir con una espera activa | El bloqueo de A desaparece | ☐ |
 | E.13 | El pedestal y las torres siguen bien | Prueba original del PR con `BOT_DEMO=1` | El bloqueo de 30 m sigue funcionando | ☐ |
+| E.14 | Bloqueo existente frente a la lista corta | Bitácora de T521, paso 1 | Anotado qué cubre hoy el bloqueo de A; la exigencia de presencia solo alcanza a la piedra y a la primera torre, no a las demás torres ni a ningún santuario (ADR-007, decisión 3) | ☐ |
 
 ## 6. Bloque F — Colisión con el compañero
 
@@ -172,7 +190,7 @@ overlay (F4) son la solución final.
 | G.8 | Criterio R5-14 | 4 jugadores repartidos frente a 2 | Subida del anfitrión ≤ 2 × la de 2 jugadores | ☐ |
 | G.9 | Calidad visual | Dos juegos reales, 10 minutos | El compañero se mueve igual que antes (sin tirones nuevos) | ☐ |
 | G.10 | Red mala | `netem wifi` con 4 bots | Sin desincronización permanente tras pérdidas (cada bloque se reenvía como mucho a los 2 s) | ☐ |
-| G.11 | 4 jugadores | 2 juegos + 2 bots, 20 minutos | Sin crash; enemigos, botín y reglas correctos | ☐ |
+| G.11 | 4 jugadores | 2 juegos + 2 bots, 20 minutos | Sin crash; enemigos, botín y reglas correctos. El límite de la sesión real sigue en 2 (ADR-007, decisión 12): esto prueba el diseño para N, no lo abre | ☐ |
 | G.12 | Entrar tarde | Un jugador entra a mitad | Recibe el estado completo de todos en < 2 s | ☐ |
 | G.13 | Fuzzing | `sh tools/nettest/fuzz.sh 120` con el codificador nuevo | Sin hallazgos | ☐ |
 

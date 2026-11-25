@@ -4,8 +4,11 @@ Abreviaturas de referencias y montaje común de prueba: ver [README](README.md).
 
 ## Resumen
 
-Un jugador puede dar cosas al otro de dos maneras: soltándolas en el suelo para que el compañero las recoja, o
-enviándolas directamente a su bolsa desde un menú. Soltar y recoger ya funciona en el PR; el envío directo no existe.
+Un jugador puede dar cosas al otro soltándolas en el suelo **marcadas para el compañero**, que las recoge. En la
+primera entrega solo se dan así **materiales y comida**; las armas, arcos y escudos quedan excluidos hasta que su
+durabilidad y sus bonificaciones viajen por la red (ADR-007, decisión 10; ADR-009, decisiones 24 y 25). El envío
+directo a la bolsa desde un menú queda para después. Soltar y recoger ya funciona en el PR; el marcado y el envío
+directo no existen.
 
 ## Actores
 
@@ -22,14 +25,14 @@ enviándolas directamente a su bolsa desde un menú. Soltar y recoger ya funcion
 
 ## Flujo principal
 
-**A. Soltar para el compañero (existe)**
+**A. Soltar marcado para el compañero (primera entrega; soltar y recoger existe, el marcado falta)**
 
-1. El emisor suelta un objeto de su bolsa (o tira un arma) como en el juego normal.
-2. El objeto cae al suelo. Tras 0,4 s quieto entra en la lista de botín compartido.
-3. El receptor ve el mismo objeto en su mundo, en el mismo sitio.
+1. El emisor elige un **material o una comida** de su bolsa y lo suelta "para <nombre>".
+2. El objeto cae al suelo. Tras 0,4 s quieto entra en la lista de botín compartido, marcado para el compañero.
+3. El receptor ve el mismo objeto en su mundo, en el mismo sitio, con un marcador en pantalla (CU-10).
 4. El receptor lo recoge. Desaparece para los dos y queda en la bolsa del receptor.
 
-**B. Enviar directamente (falta)**
+**B. Enviar directamente (falta; después de la primera entrega)**
 
 1. El emisor abre "Enviar objeto a <nombre>" en la pestaña Online y elige objeto y cantidad.
 2. El objeto sale de la bolsa del emisor.
@@ -46,7 +49,9 @@ enviándolas directamente a su bolsa desde un menú. Soltar y recoger ya funcion
 | Receptor muerto o caído | El envío espera a que reviva | — |
 | Desconexión entre "quitar" y "entregar" | El objeto vuelve al emisor: nunca se duplica ni se pierde | — |
 | Lista de botín llena (64) | Lo nuevo se queda solo en el juego de quien lo soltó | OA:3359-3360 |
-| Objeto protegido (Espada Maestra, objetos clave, etiquetas `Important` / `NotDropFromPlayer`) | No se puede enviar | `runtime/quick_drop_action.c` ya protege `Weapon_Sword_070`, `_502` y esas etiquetas (mapa 03 §1.3) |
+| Objeto protegido (Espada Maestra, objetos clave, lo que el juego impide soltar: etiquetas `Important` / `NotDropFromPlayer`) | No se puede soltar marcado ni enviar (ADR-009, decisión 25) | `runtime/quick_drop_action.c` ya protege `Weapon_Sword_070`, `_502` y esas etiquetas (mapa 03 §1.3) |
+| Rupias | No se envían nunca (ADR-009, decisión 25) | No viajan por la red |
+| Arma, arco o escudo | No se puede soltar marcado ni enviar hasta que durabilidad y bonificaciones viajen por la red (ADR-009, decisión 24) | Un arma soltada o lanzada **sí** entra hoy en el botín compartido (OA:1511-1569) y llega al otro solo con su nombre: hay que comprobarlo e impedirlo o documentarlo |
 | Nombre de objeto inválido recibido por red | Se rechaza | Hoy **no** hay lista de permitidos al recibir botín (OA:3604; mapa 07 A4) |
 | El anfitrión sale | El botín en el suelo se queda como estaba en cada juego | — |
 | Versión distinta | No hay sesión (CU-01) | — |
@@ -81,7 +86,12 @@ Falta o es débil:
 
 1. **F1 (ya en el plan)**: lista de permitidos al recibir botín: llamar a `is_loot()` (OA:3246) antes de `request` en
    OA:3604 y en `loot_host_add` (OA:3356).
-2. **Probar el camino A** con materiales, comida, armas, arcos, escudos y flechas, y anotar qué funciona.
+2. **Probar el camino A** con materiales y comida, que es lo que se entrega, y anotar qué funciona.
+2b. **Comprobar las armas en el botín compartido** (ADR-009, decisión 24): con dos instancias, soltar y lanzar un
+   arma, un arco y un escudo y ver si el otro jugador puede recogerlos por el botín del suelo que ya se comparte
+   (OA:1511-1569; `ground_update`, OA:5458-5560). Si puede, **impedirlo** (que esas entradas no se ofrezcan al otro
+   jugador) o, si impedirlo rompe algo, **documentarlo** como limitación conocida con el motivo. El resultado se
+   anota en `../bitacora/`.
 3. **Envío directo, receptor**: mensaje nuevo `GIVE {id de envío, nombre, cantidad}` dirigido a un jugador. En el
    receptor, validar el nombre contra la lista de objetos del juego (`runtime/items.c`, solo objetos con
    `CanGetPouch`) y entregar con el camino de la base: `items_request` + `rt_item_tick` (cola con cerrojo, ya
@@ -92,10 +102,13 @@ Falta o es débil:
    objeto aparezca en el suelo [sin verificar: `pouch_discard` es "la función de tirar, que crea el objeto en el
    suelo"; hay que encontrar una retirada sin soltar]. Para materiales y comida **no hay función conocida**: hace
    falta ingeniería inversa (mapa 07 §7: "Sí (quitar de la bolsa, durabilidad y modificadores)").
-5. **Primera versión sin ingeniería inversa [PROPUESTA]**: el botón "Enviar" suelta el objeto con el camino A y
-   marca esa entrada de botín como "para <nombre>", con un marcador en pantalla (CU-10) para que el compañero la
-   encuentre. Así D9 queda cubierto en F4 y el envío directo real pasa a ser una mejora.
-6. **Durabilidad y modificadores**: ampliar `OnlineLoot` con valor y modificador (cambia el protocolo) y aplicarlos al
+5. **Primera entrega, sin ingeniería inversa [DUEÑO] (ADR-007, decisión 10)**: el botón "Soltar para <nombre>"
+   suelta el objeto con el camino A y marca esa entrada de botín como "para <nombre>", con un marcador en pantalla
+   (CU-10) para que el compañero la encuentre. Solo admite **materiales y comida**; rechaza armas, arcos, escudos,
+   objetos protegidos y rupias (ADR-009, decisiones 24 y 25). Así D9 queda cubierto en F4; los puntos 3 y 4 (envío
+   directo real) pasan a ser una mejora posterior.
+6. **Durabilidad y modificadores** (condición para admitir armas, arcos y escudos; no entra en la primera entrega):
+   ampliar `OnlineLoot` con valor y modificador (cambia el protocolo y sube su versión) y aplicarlos al
    crear o entregar. Leerlos del `PouchItem` (`+0x20` valor, mapa 03 §1.3); el modificador necesita el sitio
    `replace_weapon_modifier` [sin verificar cómo se lee].
 7. Interfaz, textos traducidos, avisos en pantalla.
@@ -104,9 +117,15 @@ Falta o es débil:
 
 - **[DUEÑO] D9**: se puede recoger lo que el compañero soltó y enviarle objetos.
 - **[DUEÑO] D4**: lo enviado deja de ser del emisor y pasa a ser del receptor.
+- **[DUEÑO] (ADR-007, decisión 10; Q-09-1)** La primera entrega es **soltar marcado para el compañero**. El envío
+  directo a la bolsa, después.
+- **[DUEÑO] (ADR-009, decisión 24; Q-09-2)** **No se envían armas** (ni arcos ni escudos) hasta que su durabilidad
+  y sus bonificaciones viajen por la red. En F4, soltar marcado admite solo **materiales y comida**.
+- **[DUEÑO] (ADR-009, decisión 25; Q-09-3)** No se pueden soltar para el compañero los objetos que el juego ya
+  protege: objetos clave, Espada Maestra y lo que el juego impide soltar. Las **rupias no se envían**.
+- **[DUEÑO] (ADR-008, decisión 14)** El contenido de un cofre es de quien lo abre; puede soltarlo marcado para el
+  compañero si es material o comida.
 - **[PROPUESTA]** Nunca se duplica ni se pierde un objeto: quitar solo tras confirmación de entrega.
-- **[PROPUESTA]** No se pueden enviar objetos clave ni protegidos.
-- **[PROPUESTA]** Primera versión del envío = soltar marcado (punto 5).
 - **[PROPUESTA]** Sin límite de cantidad ni tiempo de espera entre envíos.
 
 ## Criterios de aceptación
@@ -126,8 +145,14 @@ Falta o es débil:
   exactamente en un inventario.
 - **CA-7** Dado un mensaje `GIVE` con un nombre que no está en la lista de objetos, entonces se rechaza sin llamar al
   juego.
-- **CA-8** (durabilidad) Dado A que suelta un arma con durabilidad gastada, cuando B la recoge, entonces B tiene la
-  misma durabilidad (±1). Hasta que el punto 6 esté hecho, este criterio queda como "limitación conocida" documentada.
+- **CA-8** (armas excluidas) Dado A con un arma, un arco y un escudo en la bolsa, cuando abre "Soltar para <nombre>",
+  entonces ninguno de los tres se puede elegir; igual con la Espada Maestra, un objeto clave y las rupias.
+- **CA-9** (botín compartido) Dado A que suelta o lanza un arma a mano, entonces la bitácora recoge qué ocurre en B
+  y, según lo decidido en el punto 2b, o bien B no puede recogerla (`actors <nombre del arma>` vacío en B), o bien
+  la limitación está escrita en la documentación del modo cooperativo.
+- **CA-10** (durabilidad; solo cuando se haga el punto 6) Dado A que suelta un arma con durabilidad gastada, cuando
+  B la recoge, entonces B tiene la misma durabilidad (±1) y las mismas bonificaciones. Hasta entonces las armas no
+  se envían.
 
 ## Qué NO hacer
 
@@ -139,21 +164,24 @@ Falta o es débil:
 - No cambiar `OnlineLoot` ni añadir mensajes sin pasar por el dueño de `online.h` (cambia la versión de protocolo).
 - No copiar código de proyectos de decompilación para encontrar la función de retirada.
 - No probar con el guardado real: siempre copias (`SAVAGEWIND_SAVE_DIR`).
+- No ofrecer armas, arcos, escudos, objetos protegidos ni rupias en "Soltar para <nombre>" (ADR-009, decisiones 24
+  y 25), ni admitir armas antes de que el punto 6 esté hecho y probado.
 
 ## Riesgos y preguntas abiertas
 
 - Riesgo: duplicación de objetos si los dos juegos no están de acuerdo en quién recogió (el criterio actual es por
   distancia, OA:3523-3541).
 - Riesgo: la retirada de materiales de la bolsa necesita Ghidra; puede retrasar el envío directo real a F5.
-- **Pregunta al dueño**: ¿basta en F4 con "soltar marcado para el compañero" o el envío directo a la bolsa es
-  imprescindible?
-- **Pregunta al dueño**: ¿se aceptan armas que pierden durabilidad y modificadores al pasar de un jugador a otro
-  mientras no se resuelva?
-- **Pregunta al dueño**: ¿qué objetos no se pueden enviar (clave, Espada Maestra, ropa)? ¿Se pueden enviar rupias?
-- **Pregunta al dueño**: ¿hay que pedir confirmación al receptor antes de recibir, o llega sin preguntar?
+- Riesgo: el botín del suelo ya se comparte y hoy incluye armas soltadas o lanzadas; la exclusión de armas puede
+  quedar sin efecto por ese camino si no se hace el punto 2b.
+- Preguntas ya contestadas por el dueño (Q-09-1, Q-09-2 y Q-09-3): ver ADR-007 (decisión 10) y ADR-009
+  (decisiones 24 y 25) en `../decisiones/`.
+- **Pregunta al dueño** (Q-09-4, abierta; por defecto: llega sin preguntar y, si no cabe, se devuelve; solo afecta
+  al envío directo): ¿hay que pedir confirmación al receptor antes de recibir?
 
 ## Fase y dependencias
 
-- **Fase**: F4 (lista de permitidos en F1). Durabilidad, modificadores y retirada de materiales: posible F5.
+- **Fase**: F4 (lista de permitidos en F1): soltar marcado de materiales y comida. Envío directo, durabilidad,
+  bonificaciones (y con ellas las armas) y retirada de materiales: después, posible F5.
 - **Depende de**: CU-03, CU-07 (qué es de cada jugador), CU-10 (marcador del objeto soltado).
 - **Lo necesitan**: ninguno.

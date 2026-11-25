@@ -6,7 +6,10 @@ Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`): `
 
 ## 0. Cómo se trabaja en esta fase
 
-1. **Una función cada vez**, en el orden que fije el dueño (pregunta P5-5).
+1. **Una función cada vez**, en el orden de §10. El dueño ya fijó lo principal `[DUEÑO]` (ADR-008, decisión 20):
+   **pasarse los santuarios juntos (bloque C) va antes que el tinte 3D (A) y que la historia (E)**. Las secciones
+   de este plan conservan su letra y su número (otras tareas las citan); el orden de trabajo es el de §10, no el
+   de las secciones.
 2. Cada función sigue el mismo ciclo: **pregunta → investigación → ADR (viable / no viable, camino elegido) →
    construcción → prueba en el juego**. Nadie construye antes del ADR.
 3. Las investigaciones con Ghidra las hace el dueño con su copia (`tools/ghidra/README.md`, `tools/ghidra/gq.py`).
@@ -15,6 +18,9 @@ Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`): `
    §4: `tools/game_sites.py pattern <main> <dirección> <clase>` genera la línea `Site(...)`), con una descripción en
    palabras propias. Nunca desensamblado ni pseudocódigo en el repo.
 5. Todo lo que cambie el comportamiento va tras una opción **apagada por defecto**.
+6. Las respuestas del dueño (`../../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
+   `ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md`) mandan sobre este plan. El
+   límite sigue en 2 jugadores: lo nuevo se diseña para N y se prueba con 2 (ADR-007, decisión 12).
 
 ## 1. A — Tinte 3D del segundo Link (CU-13)
 
@@ -39,6 +45,13 @@ Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`): `
   (`FN_SPECIAL_FX_B` y `FN_SPECIAL_FX_A_UNIT`, OA:1458 y OA:4011) que producen el brillo dorado de Magnesis y el
   pulso rojo de Stasis: valores escalares, no un color libre.
 
+### Qué se quiere `[DUEÑO]`
+
+Un **tinte suave sobre todo el Link del compañero**; el Link propio se ve normal; siempre acompañado del nombre y
+de la forma del marcador, para accesibilidad (ADR-007, decisión 8). Si el tinte no es viable, el resultado final
+es **nombre en color y marcador con forma** (lo que ya entrega F4), y eso **no bloquea** ningún otro bloque de F5
+(ADR-009, decisión 22).
+
 ### Preguntas de investigación (en este orden; cada una puede cerrar el bloque)
 
 | Tarea | Pregunta | Herramienta |
@@ -58,10 +71,12 @@ Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`): `
 2. **Por ámbito** (si T506 encuentra la función): un registro solo-host alrededor del dibujo del actor, como hace
    `nvn_ui_scope` para la interfaz (`runtime/nvn/cmdbuf.c`), y `exec_list` aplica el tinte dentro del ámbito.
 3. **Por el juego** (si T507 funciona): sin tocar el renderizador.
-4. **No viable**: se queda el color en el overlay 2D (F4) y se documenta.
+4. **No viable**: se queda el nombre en color y el marcador con forma del overlay 2D (F4) y se documenta
+   `[DUEÑO]` (ADR-009, decisión 22). No hace falta volver a preguntar al dueño para cerrar así el bloque.
 
 Si el color base no está en el objetivo 0 (T504), los caminos 1 y 2 necesitan que el traductor tiña otro objetivo:
-eso cambia el identificador del traductor e invalida las cachés de todos. Solo con aprobación expresa (P5-4).
+eso cambia el identificador del traductor e invalida las cachés de todos. Solo con aprobación expresa (la parte de
+P5-4 que sigue abierta); sin ella, se cierra por el camino 4.
 
 ## 2. B — Teletransporte entre mapas (CU-14)
 
@@ -82,13 +97,28 @@ eso cambia el identificador del traductor e invalida las cachés de todos. Solo 
 | 2. Recarga dirigida | Guardar, reescribir en memoria la posición y el mapa del guardado al leerlo (mecanismo de `test_warp`) y forzar una carga | Spike T512 (sin Ghidra): ¿se puede disparar la carga del último guardado desde el runtime? |
 | 3. Guía | Marca hacia la entrada del santuario donde está el compañero; se entra andando | Nada (ya hay marcas de F4) |
 
+`[DUEÑO]` (ADR-008, decisión 20): el camino 2 está **aceptado** tal cual, con su pantalla de carga y su guardado
+(en el perfil cooperativo de F4, nunca en la partida individual del invitado). Si la recarga corta la sesión, el
+sitio del jugador queda reservado 10 minutos (ADR-008, decisión 18), de sobra para volver a entrar.
+
 Se construye el primero que resulte viable; el 3 queda siempre como mínimo. En todos, el destino es **la entrada del
 mapa**, no la posición exacta del compañero (un punto arbitrario dentro de un santuario puede estar tras una puerta
 cerrada).
 
 ## 3. C y D — Santuarios y Bestias Divinas juntos
 
+`[DUEÑO]` (ADR-008, decisión 20): **que los dos puedan pasarse los santuarios juntos** es el objetivo de fondo de
+la fase. El bloque C es el **primero** que se trabaja (§10) y va antes que el tinte 3D y que la historia. No basta
+con poder llegar al mapa del compañero: los dos deben verse y jugar dentro. Hacerlos juntos es posible, no
+obligatorio: el monje de un santuario no exige a los dos (ADR-007, decisión 3). Las Bestias (bloque D) siguen al
+final.
+
 ### Hoy
+
+- Quien está en un santuario o en una Bestia Divina **no aparece** en el mundo de los demás (`docs/ONLINE.md`,
+  sección "Players on other maps"), y la tabla de huecos del mapa 07 dice de "Shrines/Divine Beasts together":
+  "Partial, untested, high". Lo que sigue en esta lista sale de leer la documentación y el código, no de haberlo
+  visto: por eso el bloque empieza con T540.
 
 - En el mismo santuario los jugadores se ven; sus bolas y cajas van como objetos del mundo (DOC:996-997).
 - Mecanismos (`movers`): cada juego envía los que mueve y los demás los colocan (OA:4787-4980; DOC:971-986). Probado
@@ -101,12 +131,17 @@ cerrada).
 
 ### Diseño
 
-1. **Matriz de pruebas** (T514) antes de tocar código: 8 santuarios que cubran 4 tipos de mecanismo (ascensor,
+0. **Investigación previa** (T540), antes de planificar nada más: con dos instancias en un PC, qué ocurre hoy
+   cuando los dos entran al mismo santuario. Resultado en `specs/bitacora/`. Solo necesita F1 (dos juegos
+   funcionando), así que puede hacerse en cuanto se abra la fase, o antes.
+1. **Matriz de pruebas** (T514), con lo aprendido en T540 y antes de tocar código: 8 santuarios que cubran 4 tipos de mecanismo (ascensor,
    plataformas móviles, bolas/cajas con interruptor, aparato de giroscopio) y uno de combate. Para cada uno: qué se
    ve igual, qué diverge, qué falla.
 2. **Arreglos** según lo que salga. El único que se puede anticipar leyendo el código es el de enemigos sin
    anfitrión (T515): que el servidor trate como "dueño de la lista" al jugador de menor ranura presente en ese mapa.
-3. **Bestias** (T516, T517): misma matriz dentro; "vista desde fuera" es investigación.
+3. **Recompensa**: el orbe es para los dos, siempre `[DUEÑO]` (ADR-007, decisión 2). Si uno no estaba o entró
+   tarde, lo iguala la tarea de ponerse al día al entrar de F4 (ADR-008, decisión 13); F5 solo lo comprueba.
+4. **Bestias** (T516, T517): misma matriz dentro; "vista desde fuera" es investigación.
 
 ## 4. E — Momentos de historia con los dos presentes (CU-14)
 
@@ -123,25 +158,47 @@ cerrada).
 - Existe `start_event` para lanzar un evento en el otro juego (OA:3703-3713), con riesgos conocidos (libera sus
   metadatos justo después, mapa 07 M8; un evento fuera de contexto puede colgar, DOC:751-752).
 
+### Reglas `[DUEÑO]`
+
+- **Qué es un momento de historia** (ADR-007, decisión 3): lista corta. Inicio (piedra y primera torre), final de
+  cada Bestia Divina, recuerdos y jefes finales. **Los santuarios no**: ningún bloqueo en los 120 santuarios ni
+  ante su monje.
+- **Qué es "presente"** (ADR-007, decisión 4): mismo mapa y a menos de 30 m. Si falta uno, el juego avisa y ofrece
+  teletransportarlo.
+- **Seguir sin el compañero** (ADR-007, decisión 6): el anfitrión puede continuar solo de inmediato, tras un
+  diálogo de confirmación. Sin temporizador de desconexión. El plazo de reconexión de 10 minutos (ADR-008,
+  decisión 18) es cosa aparte.
+- **Versión 1** (ADR-009, decisión 21): basta con estar allí. Uno ve la escena; el otro está presente y recibe el
+  progreso. Que los dos la vean a la vez es una mejora posterior, **sin tareas activas** en esta fase.
+
+Con esto el bloque E **ya no espera ninguna respuesta del dueño**.
+
 ### Diseño
 
-1. **Definición** (T501, dueño): qué eventos exigen a los dos. Es la pregunta P5-1 y bloquea todo el bloque.
+1. **Definición** (T501): resuelta por los ADR citados arriba. No queda nada que decidir antes de empezar.
 2. **Catálogo** (T518): jugar con `[event]` en el registro y construir la tabla `nombre de evento → cómo arranca
-   (botón / zona / otro evento)`.
+   (botón / zona / otro evento)` para cada momento de la lista corta.
 3. **Lógica pura** (T520) `runtime/coop_story.c`: tabla de eventos y `story_gate(evento, compañeros) →
-   permitir / esperar`, con las reglas de P5-2 y P5-3.
+   permitir / esperar`, con las reglas de arriba: 30 m y mismo mapa; el anfitrión puede saltarse la espera con su
+   confirmación.
 4. **Puerta por botón** (T521): generaliza el bloqueo actual. Hoy se retiene A cuando *otro* está en el pedestal;
    la puerta nueva retiene A cuando *yo* estoy junto a un punto de arranque de la tabla y mi compañero no está
    presente. Problema: saber que "estoy junto a un punto de arranque" antes de que el evento empiece. Sin ingeniería
    inversa solo se puede con una tabla de posiciones de esos puntos, anotadas por el dueño al hacer el catálogo
    (dejar empezar el evento y cancelarlo después no es una opción: no se conoce una forma limpia de cancelar). Por
    eso T521 depende del catálogo y se limita a los puntos con posición conocida.
+   **Revisión del bloqueo existente** (ADR-007, consecuencia de la decisión 3): el bloqueo de A en pedestales que
+   trae el PR cubre la piedra y las torres. Hay que contrastarlo con la lista corta: la exigencia de presencia vale
+   solo para la piedra y la **primera** torre; en las demás torres el bloqueo actual se conserva únicamente como
+   protección contra empezar lo mismo a la vez (que es lo que hace hoy), sin exigir presencia.
 5. **Puerta por zona** (T522): necesita la investigación T519: ¿por qué función pasan las peticiones de inicio de
    evento y se puede **aplazar** una sin romper el estado?
-6. **Arranque para el otro**: cada juego reproduce su propia escena cuando su jugador la dispara; como ambos están
-   presentes, el segundo la dispara en cuanto el primero termina (el bloqueo de A actual ya ordena esto). No se
-   lanza la escena por la red salvo en los casos que ya hace el PR (piedra, Kolog).
-7. **Interfaz** (T523): aviso "Esperando a tu compañero" y marca hacia el punto.
+6. **Un solo juego reproduce la escena** (versión 1): la ve quien la dispara. El otro está presente y recibe el
+   progreso por los flags, como ya ocurre hoy. No se lanza la escena por la red salvo en los casos que ya hace el
+   PR (piedra, Kolog). El bloqueo de A actual sigue evitando que los dos empiecen lo mismo a la vez.
+7. **Interfaz** (T523): aviso "Esperando a tu compañero", marca hacia el punto, **oferta de teletransportar** al
+   que falta (por el mecanismo de invocar con aceptación de F4: ADR-008, decisión 16) y, solo para el anfitrión,
+   el **diálogo de confirmación** para continuar solo.
 
 ## 5. F — Colisión con el compañero
 
@@ -227,21 +284,39 @@ En F5 casi no hay paralelismo; aun así, estos ficheros tienen dueño único:
 | `tools/online_mod.py` | Solo T524/T525 (cambiarlo obliga a subir su número de versión y a regenerar `online_mod/` en los dos PC) |
 
 Se pueden hacer en paralelo sin riesgo: la lógica pura (`runtime/coop_story.c`, `coop_interest.c`,
-`coop_statecodec.c` con sus pruebas), las medidas en Docker y la redacción de consultas para Ghidra.
+`coop_statecodec.c` con sus pruebas), las medidas en Docker y la redacción de consultas para Ghidra. `coop_story.c`
+(T520) ya no espera ninguna decisión, solo el catálogo T518. La investigación T540 no toca código, pero necesita el
+turno de los dos juegos: no coincide con ninguna otra prueba en el juego.
 
 ## 9. Coordinación de la versión de protocolo
 
 - Un salto al principio de F5 (T502) con lo que se sabe seguro: indicadores de historia en STATE (esperando,
-  en evento de la tabla), mensaje STORY (evento, estado), color 3D activado, y un STATE reducido para el filtrado.
+  en evento de la tabla), mensaje STORY (evento, estado; incluye "el anfitrión continúa solo"), color 3D activado,
+  y un STATE reducido para el filtrado.
 - El STATE por bloques (T530) es un cambio de cable grande: **segundo salto**, único, coordinado por el dueño del
   protocolo, con el bot y las pruebas actualizados en el mismo cambio.
 - Nada más cambia la versión. Las investigaciones no tocan el cable.
 
-## 10. Orden propuesto (pendiente de P5-5)
+## 10. Orden de trabajo
 
-1. H (T533-T537): baja el riesgo de todo lo demás y no depende de decisiones.
-2. B y C (T511-T515): es lo que más se nota al jugar.
-3. E (T501, T518-T523).
-4. A (T503-T510).
-5. G (T526-T532).
-6. F (T524-T525) y D (T516-T517).
+`[DUEÑO]` (ADR-008, decisión 20): **C va antes que A y que E**. El resto del orden es propuesta (lo que queda
+abierto de P5-5) y el dueño puede cambiarlo.
+
+1. **C — Santuarios juntos** (T540, luego T514 y T515). Empieza por la investigación T540, que solo necesita F1.
+2. **B — Teletransporte entre mapas** (T511-T513): completa el objetivo de los santuarios (llegar adonde está el
+   compañero sin entrar andando). C no depende de B: a la matriz se entra andando.
+3. **H — Direcciones fijas** (T533-T537): baja el riesgo de todo lo demás y no depende de decisiones. T533 lleva
+   `[P]` y puede adelantarse; los lotes T534-T536 obligan a recompilar el juego, así que no se abren a mitad de la
+   matriz de santuarios.
+4. **E — Historia** (T518-T523). Ya no espera respuestas del dueño (T501 quedó resuelta por los ADR).
+5. **A — Tinte 3D** (T503-T510). Si sale "no viable", se cierra con nombre en color y marcador con forma y no
+   retrasa nada (ADR-009, decisión 22).
+6. **G — Más de 2 jugadores** (T526-T532).
+7. **F — Colisión** (T524-T525) y **D — Bestias** (T516-T517).
+
+Dependencias que cambian con este orden:
+
+- T514 depende ahora de T540. T515 y T516 siguen dependiendo de T514.
+- T518 y T520 dejan de depender de una decisión pendiente: T501 está resuelta.
+- Nada de C, B o E depende del bloque A.
+- `tasks.md` lista los bloques en este mismo orden; los identificadores de tarea no cambian.

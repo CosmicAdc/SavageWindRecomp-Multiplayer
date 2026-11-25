@@ -93,18 +93,20 @@ el bot como par que se cae (`BOT_DROP`), o dos PC y desconecta el cable/WiFi de 
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
 | 4.1 | Lista de red local (Docker) | `sh tools/nettest/run.sh lan` | 1 resultado en < 2 s en la misma red; 0 en redes distintas | ☐ |
-| 4.2 | Lista de red local (juego) | Juego A crea sesión; juego B abre Online > "Search local network" | A aparece con su nombre, 1/8 jugadores y candado si hay contraseña; elegirlo y unirse funciona con mando | ☐ |
+| 4.2 | Lista de red local (juego) | Juego A crea sesión; juego B abre Online > "Search local network" | A aparece con su nombre, 1/2 jugadores (límite actual: ADR-007, decisión 12) y candado si hay contraseña; elegirlo y unirse funciona con mando | ☐ |
 | 4.3 | Versión distinta en la lista | Bot anfitrión con otra versión de compilación en su respuesta | La fila se ve con aviso y no deja unirse (o avisa antes) | ☐ |
 | 4.4 | Código de invitación, unidad | `build/test_online_invite` | Ida y vuelta IPv4/IPv6; una letra cambiada se rechaza | ☐ |
 | 4.5 | Código de invitación, juego | A crea sesión, copia el código; B lo pega en "Dirección" | B entra sin teclear IP ni puerto | ☐ |
 | 4.6 | Apertura automática (Docker) | `sh tools/nettest/run.sh upnp` | Abre, obtiene IP externa, cierra; sin IGD: "no disponible" en < 5 s | ☐ |
 | 4.7 | La apertura no detiene el juego | Juego A: crear sesión en una red sin UPnP, mirando el overlay de rendimiento (F10) | Sin congelación durante los 5 s de búsqueda | ☐ |
-| 4.8 | Mensajes de alternativa | Tres casos: abierto / no disponible / dirección compartida por el proveedor | El texto correcto en cada caso, con el siguiente paso | ☐ |
+| 4.8 | Mensajes de estado del puerto | Tres casos: abierto / no disponible / dirección compartida por el proveedor | El texto correcto en cada caso; ninguno nombra una red virtual ni un servicio externo (ADR-009, decisión 23) | ☐ |
+| 4.8b | Error claro al no poder conectar | Juego B: unirse a una dirección que no responde y a un código válido de un anfitrión apagado | Mensaje que dice qué se intentó y que no se pudo conectar; sin guía de red virtual ni oferta de servicio | ☐ |
 | 4.9 | Cierre de la redirección | Terminar sesión y mirar el router o `miniupnpd` | La redirección ya no está | ☐ |
 | 4.10 | IPv6 local | Juego A crea sesión; B se une a `[::1]:52530` | Conecta | ☐ |
 | 4.11 | IPv6 en la lista de direcciones | Pestaña de A con sesión abierta | Aparecen las IPv6 globales si el PC tiene | ☐ |
 | 4.12 | Router real y cortafuegos | Tarea T341 | Bitácora rellena | ☐ |
-| 4.13 | Guía | El dueño sigue `docs/coop-conexion.md` sin ayuda | Conecta o llega a un diagnóstico claro | ☐ |
+| 4.13 | Guía | El dueño sigue `docs/coop-conexion.md` sin ayuda; además `grep -ci -e tailscale -e zerotier docs/coop-conexion.md` | Conecta o llega a un diagnóstico claro; el `grep` da 0 | ☐ |
+| 4.15 | Dependencia anotada | `grep -ci miniupnpc docs/third-party.md` | Distinto de 0, con versión y licencia (ADR-007, decisión 11) | ☐ |
 | 4.14 | Accesibilidad | Recorre la pestaña solo con mando; mira los indicadores con la opción de visión de color activada y desactivada | Todo alcanzable; ningún estado depende solo del color | ☐ |
 
 ## 3. CU-05 — Reconectar
@@ -112,10 +114,11 @@ el bot como par que se cae (`BOT_DROP`), o dos PC y desconecta el cable/WiFi de 
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
 | 5.1 | Reanudación en el servidor | `sh tools/nettest/run.sh resume_server` | Misma ranura dentro del plazo; jugador nuevo fuera de plazo | ☐ |
+| 5.1b | Plazo por defecto | Sin clave `grace` en `online.ini`, mirar el plazo que anuncia el WELCOME en el registro | 600 s (10 minutos) | ☐ |
 | 5.2 | Reintento del cliente | `sh tools/nettest/run.sh resume_client` (corte de 10 s) | Vuelve a `CONNECTED` solo, misma ranura | ☐ |
 | 5.3 | Juego + bot que se cae | Juego A anfitrión; bot con `BOT_DROP=20,8` cerca de Link | A muestra "reconnecting" junto al bot, el Link del bot desaparece y **reaparece con su equipo** en < 5 s tras volver; sin piezas duplicadas | ☐ |
 | 5.4 | Dos PC, corte real | Dos PC en la misma red; desconecta el WiFi del invitado 10 s | Invitado: "Reconnecting…", vuelve solo. Anfitrión: compañero "reconnecting" y luego normal | ☐ |
-| 5.5 | Corte más largo que la gracia | Igual, 90 s | Invitado: mensaje de fallo claro y botón "Reconnect"; anfitrión: "left" | ☐ |
+| 5.5 | Corte más largo que la gracia | Igual, con `grace = 60` en el `online.ini` del anfitrión y un corte de 90 s (el valor por defecto es 10 minutos: ADR-008, decisión 18) | Invitado: mensaje de fallo claro y botón "Reconnect"; anfitrión: "left" | ☐ |
 | 5.6 | Cancelar | Durante "Reconnecting…", pulsar "Cancel" | Estado "Not connected" inmediato | ☐ |
 | 5.7 | No se aplica estado viejo | Sesión 1 con misiones compartidas; salir; unirse a otra sesión con un anfitrión con partida nueva | Ningún flag de la sesión 1 se activa en la sesión 2 (compara con `swctl flag <nombre>`) | ☐ |
 | 5.8 | El anfitrión cae | Cerrar el juego A a la fuerza | B reintenta, falla al vencer el plazo con mensaje claro; sin crash | ☐ |

@@ -182,7 +182,8 @@ Función pura en `runtime/online_invite.c`: `(familia, dirección, puerto) ↔ t
 - Qué dirección se codifica: (1) la IP externa que devuelva UPnP/NAT-PMP si hubo éxito; (2) si no, la IPv6 global si
   existe; (3) si no, la IPv4 local, con el aviso "solo sirve en tu red local".
 - El campo "Dirección" acepta indistintamente código, `IPv4:puerto`, `[IPv6]:puerto` o nombre.
-- El código **no** lleva la contraseña ni nada secreto. Sí revela la IP: el texto de ayuda lo dice.
+- El código **no** lleva la contraseña ni nada secreto. Sí revela la IP: el texto de ayuda lo dice. **[DUEÑO]**
+  Aceptado (ADR-007, decisión 12).
 
 ### H. UPnP y NAT-PMP/PCP (R3-18, R3-20)
 
@@ -194,19 +195,22 @@ Función pura en `runtime/online_invite.c`: `(familia, dirección, puerto) ↔ t
 2. Secuencia: descubrimiento SSDP del IGD → `AddPortMapping` TCP → `GetExternalIPAddress`. Si falla, NAT-PMP y PCP
    contra la puerta de enlace. Al terminar la sesión: `DeletePortMapping` (también con plazo; no retrasa la salida).
 3. Estado publicado con mutex para la UI: buscando / abierto (IP externa) / no disponible (motivo).
-4. Mensajes de alternativa, siempre con el siguiente peldaño:
+4. Mensajes de resultado. **[DUEÑO]** Solo nombran conexión directa; nunca una red virtual ni un servicio externo
+   (ADR-009, decisión 23):
    - "Puerto abierto automáticamente. Comparte este código: …"
-   - "No se pudo abrir el puerto automáticamente. Opciones: abrir el puerto TCP <n> en el router, usar IPv6 si los
-     dos tenéis, o una red virtual (Tailscale, ZeroTier)."
+   - "No se pudo abrir el puerto automáticamente. Opciones: abrir el puerto TCP <n> en el router, o usar IPv6 si los
+     dos tenéis."
    - Si la IP externa del router es privada o de rango CGNAT: "Tu proveedor comparte tu dirección: el puerto abierto
-     no sirve desde fuera. Usa IPv6 o una red virtual."
+     no sirve desde fuera. Solo se puede conectar por IPv6 o en la misma red local."
+   - Al fallar un intento de unirse: qué se intentó (dirección o código, puerto) y que no se pudo conectar. Nada más.
 5. Cortafuegos de Windows: texto fijo bajo "Crear sesión" ("La primera vez Windows preguntará si permite la
    conexión: acepta en redes privadas").
 
-**Spike previo (T306).** Código propio mínimo (SSDP + SOAP sobre HTTP plano + NAT-PMP, unos cientos de líneas)
-frente a incluir una biblioteca permisiva en `third_party/`. Criterios: funciona con el router del dueño, con
-`miniupnpd` en Docker, licencias, y coste de compilación en las tres plataformas (mapa 05 §6.4 explica por qué una
-biblioteca enlazada es cara aquí).
+**Spike previo (T306).** **[DUEÑO]** miniupnpc está aceptada (ADR-007, decisión 11), así que el spike ya no elige
+entre código propio y biblioteca: comprueba miniupnpc contra `miniupnpd` en Docker y contra el router del dueño,
+confirma su licencia y decide **cómo se incluye** (fuente en `third_party/` o paquete del sistema) mirando el coste de
+compilación en las tres plataformas (mapa 05 §6.4 explica por qué una biblioteca enlazada es cara aquí). Queda
+anotada en `docs/third-party.md`.
 
 ### I. IPv6 (R3-19)
 
@@ -226,7 +230,7 @@ borran de inmediato (DOC:726-730).
 
 1. WELCOME añade un **testigo de sesión** aleatorio (16 bytes) y el identificador de sesión del servidor.
 2. Servidor: al perder a un cliente autenticado, su `SClient` pasa a estado "ausente" durante el plazo de gracia
-   (propuesta: 60 s, pregunta P3-1): conserva nombre, último STATE y EQUIP; envía a los demás un aviso AWAY (mensaje
+   (**[DUEÑO]** 10 minutos; ADR-008, decisión 18): conserva nombre, último STATE y EQUIP; envía a los demás un aviso AWAY (mensaje
    nuevo) en vez de LEAVE. Si vence el plazo: LEAVE.
 3. Cliente: estado nuevo `ONLINE_RECONNECTING`. Reintentos con espera 1, 2, 4, 8, 15 s (tope 15 s) hasta el plazo.
    HELLO con el testigo → el servidor devuelve la misma ranura, y reenvía JOIN de todos, sus STATE/EQUIP, y pide al
@@ -261,7 +265,8 @@ jugadores muestra la latencia.
 
 ### L. Decisión TCP frente a ENet/UDP (R3-27)
 
-Es un experimento, no un cambio en el juego.
+Es un experimento, no un cambio en el juego. **[DUEÑO]** ENet está aceptada como dependencia (ADR-007, decisión 11):
+la decisión de T305 depende solo de las medidas, ya no de un permiso. ADR-005 sigue pendiente hasta tenerlas.
 
 **Montaje (Docker, red puente propia, `--cap-add NET_ADMIN`):**
 

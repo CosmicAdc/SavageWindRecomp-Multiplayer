@@ -38,8 +38,8 @@ puerto del router por sí solo. Hoy no existe nada de esto.
 **C. Apertura de puerto**
 
 1. Al crear la sesión, el juego pide al router que redirija el puerto TCP.
-2. La pestaña muestra el resultado: "Puerto abierto", o "No se pudo abrir: tendrás que redirigirlo a mano o usar una
-   red virtual", con la explicación que ya existe hoy.
+2. La pestaña muestra el resultado: "Puerto abierto", o "No se pudo abrir: tendrás que redirigirlo a mano en el
+   router". El juego no recomienda redes virtuales ni ningún otro servicio (ADR-009, decisión 23).
 3. Al terminar la sesión, el juego retira la redirección.
 
 ## Flujos alternativos y de error
@@ -49,7 +49,11 @@ puerto del router por sí solo. Hoy no existe nada de esto.
 - **El router no admite apertura automática** o está desactivada: se avisa y se ofrece el camino manual. La sesión
   local sigue funcionando.
 - **El anfitrión está detrás de un operador que comparte IP pública (CG-NAT)**: ni la apertura ni el código sirven.
-  Se indica que hace falta una red virtual (Tailscale, ZeroTier, Radmin VPN), como ya dice la interfaz (UI:57-59).
+  El juego **no ofrece nada más**: muestra solo un mensaje de error claro que dice qué se intentó y que no se pudo
+  conectar (ADR-009, decisión 23). El texto actual de la interfaz que recomienda una red virtual (UI:57-59) se
+  sustituye por ese mensaje.
+- **La conexión con código o por dirección falla por cualquier otro motivo**: el mismo mensaje de error claro, sin
+  guía de red virtual ni reintento por otro camino.
 - **Código mal copiado o caducado**: mensaje claro, sin intentar conectar a direcciones inválidas.
 - **Versión distinta**: la lista de red local muestra la partida como "otra versión" y no deja entrar; con código, el
   rechazo llega en el saludo (CU-01).
@@ -75,11 +79,13 @@ puerto del router por sí solo. Hoy no existe nada de esto.
 2. **Código de invitación**: una codificación local y sin servidor de dirección + puerto (y versión) en texto corto,
    con dígito de control para detectar errores de copia. La dirección pública se obtiene del router al abrir el
    puerto [sin verificar: depende de la biblioteca elegida] o la escribe el anfitrión.
-3. **Apertura automática de puerto (UPnP y, si es posible, NAT-PMP/PCP)**: en el hilo de red, nunca en el hilo de
-   UI; con plazo corto; con retirada al cerrar. Requiere una biblioteca de terceros: hay que registrarla en
-   `docs/third-party.md` y decidirlo en un ADR.
-4. **Interfaz**: sección "Partidas en tu red", botón "Unirse con código", estado del puerto, botón "Copiar código".
-   Dueño único de `ui/menu.mm` y `ui/i18n/*.inc` según el plan. Textos traducidos y `tools/i18n_check.py`.
+3. **Apertura automática de puerto (UPnP y, si es posible, NAT-PMP/PCP)** con **miniupnpc**: en el hilo de red,
+   nunca en el hilo de UI; con plazo corto; con retirada al cerrar. La biblioteca ya está aprobada por el dueño
+   (ADR-007, decisión 11); hay que anotarla en `docs/third-party.md` con su licencia.
+4. **Interfaz**: sección "Partidas en tu red", botón "Unirse con código", estado del puerto, botón "Copiar código"
+   y el **mensaje de error claro** cuando no se puede conectar (qué se intentó y que no se pudo), en lugar del
+   texto actual sobre redes virtuales. Dueño único de `ui/menu.mm` y `ui/i18n/*.inc` según el plan. Textos
+   traducidos y `tools/i18n_check.py`.
 5. **IPv6**: mostrar también direcciones IPv6 propias y admitirlas en el código.
 6. Datos de red no confiables: todo paquete UDP recibido pasa por la validación única de `contratos/validacion-red.md`
    (longitudes, cadenas terminadas, versión).
@@ -88,11 +94,19 @@ puerto del router por sí solo. Hoy no existe nada de esto.
 
 - **[DUEÑO] D7**: conexión directa, un jugador hospeda. Por eso el código de invitación **no** usa ningún servidor
   de emparejamiento ni de relé.
-- **[PROPUESTA]** El código de invitación contiene la dirección del anfitrión: quien lo recibe puede conocer su IP
-  pública. Hay que avisarlo en la interfaz.
+- **[DUEÑO] (ADR-007, decisión 12; Q-04-1)** El código de invitación puede contener la dirección del anfitrión:
+  quien lo recibe puede conocer su IP pública. Se avisa en la interfaz.
+- **[DUEÑO] (ADR-007, decisión 11; Q-04-2)** Las bibliotecas de terceros están aceptadas (miniupnpc para abrir el
+  puerto, ENet y las que hagan falta) siempre que sean de código abierto, con licencia compatible con MIT, y queden
+  anotadas en `docs/third-party.md`. La apertura automática de puerto entra en F3 sin más consulta.
+- **[DUEÑO] (ADR-009, decisión 23; Q-04-3)** Si la conexión directa es imposible (anfitrión sin IP pública), **no
+  se ofrece nada**: ni guía de red virtual (Tailscale, ZeroTier…) dentro del juego ni servicio de presentación o de
+  perforación de NAT. El juego muestra solo un mensaje de error claro. Siguen en el alcance: descubrimiento en red
+  local, apertura de puerto con miniupnpc, código de invitación e IPv6.
+- **[DUEÑO] (ADR-007, decisión 12)** Límite de 2 jugadores por ahora. La contraseña es **opcional**; al abrir el
+  puerto a Internet la interfaz la **recomienda**, no la exige.
 - **[PROPUESTA]** La apertura automática de puerto va activada por defecto pero con un interruptor para apagarla.
 - **[PROPUESTA]** El anuncio en red local se puede apagar ("partida oculta").
-- **[PROPUESTA]** Si se abre el puerto a Internet, exigir contraseña (ver pregunta en CU-01).
 
 ## Criterios de aceptación
 
@@ -105,10 +119,14 @@ puerto del router por sí solo. Hoy no existe nada de esto.
 - **CA-4** Dado un router con UPnP (o un emulador en Docker [sin verificar: hay que elegir uno]), cuando A crea la
   sesión, entonces existe la redirección TCP del puerto; cuando A la termina, desaparece.
 - **CA-5** Dado un router sin UPnP, cuando A crea la sesión, entonces crear no tarda más de 5 s adicionales, la
-  interfaz no se congela y se muestra el aviso con el camino manual.
+  interfaz no se congela y se muestra el aviso con el camino manual (redirigir el puerto en el router), sin
+  mencionar redes virtuales.
 - **CA-6** Dado un paquete UDP de descubrimiento mal formado o gigante enviado al anfitrión, entonces se ignora y no
   hay cuelgue (prueba con un guion en Docker).
 - **CA-7** Dado un anfitrión con otro número de versión, entonces la lista de B lo marca como incompatible.
+- **CA-8** Dado un código o una dirección a los que no se puede conectar (puerto de prueba cerrado), cuando B
+  intenta unirse, entonces ve un mensaje de error que dice qué se intentó y que no se pudo conectar, y ningún texto
+  de la pestaña Online nombra una red virtual ni un servicio externo (búsqueda en `ui/i18n/*.inc`).
 
 ## Qué NO hacer
 
@@ -117,21 +135,22 @@ puerto del router por sí solo. Hoy no existe nada de esto.
 - No dejar el puerto abierto en el router al cerrar la sesión o el juego.
 - No confiar en ningún paquete UDP recibido: longitudes, cadenas terminadas y versión se validan siempre.
 - No responder a la difusión con datos sensibles (contraseña, ruta de ficheros, nombre del PC).
-- No añadir una biblioteca de terceros sin ADR y sin registrarla en `docs/third-party.md`.
+- No construir una guía de red virtual dentro del juego ni un servicio de presentación o de perforación de NAT
+  (ADR-009, decisión 23).
+- No añadir una biblioteca de terceros que no sea de código abierto con licencia compatible con MIT, ni sin
+  registrarla en `docs/third-party.md` (ADR-007, decisión 11).
 - No entregar este caso antes del endurecimiento del servidor de F3 (envío no bloqueante, límites, validación).
 - No quitar "Unirse por dirección": sigue siendo el camino de reserva.
 
 ## Riesgos y preguntas abiertas
 
-- Riesgo: muchos routers domésticos tienen UPnP apagado y muchos operadores usan CG-NAT; en esos casos la conexión
-  directa por Internet no es posible sin red virtual.
+- Riesgo aceptado por el dueño: muchos routers domésticos tienen UPnP apagado y muchos operadores usan CG-NAT; en
+  esos casos la conexión directa por Internet no es posible y el juego solo lo dice (ADR-009, decisión 23).
 - Riesgo de seguridad: abrir el puerto expone un servidor sin cifrado ni autenticación fuerte (mapa 06 H-3, H-4,
   H-5). Este caso no debería entregarse antes que el endurecimiento de F3.
 - Riesgo: una biblioteca nueva de terceros afecta a la compilación en Windows, Linux y macOS.
-- **Pregunta al dueño**: ¿aceptas que el código de invitación revele la IP pública del anfitrión a quien lo reciba?
-- **Pregunta al dueño**: ¿aceptas añadir una biblioteca de terceros para UPnP (hay que revisar su licencia)?
-- **Pregunta al dueño**: si la conexión directa es imposible (CG-NAT), ¿basta con recomendar una red virtual o
-  quieres estudiar más adelante un relé propio (contradice D7 tal como está)?
+- Preguntas ya contestadas por el dueño (Q-04-1, Q-04-2, Q-04-3 y la contraseña): ver ADR-007 (decisiones 11 y 12)
+  y ADR-009 (decisión 23) en `../decisiones/`. Este caso no tiene preguntas abiertas.
 
 ## Fase y dependencias
 
