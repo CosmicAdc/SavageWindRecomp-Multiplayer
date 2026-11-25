@@ -180,6 +180,10 @@ static struct {
     bool skeleton;                                // his skeleton has come: his Link is posed by it, plays no AS
 } g_act[ONLINE_MAX];
 
+// a player's Link here, if the game still has it (0: none, or deleted since the last frame - game over, a load - and
+// not forgotten yet: rt_online_frame finds that later in the frame). The runes' work on it goes through this
+static uint64_t link_live(int i) { return g_act[i].link && alive(g_act[i].link, g_act[i].link_w) ? g_act[i].link : 0; }
+
 // tools/online_mod.py ANIMS: the AS names of OnlinePlayer's one-clip animations, in ONLINE_A_* order
 static const char *const k_anims[ONLINE_A_COUNT] = {
     "OnlineWait", "OnlineWalk", "OnlineRun", "OnlineDash", "OnlineJump", "OnlineFall", "OnlineGlide",
@@ -4119,7 +4123,7 @@ static void stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
         if (VALID(body)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)g->m, 0, 0, 0, 0);
         stasis_look(c, g_act[i].stop, true);
         // its chains, the game's own, where it is
-        if (!g_act[i].link) continue;
+        if (!link_live(i)) continue;
         rune_keep(c, i, &g_act[i].stop_fx, "OnlineRuneFx", pl[i].name);
         uint64_t fxa = g_act[i].stop_fx.actor;
         if (!fxa) continue;
@@ -4316,8 +4320,9 @@ static void fx_end(Cpu *c, void *h) {
 // made again for him is never drawn (his beam and magnet were then gone for good)
 static void rune_keep(Cpu *c, int i, Piece *p, const char *name, const char *who) {
     if (piece_update(c, i, p, name, who)) model_visible(c, p->actor, false);
-    if (!p->actor || !g_act[i].link) return;
-    const float *lm = (const float *)(uintptr_t)(g_act[i].link + 0x398);
+    uint64_t lk = link_live(i);
+    if (!p->actor || !lk) return;
+    const float *lm = (const float *)(uintptr_t)(lk + 0x398);
     float at[12] = {1, 0, 0, lm[3], 0, 1, 0, lm[7] + 1, 0, 0, 1, lm[11]};
     call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)at, 0, 0, 0, 0);  // (moved again where it's used, after)
 }
@@ -4332,11 +4337,12 @@ static void rune_pieces(Cpu *c, int i, bool holding, const char *who) {
     rune_keep(c, i, &g_act[i].magnet_fx, "OnlineMagnetFx", who);
     if (!g_act[i].stop) rune_keep(c, i, &g_act[i].stop_fx, "OnlineRuneFx", who);
     float hand[12];
-    if (g_act[i].slate.actor && g_act[i].link) {
-        if (holding && bone_mtx(c, g_act[i].link, "Weapon_R", hand))
+    uint64_t lk = link_live(i);
+    if (g_act[i].slate.actor && lk) {
+        if (holding && bone_mtx(c, lk, "Weapon_R", hand))
             call(c, FN_SET_MTX, g_act[i].slate.actor, (uint64_t)(uintptr_t)hand, 0, 0, 0, 0);
         else if (!holding) {
-            const float *lm = (const float *)(uintptr_t)(g_act[i].link + 0x398);
+            const float *lm = (const float *)(uintptr_t)(lk + 0x398);
             float at[12] = {1, 0, 0, lm[3], 0, 1, 0, lm[7] + 1, 0, 0, 1, lm[11]};
             call(c, FN_SET_MTX, g_act[i].slate.actor, (uint64_t)(uintptr_t)at, 0, 0, 0, 0);
         }
@@ -4346,7 +4352,8 @@ static void rune_pieces(Cpu *c, int i, bool holding, const char *who) {
 static void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
     for (int i = 0; i < ONLINE_MAX; i++) {
         const OnlineGrab *g = i != me && pl[i].used && pl[i].pose.valid ? &pl[i].pose.grab : NULL;
-        bool want = g && g->name[0] && g_act[i].link;
+        uint64_t lk = link_live(i);
+        bool want = g && g->name[0] && lk;
         if (g_act[i].grab) {
             float dx = want ? g->from[0] - g_act[i].grab_from[0] : 0, dz = want ? g->from[2] - g_act[i].grab_from[2] : 0;
             if (!want || strcmp(g->name, g_act[i].grab_name) || dx * dx + dz * dz > 0.25f ||
@@ -4368,7 +4375,7 @@ static void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
         }
         if (!want) {
             g_act[i].grab_name[0] = 0, g_act[i].grab_wait = 0;
-            if (g_act[i].link && i != me && pl[i].used) rune_pieces(c, i, false, pl[i].name);
+            if (lk && i != me && pl[i].used) rune_pieces(c, i, false, pl[i].name);
             continue;
         }
         if (!g_act[i].grab && (strcmp(g->name, g_act[i].grab_name) || g_act[i].grab_wait-- <= 0)) {
@@ -4447,9 +4454,9 @@ static void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
         // its x = y x z
         uint64_t fxa = g_act[i].rune_fx.actor;
         float hand[12], left[12];
-        if (!fxa || !bone_mtx(c, g_act[i].link, "Weapon_R", hand)) continue;
+        if (!fxa || !bone_mtx(c, lk, "Weapon_R", hand)) continue;
         float o[3] = {hand[3], hand[7], hand[11]};
-        if (bone_mtx(c, g_act[i].link, "Weapon_L", left))
+        if (bone_mtx(c, lk, "Weapon_L", left))
             o[0] = (o[0] + left[3]) / 2, o[1] = (o[1] + left[7]) / 2, o[2] = (o[2] + left[11]) / 2;
         const float *gm = g_act[i].grab ? (const float *)(uintptr_t)(g_act[i].grab + 0x398) : g->m;  // (as it's drawn)
         float z[3] = {gm[3] - o[0], gm[7] - o[1], gm[11] - o[2]};
