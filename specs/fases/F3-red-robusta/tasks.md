@@ -162,7 +162,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no integres nada en `runtime/` todavía; no analices XML con funciones sin límite de longitud; no confíes en la respuesta del router (tamaño máximo, plazo).
   modelo sugerido: alto
 
-- [ ] T307 [P] [investigación] Qué identificador de compilación se puede comparar entre dos PC
+- [x] T307 [P] [investigación] Qué identificador de compilación se puede comparar entre dos PC
+  hecha: agente Sonnet (integrada `4dd75f6`) — bitácora F3-T307-identificador-compilacion.md
   files: specs/bitacora/F3-T307-identificador-compilacion.md
   verify: `grep -c '^| [123] |' specs/bitacora/F3-T307-identificador-compilacion.md` da 3 (una fila de tabla por pregunta, con la orden usada y su salida en el cuerpo)
   depende de: F0
@@ -489,7 +490,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no leas ficheros del juego en cada llamada; no compares cadenas sin terminador; no decidas tú qué identificador comparar: usa la respuesta de T307.
   modelo sugerido: medio
 
-- [ ] T326 [P] [módulo] Direcciones: analizador común e IPv6 en la lista local
+- [~] T326 [P] [módulo] Direcciones: analizador común e IPv6 en la lista local
+  reclamada: agente (integrada `62f04d9`) — online_addr con IPv6 y prueba en CI; FALTA la parte de la lista local en el juego
   files: runtime/online_addr.c, runtime/online_addr.h, tests/test_online_addr.c
   verify: `clang -Wall -Iruntime tests/test_online_addr.c runtime/online_addr.c runtime/online_invite.c -o build/test_online_addr && build/test_online_addr` sale con 0
   depende de: T322
