@@ -370,6 +370,21 @@ menos de 4 m: daño fijo y derribo (OA:2929-2941).
 6. Alcance `[DUEÑO]` (ADR-008, decisión 17): **cuerpo a cuerpo y bombas**. Flechas y runas quedan fuera de la primera
    entrega. El alcance de las armas no cambia; lo que cambia es quién valida el daño (el anfitrión, no el atacante).
 
+### N. Amenaza de los enemigos (CU-15)
+
+**Hoy.** El dueño de cada enemigo es el más cercano (con histéresis de 40 m / 10 m, 15 m durante 5 s y 10 s sin
+cambiar) o el último que le golpeó desde menos de 80 m, con 6 s de espera (OA:2520-2623). El HIT viaja sin origen
+(`online.c:281-282`).
+
+**Reglas.** `[DUEÑO]` ADR-012, decisión 2: el enemigo pasa a quien más daño le hace, con el más cercano como
+desempate, sin perder los 80 m ni los 10 s; lo decide el anfitrión con los golpes que ya ve.
+
+**Diseño.** Lógica pura `runtime/coop_threat.c` (T443): amenaza por ranura y enemigo = daño efectivo, con semivida de
+8 s; el daño del dueño es la vida que baja y ningún HIT explica. `pick` devuelve cercanía (sin líder claro: regla de
+hoy), mantener o pasar a otro (líder claro: 1,5 veces la segunda amenaza). Integración en `oa_enemies.c` (T444), que
+sustituye el traspaso "al último que golpea"; los traspasos por amenaza respetan `hold`. Protocolo: HIT con ranura de
+origen (T409). Detalle y preguntas Q-15-1 a Q-15-4 en `../../casos-de-uso/CU-15-amenaza-de-los-enemigos.md`.
+
 ## 2. Ingeniería inversa necesaria (tareas de investigación para el dueño)
 
 Cada una se hace con Ghidra sobre la copia del dueño (`tools/ghidra/README.md`, `tools/ghidra/gq.py`). La respuesta
@@ -394,10 +409,11 @@ juego (~15 min). **Se agrupan en una sola entrega.**
 | Carril | Ficheros (dueño único) | Tareas |
 |---|---|---|
 | **Protocolo** | `runtime/online.h`, `PROTOCOL`, cabecera compartida con el bot, tabla de autoridad de F3 | T409 |
-| **Lógica pura** (paralelo) | `runtime/coop_flags.*`, `coop_world.*`, `coop_rewards.*`, `coop_tp.*`, `coop_give.*`, `coop_palette.*`, `coop_revive.*`, `coop_pvp.*` + `tests/test_coop_*.c` | T410, T412, T415, T418, T424, T430, T433 (T420: segunda entrega) |
+| **Lógica pura** (paralelo) | `runtime/coop_flags.*`, `coop_world.*`, `coop_rewards.*`, `coop_tp.*`, `coop_give.*`, `coop_palette.*`, `coop_revive.*`, `coop_pvp.*`, `coop_threat.*` + `tests/test_coop_*.c` | T410, T412, T415, T418, T424, T430, T433, T443 (T420: segunda entrega) |
 | **Mundo** (serie, en la cadena única de §5) | módulo de flags de `online_actors` (`oa_flags` / `oa_gamedata`), guardados (`runtime/save_backup.c`, `runtime/services/save_profiles.*`), parte de `online.c` que guarda los QUEST | T411, T413, T414, T416, T442 (T417: aplazada) |
 | **Reglas** (serie) | módulo de reglas (`oa_rules`), `runtime/control_game.c`, `runtime/control_tp.c`, `runtime/items.c` | T419, T423, T431, T434 (segunda entrega y posteriores: T421, T422, T432) |
 | **UI** (serie, en la cadena única de §5) | `runtime/ui/online_ui.mm`, `runtime/ui/coop_hud.mm` (nuevo) | T425-T429, T435 |
+| **Enemigos** (fuera de la cadena: ninguna otra tarea de F4 toca su fichero) | `runtime/oa_enemies.c`, `tools/coop/threat_run.sh` | T444 |
 | **Entrada** | `runtime/hle/input.c`, `runtime/hle/bindings.c` | T436 |
 | **i18n** | `runtime/ui/i18n/*.inc` | T437 |
 | **Parches** (una entrega) | `tools/patches.py`, `tools/game_sites.py`, `runtime/game_sites.h` | lo que salga de T404-T406 |
@@ -417,6 +433,7 @@ Los ajustes nuevos van a `online.ini` (como en F3), no a `savagewind.ini`: así 
   definen de una vez, con manejadores vacíos.
 - Mensajes nuevos: WORLD, REWARD, TP_REQ, TP_REPLY, GIVE, MARK, QCHAT, PVP_CTL, PVP_HIT, PVP_DMG, DOWN, REVIVE.
   Campos nuevos de STATE: vida, vida máxima, color, forma, indicadores (caído, PvP activo).
+- HIT pasa a llevar la ranura de origen, que pone el servidor (CU-15, ADR-012): sin mensajes nuevos.
 - WORLD lleva, además del identificador de mundo, los contenedores de corazón y las mejoras de resistencia del
   anfitrión (elemento D2). TP_REQ lleva la operación (ir o invocar). Las reglas de sesión del anfitrión ganan
   "PvP permitido".
@@ -443,7 +460,8 @@ Los ajustes nuevos van a `online.ini` (como en F3), no a `savagewind.ini`: así 
    T413 → T411 → T414 → T416 → T436 → T425 → T426 → T427 → T428 → T429 → T442 → T419 → T423 → T431 → T434 → T435.
    Dependencias que la justifican: T436 antes de T426 y T427 (sus acciones); T423 después de T426 (cola de MARK) y
    T428; T419, T431 y T442 después de T428 (avisos por identificador).
-5. Los carriles Mundo, Reglas y UI son agrupaciones de esa cadena, no hilos paralelos.
+5. Los carriles Mundo, Reglas y UI son agrupaciones de esa cadena, no hilos paralelos. T444 (amenaza) va aparte,
+   tras T409, T438 y T443, porque solo toca `oa_enemies.c`; T439 la espera.
 6. Cierre: T437 → T439 → T440 → T441 (T438 ya se hizo tras T409).
 7. Después del cierre, por este orden de prioridad y solo si el dueño lo pide: envío directo (T404 → T420 → T421 →
    T422), revisión de cofres (T408 → T417), rescate manual (T406 → T432), armas (T405 y su ventana de protocolo).

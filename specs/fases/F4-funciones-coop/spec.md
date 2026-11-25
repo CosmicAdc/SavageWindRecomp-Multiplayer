@@ -48,6 +48,7 @@ contraseña de sesión es opcional (`[DUEÑO]` ADR-007, decisión 12; el acceso 
 | CU-10 Marcadores, pings, nombre en color, accesibilidad | Figura, nombre, distancia y flecha de borde en el overlay con 8 colores fijos por ranura (`runtime/ui/online_ui.mm:20-23`, `:181-304`) | Color y forma por orden de entrada y cambiables en Opciones, pings, chat rápido de ocho frases, avisos en pantalla, vida del compañero siempre visible |
 | CU-11 Revivir al compañero | Reanimación automática instantánea por hada (OA:2825-2831) | Primera entrega: reanimación automática mientras el compañero siga en pie; si caen los dos, fin de partida normal. El rescate manual (estado "caído") queda planificado para después |
 | CU-12 PvP por acuerdo, daño validado | Interruptor por jugador; el atacante declara el daño en su STATE y la víctima lo aplica (OA:2874-2942) | Acuerdo mutuo como regla de sesión, que el anfitrión puede prohibir; el anfitrión valida cada golpe; solo cuerpo a cuerpo y bombas |
+| CU-15 Amenaza de los enemigos (ADR-012) | El enemigo es del más cercano, o del último que le golpeó desde menos de 80 m (OA:2520-2623) | El enemigo pasa a quien más daño le hace, con el más cercano como desempate; se conservan los 80 m y los 10 s sin cambiar de dueño |
 
 Además (forma parte de CU-06/CU-07): las recompensas de santuario son **para los dos**. El contenido de un cofre es
 **de quien lo abre**, que puede soltarlo marcado para el compañero; se revisa después de probarlo (`[DUEÑO]` ADR-008,
@@ -75,6 +76,7 @@ ADR-007, decisión 9).
 | K | Reanimación automática mientras el compañero siga en pie (sin estado caído) | No |
 | L | Rescate manual: estado "caído" esperando al compañero (**entrega posterior, prioridad baja**) | **Sí** |
 | M | PvP por acuerdo y daño validado por el anfitrión | No |
+| N | Amenaza de los enemigos: dueño por daño, calculado por el anfitrión (CU-15) | No |
 
 Los elementos H, I y L tienen una tarea de investigación delante y **no forman parte de la primera entrega** de F4
 (`[DUEÑO]` ADR-007, decisiones 7 y 10; ADR-009, decisión 24): la fase se cierra sin ellos. Sus tareas se conservan,
@@ -199,6 +201,13 @@ con prioridad baja.
   normal; no se pierde ningún objeto.
 - **R4-34** `[DUEÑO]` (ADR-011, decisión 40) No se puede abrir un duelo en santuarios ni durante escenas.
 
+### N. Amenaza de los enemigos (CU-15)
+
+- **R4-36** `[DUEÑO]` (ADR-012, decisión 2) Cada enemigo pasa al jugador que más daño le hace, con el más cercano como
+  desempate. Lo calcula el juego del anfitrión con los HIT (que llevan la ranura de origen que pone el servidor) y con
+  la vida que baja; nunca a un jugador a más de 80 m, ni más de un cambio de dueño cada 10 s. Sin golpes, la regla
+  de cercanía de hoy no cambia.
+
 ## 5. Criterios de salida (medibles)
 
 | # | Criterio | Cómo se mide |
@@ -219,6 +228,7 @@ con prioridad baja.
 | S14 | Idiomas | `tools/i18n_check.py` → `0 missing`; los avisos nacen en `.c` por identificador y su literal vive en `coop_hud.mm` dentro de `tr()` (si no, el comprobador no los ve) |
 | S15 | Regresión | Recorrido de 30 minutos de F1 sin crash |
 | S16 | Ponerse al día al entrar | Un invitado con perfil cooperativo recién creado entra en un mundo avanzado: mismos contenedores de corazón y mejoras de resistencia que el anfitrión, habilidades de campeón ya ganadas, inventario vacío; al volver a entrar no recibe nada por segunda vez |
+| S17 | Amenaza de los enemigos | CU-15 CA-2 a CA-5 con `tools/coop/threat_run.sh` (0 traspasos al que hace menos daño, 1 al que hace más, 0 a más de 80 m) y CA-6 con dos juegos: el enemigo se vuelve hacia quien dispara en < 12 s |
 
 ## 6. Riesgos
 
@@ -239,6 +249,7 @@ con prioridad baja.
 | 13 | Un perfil cooperativo vacío es una partida nueva: el juego puede arrancar por la introducción, lejos del anfitrión **[sin verificar]** | Pregunta 5 del spike T402, antes de construir T414 |
 | 14 | No hay en el código una vía para fijar la resistencia máxima; para los corazones solo existe `give_heart` (OA:3763), que entrega un contenedor cada vez **[sin verificar que sirva para igualar]** | Primer paso de T442: comprobarlo; si falta, parar y abrir investigación |
 | 15 | Un arma soltada llega hoy al otro jugador por el botín de suelo, solo con su nombre (DOC:528-547) | R4-31: impedirlo o documentarlo en T423 |
+| 16 | Más cambios de dueño de enemigos con la amenaza: cada uno borra el enemigo en un juego y lo crea en otro | Margen de 1,5, 10 s de `hold` y CU-15 CA-9 |
 
 ## 7. Preguntas para el dueño
 
@@ -262,3 +273,4 @@ Siguen abiertas (se construye con su valor por defecto y se anota):
 | P4-9 | Botón del ping y de la rueda de chat rápido (Q-10-5 de `../../casos-de-uso/PREGUNTAS-ABIERTAS.md`). No es una decisión de diseño sino una comprobación de qué botones están libres | Sin decidir: T436 revisa `docs/controls.md` y `runtime/input_bind.h` y propone una combinación al dueño | T436 (asignación en mando) |
 | P4-10 | Al ponerse al día (R4-28): ¿los orbes que el anfitrión tiene **sin canjear** también se entregan al invitado? Los ADR solo hablan de contenedores y mejoras ya canjeados | No se entregan | T442 |
 | P4-11 | Un invitado que **vuelve** a un mundo que avanzó sin él: ¿se le iguala otra vez al anfitrión o recibe los hitos que se perdió? | Recibe los hitos que se perdió (orbes, contenedores, habilidades), por el libro de entregas; así conserva su propio reparto entre corazones y resistencia | T442 |
+| P4-12 | Amenaza (CU-15, Q-15-1 a Q-15-4): peso de una flecha frente a un golpe, margen para quitar el enemigo, memoria y distancia a la que el líder lo conserva | Mismo peso por punto de daño; 1,5 veces; semivida de 8 s; hasta 80 m | T443 |

@@ -238,7 +238,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 ## Bloque 1 — Protocolo (dueño único)
 
 - [ ] T409 [protocolo] Definir el cambio de cable de F4 en un solo salto de versión
-  files: runtime/online.h, runtime/online.c (solo `PROTOCOL`, enumeración de mensajes, estructuras de cable y reenvío dirigido), runtime/online_authority.c, la cabecera compartida con el bot, tools/online_bot.c, tests/test_online_wire.c, tests/test_online_authority.c, specs/contratos/protocolo.md
+  files: runtime/online.h, runtime/online.c (solo `PROTOCOL`, enumeración de mensajes, estructuras de cable y reenvío dirigido), runtime/online_authority.c, la cabecera compartida con el bot, tools/online_bot.c, tests/test_online_wire.c, tests/test_online_authority.c, specs/contratos/protocolo.md, specs/contratos/validacion-red.md (fila de HIT con origen, CU-15)
   verify: `make test-online` sale con 0 **y** `sh tools/nettest/run.sh smoke` sale con 0
   depende de: F3 completa, T401 (o su valor por defecto anotado)
   quién: agente designado como **dueño del protocolo**
@@ -247,6 +247,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     1. Sube `PROTOCOL` al siguiente número libre y regístralo en `specs/contratos/protocolo.md`.
     2. Mensajes nuevos (estructuras empaquetadas, tamaño fijo): WORLD (identificador de mundo 16 bytes, contenedores de corazón del anfitrión u8, mejoras de resistencia del anfitrión u8: los usa T442), REWARD (hash de flag u32, nombre de objeto char[40], valor s32, clase u8), TP_REQ (destino u8, operación u8: 0 ir, 1 invocar), TP_REPLY (destino u8, resultado u8, posición float[3]), GIVE (destino u8, operación u8, identificador u32, nombre char[40], cantidad s32), MARK (posición float[3], tipo u8), QCHAT (frase u8), PVP_CTL (operación u8), PVP_HIT (objetivo u8, secuencia u16), PVP_DMG (objetivo u8, atacante u8, daño s16), DOWN (segundos u8), REVIVE (objetivo u8).
     3. STATE: añade `int16_t life` (cuartos de corazón), `int16_t life_max` (cuartos de corazón; 0 = no se conoce), `uint8_t colour`, `uint8_t shape`, `uint8_t coop_flags` (bit 0 caído, bit 1 PvP activo). Reglas de sesión del anfitrión: añade el bit "PvP permitido" junto a las reglas existentes (`collide`, `nopause`, `revive`).
+    3b. (CU-15, ADR-012) HIT pasa de relé crudo a **relé con ranura**: el servidor antepone la ranura de quien lo envió (de servidor a cliente 1 + 9 bytes; de cliente a servidor sigue en 9). `online_take_hits` gana un parámetro `uint8_t *from` con esa ranura, acotada a `< ONLINE_MAX` al recibir (si no, se descarta). Fila nueva en `specs/contratos/validacion-red.md`; prueba de ida y vuelta en `tests/test_online_wire.c`; el bot lee HIT con el formato nuevo. `aggro_id`/`aggro_seq` se quedan en STATE sin cambios.
     4. Reenvío dirigido en el servidor: los mensajes con campo destino se envían solo a esa ranura, con la ranura de origen delante.
     5. Tabla de autoridad: WORLD, REWARD y PVP_DMG solo del anfitrión; PVP_HIT solo hacia el anfitrión; **TP_REQ de un no anfitrión, solo hacia el anfitrión** (modo "solo al anfitrión" que F3 ya tiene en `online_authority.c`, T312): el anfitrión valida mapa y espera de 30 s (T419) y lo reenvía al destino con un TP_REQ propio; TP_REQ del anfitrión, al destino; TP_REPLY y GIVE pasan por la validación de longitud y se reenvían al destino; MARK, QCHAT, PVP_CTL, DOWN, REVIVE a todos. Así el anfitrión siempre ve las peticiones (constitución, regla 11).
     6. Límites de tasa por tipo (añádelos a la tabla de F3): MARK 2/s, QCHAT 2/s, TP_REQ 1 cada 2 s, GIVE 5/s, PVP_HIT 4/s.
@@ -756,6 +757,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     3. `BOT_PVP_CHEAT=1` (envía PVP_DMG y PVP_HIT imposibles, y propone PvP con el PvP prohibido por el anfitrión).
     4. `BOT_TP=1` (pide ir con el otro cada 35 s, contesta a los "ir" que recibe y acepta las invocaciones), `BOT_TP_FAST=1` (pide ir cada 5 s, para comprobar que la espera de 30 s se hace cumplir en el anfitrión) y `BOT_WORLD_FAKE=1` (envía WORLD sin ser anfitrión, con números de corazones y resistencia desorbitados).
     5. `BOT_FLOOD=mark,<hz>`.
+    5b. (CU-15, para T444) `BOT_THREAT=<daño>,<hz>,<s>`: desde el segundo s lee ENEMIES, elige el enemigo vivo más cercano al jugador al que sigue y le envía HIT con ese daño y ritmo; además sube `aggro_id`/`aggro_seq` en su STATE, como un juego real al golpear una copia. Registra `bot: mode threat active` y cada HIT enviado (`bot: hit <id> <daño>`).
     6. Escenarios: `flags_all_ones`, `flags_one`, `pvp_cheat`, `mark_rate`, `tp_cooldown`, `world_fake`; y `give_states` solo con T420.
   hecho cuando: `bot_modes_f4` pasa y los escenarios existen.
   no hagas: no copies estructuras de cable a mano; no cambies el comportamiento por defecto del bot.
@@ -764,7 +766,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T439 [integración] Registrar los módulos en el fotograma, objetivos de prueba y variables
   files: el orquestador de fotograma de `online_actors` (`rt_online_frame`), Makefile (bloque de pruebas del final), runtime/launch_flags_table.c (regenerado)
   verify: `make test-online test-coop` sale con 0 y `make test-launch-flags` sale con 0
-  depende de: T411, T416, T419, T423, T431, T434, T442 y de todo lo que edite `online.c` (cadena de `plan.md` §5)
+  depende de: T411, T416, T419, T423, T431, T434, T442, T444 (variable nueva `SAVAGEWIND_ONLINE_THREAT_TEST`) y de todo lo que edite `online.c` (cadena de `plan.md` §5)
   quién: agente integrador
   contexto: Tras F2, `rt_online_frame` es una lista de llamadas con el orden escrito. Cada función de F4 necesita su llamada por fotograma en un sitio concreto del orden, y su limpieza al salir de sesión y en `RT_ON_RESET`.
   pasos:
@@ -792,7 +794,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 - [ ] T441 [cierre] Recorrido de extremo a extremo y bitácora de F4
   files: specs/bitacora/F4-cierre.md
-  verify: la bitácora tiene OK o FALLO con evidencia para cada criterio S1-S16 de `spec.md`
+  verify: la bitácora tiene OK o FALLO con evidencia para cada criterio S1-S17 de `spec.md`
   depende de: todas las de la primera entrega, incluida T442. No esperan al cierre las de "después" (T404, T405, T406, T408, T417, T420, T421, T422, T432): ver la tabla del principio de este fichero
   quién: dueño (un agente prepara las órdenes)
   contexto: Un cambio cuenta como hecho cuando se ha visto funcionar en el juego. F4 escribe en guardados: todas las pruebas se hacen con copias.
