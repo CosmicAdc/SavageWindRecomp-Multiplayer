@@ -43,6 +43,8 @@ bool opt_action(const char *label, const char *value, const char *desc, bool upp
 // keyboard with a controller). True when Enter / the keyboard confirmed a change.
 #include <stddef.h>
 bool opt_text(const char *label, char *buf, size_t cap, const char *hint, const char *desc);
+// as opt_text, for a secret (a password): the row shows one * per character and the field masks what is typed
+bool opt_text_secret(const char *label, char *buf, size_t cap, const char *hint, const char *desc);
 // that text row is being edited (its buffer is the user's: don't overwrite it)
 bool opt_text_editing(const char *label);
 // the next row is shown greyed out and can't be changed (e.g. not usable in this mode)
