@@ -388,8 +388,8 @@ adivinar, para y pregunta: no inventes.
 
 ## Bloque 4 — Módulos puros (paralelo; cada uno en ficheros nuevos)
 
-- [~] T320 [P] [módulo] Cubo de fichas con reloj inyectado
-  reclamada: agente Sonnet modulos-f3 (coop/F3MOD, en curso; adelantada)
+- [x] T320 [P] [módulo] Cubo de fichas con reloj inyectado
+  reclamada: agente Sonnet modulos-f3 (integrada `1bea3c8`, adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/online_ratelimit.c, runtime/online_ratelimit.h, tests/test_online_ratelimit.c
   verify: `clang -Wall -Iruntime tests/test_online_ratelimit.c runtime/online_ratelimit.c -o build/test_online_ratelimit && build/test_online_ratelimit` sale con 0
   depende de: ninguna
@@ -404,7 +404,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no leas el reloj dentro del módulo; no uses variables globales; no toques `online.c`.
   modelo sugerido: bajo
 
-- [ ] T321 [P] [módulo] Autenticación: hash con sal, HMAC y comparación en tiempo constante
+- [~] T321 [P] [módulo] Autenticación: hash con sal, HMAC y comparación en tiempo constante
+  reclamada: agente Opus auth-t321 (coop/T321, en curso; adelantada)
   files: runtime/online_auth.c, runtime/online_auth.h, tests/test_online_auth.c
   verify: `clang -Wall -Iruntime tests/test_online_auth.c runtime/online_auth.c runtime/update_crypto.c -o build/test_online_auth && build/test_online_auth` sale con 0 (incluye los vectores de prueba públicos de HMAC-SHA256 del RFC 4231)
   depende de: ninguna
@@ -422,8 +423,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no inventes un algoritmo propio; no uses `rand()`/`srand()`; si `online_auth_random` falla, no sigas con ceros: devuelve error.
   modelo sugerido: alto
 
-- [~] T322 [P] [módulo] Código de invitación (dirección + puerto ↔ texto)
-  reclamada: agente Sonnet modulos-f3 (coop/F3MOD, en curso; adelantada)
+- [x] T322 [P] [módulo] Código de invitación (dirección + puerto ↔ texto)
+  reclamada: agente Sonnet modulos-f3 (integrada `1bea3c8`, adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/online_invite.c, runtime/online_invite.h, tests/test_online_invite.c
   verify: `clang -Wall -Iruntime tests/test_online_invite.c runtime/online_invite.c -o build/test_online_invite && build/test_online_invite` sale con 0
   depende de: ninguna
@@ -502,8 +503,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no resuelvas nombres (nada de `getaddrinfo`) en este módulo; no devuelvas direcciones de bucle local; no toques `online.c` (lo integrará el carril UI/núcleo).
   modelo sugerido: medio
 
-- [~] T327 [P] [módulo] Estadísticas de calidad de red
-  reclamada: agente Sonnet modulos-f3 (coop/F3MOD, en curso; adelantada)
+- [x] T327 [P] [módulo] Estadísticas de calidad de red
+  reclamada: agente Sonnet modulos-f3 (integrada `1bea3c8`, adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/online_netstat.c, runtime/online_netstat.h, tests/test_online_netstat.c
   verify: `clang -Wall -Iruntime tests/test_online_netstat.c runtime/online_netstat.c -lm -o build/test_online_netstat && build/test_online_netstat` sale con 0
   depende de: ninguna

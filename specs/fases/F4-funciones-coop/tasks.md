@@ -296,7 +296,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no cambies cómo el invitado aplica QUESTS; no llames al juego desde `online.c`; no quites el filtro `g.hosting`; no pruebes con un guardado real.
   modelo sugerido: alto
 
-- [ ] T412 [P] [lógica] Identidad de mundo y nombre del perfil cooperativo
+- [x] T412 [P] [lógica] Identidad de mundo y nombre del perfil cooperativo
+  reclamada: integrada `60d7f88` (adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/coop_world.c, runtime/coop_world.h, tests/test_coop_world.c
   verify: `clang -Wall -Iruntime tests/test_coop_world.c runtime/coop_world.c -o build/test_coop_world && build/test_coop_world` sale con 0
   depende de: ninguna
@@ -346,7 +347,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no uses `sp_copy` ni ninguna otra copia desde el perfil individual del invitado (ADR-007, decisión 5); no escribas nada en el perfil individual; no uses el identificador recibido para formar una ruta sin validarlo; no cambies de carpeta con el juego en marcha sin pasar por el reinicio que definió el ADR; no borres perfiles; no toques el perfil del anfitrión; no des aquí corazones ni resistencia (eso es T442).
   modelo sugerido: alto
 
-- [ ] T415 [P] [lógica] Política de recompensas y libro de entregas
+- [x] T415 [P] [lógica] Política de recompensas y libro de entregas
+  reclamada: integrada `60d7f88` (adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/coop_rewards.c, runtime/coop_rewards.h, tests/test_coop_rewards.c
   verify: `clang -Wall -Iruntime tests/test_coop_rewards.c runtime/coop_rewards.c -o build/test_coop_rewards && build/test_coop_rewards` sale con 0
   depende de: ninguna (ya no espera a T401: la tabla la fijó el dueño en ADR-007, decisiones 2 y 5, y ADR-008, decisiones 13, 14 y 19; está escrita en `plan.md` §D)
@@ -523,7 +525,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 ## Bloque 5 — Marcadores, pings, chat rápido y accesibilidad
 
-- [ ] T424 [P] [lógica] Paleta segura y formas
+- [x] T424 [P] [lógica] Paleta segura y formas
+  reclamada: integrada `60d7f88` (adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/coop_palette.c, runtime/coop_palette.h, tests/test_coop_palette.c
   verify: `clang -Wall -Iruntime tests/test_coop_palette.c runtime/coop_palette.c runtime/colour_vision.c -lm -o build/test_coop_palette && build/test_coop_palette` sale con 0
   depende de: ninguna
@@ -616,7 +619,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 ## Bloque 6 — Revivir
 
-- [ ] T430 [P] [lógica] Política de revivir
+- [x] T430 [P] [lógica] Política de revivir
+  reclamada: integrada `60d7f88` (adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/coop_revive.c, runtime/coop_revive.h, tests/test_coop_revive.c
   verify: `clang -Wall -Iruntime tests/test_coop_revive.c runtime/coop_revive.c -lm -o build/test_coop_revive && build/test_coop_revive` sale con 0
   depende de: ninguna (P4-4 ya está resuelta: ADR-008, decisión 15)
@@ -663,7 +667,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 ## Bloque 7 — PvP
 
-- [ ] T433 [P] [lógica] Acuerdo de PvP y validación de golpes
+- [x] T433 [P] [lógica] Acuerdo de PvP y validación de golpes
+  reclamada: integrada `bf54ccd` (adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/coop_pvp.c, runtime/coop_pvp.h, tests/test_coop_pvp.c
   verify: `clang -Wall -Iruntime tests/test_coop_pvp.c runtime/coop_pvp.c -lm -o build/test_coop_pvp && build/test_coop_pvp` sale con 0
   depende de: ninguna (P4-6 sigue abierta y T401 ya no la decide: se construye con su valor por defecto)
@@ -809,8 +814,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 ## Bloque 9 — Amenaza de los enemigos (CU-15, ADR-012)
 
-- [~] T443 [P] [lógica] Amenaza de los enemigos: lógica pura
-  reclamada: agente Opus amenaza-t443 (coop/T443, en curso; adelantada)
+- [x] T443 [P] [lógica] Amenaza de los enemigos: lógica pura
+  reclamada: integrada `f57533e` (adelantada) — verify 0 en Windows y Linux (CI Coop tests)
   files: runtime/coop_threat.c, runtime/coop_threat.h, tests/test_coop_threat.c
   verify: `clang -Wall -Iruntime tests/test_coop_threat.c runtime/coop_threat.c -lm -o build/test_coop_threat && build/test_coop_threat` sale con 0
   depende de: ninguna

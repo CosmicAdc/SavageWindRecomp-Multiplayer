@@ -82,8 +82,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies `runtime/online.c` para que una prueba pase; si una prueba descubre un fallo real, déjala escrita, desactívala con un comentario que diga por qué, y anótalo; no abras sockets.
   modelo sugerido: medio
 
-- [~] T204 [net] Pruebas de la máquina de estados de sesión.
-  reclamada: agente Sonnet sesion-t204 (coop/T204 `fde83e8`, escrita; sin integrar) — Windows imprime el aviso y sale 0; FALTA Docker (solo POSIX); R_FULL y expulsión por silencio quedan PENDIENTE (T218)
+- [x] T204 [net] Pruebas de la máquina de estados de sesión.
+  reclamada: agente Sonnet sesion-t204 (integrada `3297186`) — Docker/Linux: 9 casos 0 fallos, 2 pendientes (T218); Windows: aviso y 0
   files: `tools/test_online_session.c` (nuevo), `Makefile` (bloque al final)
   verify: en Docker: `docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas sh -c 'make B=/tmp/b GEN=/nonexistent test-online-session'` termina con 0 y lista al menos los nueve casos de `pasos`; en Windows `make test-online-session` imprime que la prueba es solo POSIX y termina con 0
   depende de: T203
@@ -98,7 +98,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no modifiques `runtime/online.c`; no uses puertos reales; no dependas de esperas reales (`sleep`).
   modelo sugerido: alto
 
-- [ ] T205 [P] [ci] Flujo de CI para las pruebas del cooperativo.
+- [x] T205 [P] [ci] Flujo de CI para las pruebas del cooperativo.
+  reclamada: orquestador (`487a5af`) — pasos del flujo en el contenedor Linux en 0; FALTA verlo verde en Actions tras el push
   files: `.github/workflows/coop.yml` (nuevo)
   verify: `$PY -c "import yaml,sys; yaml.safe_load(open('.github/workflows/coop.yml'))"` no da error (o revisión manual si no hay `yaml`); tras el siguiente push que pida el dueño, el flujo aparece en Actions y termina en verde
   depende de: T203
@@ -112,8 +113,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no añadas secretos; no edites otros flujos; no hagas el push tú.
   modelo sugerido: bajo
 
-- [~] T213 [net] Capa única de validación de lo que llega por red.
-  reclamada: agente Opus valida-t213 (coop/T213, en curso)
+- [x] T213 [net] Capa única de validación de lo que llega por red.
+  reclamada: agente Opus valida-t213 (integrada `4bed182`) — validate 181320/0, net 309/0, wire 16647/0; Linux en 0; FALTA bot contra el juego y firma
   files: `runtime/online_validate.h`, `runtime/online_validate.c` (nuevos), `runtime/online.c`, `tools/test_online_validate.c` (nuevo), `Makefile` (bloque al final)
   verify: `make test-online-validate` termina con 0 (casos dirigidos + 100 000 estructuras aleatorias con semilla fija); `make test-online-wire test-online-net` siguen en 0; `grep -n "online_validate_" runtime/online.c` muestra una llamada en cada `case` de `cl_message` que guarda datos; recorrido de F1 completo con firma igual a la referencia; bot con `BOT_NAN=1`, `BOT_LOOT=...` y `BOT_SHIELD=1`: el juego sigue y registra los descartes
   depende de: T204
@@ -132,8 +133,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## FASE 0 — Cadena OA (estrictamente en serie, un dueño, un worktree)
 
-- [~] T206 [oa] Reordenar `online_actors.c` por módulos, dentro del mismo fichero.
-  reclamada: agente Opus oa-t206 (coop/T206, en curso; base `7b53d18`)
+- [x] T206 [oa] Reordenar `online_actors.c` por módulos, dentro del mismo fichero.
+  reclamada: agente Opus oa-t206 (integrada `3370d18`) — oa_check IGUALES; mismo único aviso; FALTA firma de referencia
   files: `runtime/online_actors.c`, `tools/coop/oa_check.py` (nuevo), `specs/decisiones/<n>-reparto-oa.md`
   verify: `$PY tools/coop/oa_check.py --antes f1-cerrada:runtime/online_actors.c --despues runtime/online_actors.c` termina con 0; `make -j8` compila sin avisos nuevos; `make test-online-gate` en 0; recorrido corto (pasos 1-3) pasa
   depende de: T201
@@ -149,7 +150,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies ni un carácter dentro de una función, variable o macro (ni espacios, ni comentarios, ni nombres); no quites `static`; no crees ficheros `.c` nuevos todavía; no arregles nada que veas mal.
   modelo sugerido: alto
 
-- [ ] T207 [oa] Cortar en módulos `oa_*.c` con una cabecera interna.
+- [x] T207 [oa] Cortar en módulos `oa_*.c` con una cabecera interna.
+  reclamada: agente Opus oa-t207 (integrada `929661f`; ADR renumerado a ADR-023) — make -j8, 6 pruebas, Linux distro_build 0; dos juegos a 60 fps; FALTA firma
   files: `runtime/oa_core.c`, `oa_gamedata.c`, `oa_sample.c`, `oa_puppet.c`, `oa_runes.c`, `oa_enemies.c`, `oa_loot.c`, `oa_world.c`, `oa_flags.c`, `oa_rules.c`, `oa_control.c`, `oa_frame.c`, `runtime/online_actors_internal.h` (nuevos); `runtime/online_actors.c` (se elimina)
   verify: `$PY tools/coop/oa_check.py --antes <commit de T206>:runtime/online_actors.c --modulos "runtime/oa_*.c"` termina con 0; `make -j8` enlaza en Windows; `ENGINE=docker JOBS=4 tools/linux/distro_build.sh debian:13` termina con 0; `wc -l runtime/oa_*.c` anotado; recorrido completo de F1 con `firma_log.py --comparar` en 0
   depende de: T206
@@ -166,7 +168,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies cuerpos de función más allá del renombrado mecánico del commit 2; no rediseñes el estado compartido; no partas `g_act` (es T208); no añadas `RT_ON_RESET` (es T212); no dejes un símbolo exportado sin prefijo.
   modelo sugerido: alto
 
-- [ ] T208 [oa] Partir `g_act[]` por dueño.
+- [~] T208 [oa] Partir `g_act[]` por dueño.
+  reclamada: agente Opus oa-t208 (coop/T208 `23051ec`, sin integrar) — compila y pruebas en 0; pasada con dos juegos: pasos 4-5 fallan y B recrea enemigos en bucle: en diagnóstico (diag-t208)
   files: `runtime/oa_puppet.c`, `runtime/oa_runes.c`, `runtime/oa_world.c`, `runtime/oa_rules.c`, `runtime/oa_frame.c`, `runtime/oa_core.c`, `runtime/online_actors_internal.h`
   verify: `grep -rn "g_act\[" runtime/` no devuelve nada; `make -j8` compila; `$PY tools/coop/firma_log.py --comparar ...` en 0 tras el recorrido completo; en juego: Magnesis, Stasis y Cryonis de B se ven en A
   depende de: T207
