@@ -19,6 +19,12 @@ explicado en `F0-preparacion/tasks.md`, "Cómo leer una tarea".
 
 Una fase no empieza hasta que el dueño aprueba el cierre de la anterior (T024, T121, T221).
 
+**F3 y F4 "en paralelo" tiene un límite:** F3 es dueña de `runtime/online.c` mientras dure su cadena núcleo
+(T309-T319). Las investigaciones de F4 (T401-T403, T407, T408) y su lógica pura (`coop_*.c` con sus pruebas) pueden
+empezar durante F3; todo lo que edite `runtime/online.c` (T413 y siguientes) espera al cierre del bloque 3 de F3, y
+T409 (protocolo) espera a F3 completa. F3 no se cierra sin la prueba con dos PC por Internet (T341; ADR-011,
+decisión 47).
+
 ## 2. Dependencias entre tareas
 
 ### F0 (25 tareas)
@@ -152,6 +158,12 @@ Recursos únicos de esta máquina, que ninguna planificación puede duplicar:
 
 ## 5. Protocolo de relevo: cómo coge una tarea un agente
 
+**Este protocolo está enmendado por [ADR-006](../decisiones/ADR-006-orquestador-y-subagentes.md)** (un orquestador
+integra y verifica; los subagentes solo escriben). Donde los pasos de abajo piden ejecutar algo (pasos 7, 8 y 12, y
+cualquier "prueba", "mide", "compila" o "regenera" de una tarea), lo ejecuta **el orquestador** (o el dueño), no el
+subagente: el subagente **no compila, no ejecuta pruebas, no lanza el juego ni Docker, no descarga ni instala nada y
+no hace push**. Solo puede usar comprobaciones de solo lectura baratas (`grep`, `git diff`).
+
 1. **Leer** `specs/constitution.md` (reglas no negociables) y el contrato que toque la tarea en `specs/contratos/`
    (`protocolo.md`, `hilos-y-frame.md`, `autoridad-mundo.md`, `validacion-red.md`). Si alguno no existe todavía,
    decirlo en la bitácora y seguir con las reglas comunes del `tasks.md` de la fase.
@@ -167,17 +179,19 @@ Recursos únicos de esta máquina, que ninguna planificación puede duplicar:
    (`game_dir.txt`, venv, `generated/`, `build/`, `online_mod/`; F0 `plan.md` §10). Comprobar finales de línea:
    `git config core.autocrlf` debe dar `false`.
 6. **Tocar solo los ficheros de `files:`**. Si hace falta otro, parar y pedirlo.
-7. **Ejecutar `verify`** tal como está escrito. Si un comando de `verify` no existe o falla por una razón ajena
-   (falta `python3`, falta Docker), no sustituirlo por otro en silencio: anotarlo.
-8. **Pedir turno** para cualquier prueba con los dos juegos.
+7. **Dejar escrito el `verify`** tal como está en la tarea y marcarlo "NO verificado" (ADR-006): lo ejecuta el
+   orquestador, de uno en uno. Si un comando de `verify` no existe o fallaría por una razón ajena (falta `python3`,
+   falta Docker), no sustituirlo por otro en silencio: anotarlo para el orquestador.
+8. **Pedir turno al orquestador** para cualquier prueba con los dos juegos: el subagente no los lanza.
 9. **Antes del commit**: la comprobación de trampas de nombres (`F0-preparacion/plan.md` §8). Un commit por cambio
    verificable, con el número de tarea en el mensaje. Sin `git push`.
 10. **Entrada de bitácora** en `specs/bitacora/` con la plantilla de `verificacion.md` de la fase: fecha, commit,
     versión del juego, hardware, ajustes, FPS, qué se observó, logs (fuera del repositorio).
 11. **Decir lo que NO se verificó**, de forma explícita y separada: qué se comprobó solo por lectura, qué caminos no
     se probaron, qué quedó "sin reproducir". Una tarea entregada sin esta sección se devuelve.
-12. **Entregar**: marcar `- [x]`, enlazar la entrada de bitácora en la línea `reclamada:`, y avisar al coordinador
-    para la integración en `coop/main`. Borrar el worktree solo después de integrar
+12. **Entregar**: hacer commit en la rama de la tarea y entregar diff, resumen y la lista de "NO verificado" al
+    orquestador. El orquestador integra en `coop/main` (merge `--no-ff`), ejecuta el `verify`, marca `- [x]`, enlaza la
+    entrada de bitácora en la línea `reclamada:` y hace el push solo al cerrar la fase. Borrar el worktree solo después de integrar
     (`git worktree remove "$SW/wt/<tarea>"`).
 
 Si el agente no puede terminar: dejar la casilla en `[~]`, escribir en la bitácora hasta dónde llegó, qué probó y
