@@ -8,7 +8,7 @@
 // BOT_LOOT=<actor>: a LOOT_ADD of that actor's name, at its position;
 // BOT_SHIELD=1: an ESTATE with one enemy whose shield is 40 'A' with no terminator.
 //
-//   cc -O2 -o build/online_bot tools/online_bot.c [-lws2_32]
+//   cc -O2 -Iruntime -o build/online_bot tools/online_bot.c [-lws2_32]
 //   build/online_bot [host] [port] [name] [radius] [head upper lower] [weapon shield bow sheath quiver]
 //                    (127.0.0.1 52520 Bot 4, Hylian set, Traveler's sword, shield, bow, its sheath, a quiver)
 #ifdef _WIN32
@@ -32,66 +32,7 @@ typedef int sock_t;
 #include <stdlib.h>
 #include <string.h>
 
-#pragma pack(push, 1)
-typedef struct {
-    float pos[3], yaw;
-    uint8_t flags;
-    uint16_t ping_ms;
-    uint8_t anim;
-    char as[4][32];  // the AS its Link plays: slot 0, slot 1 banks 0 and 1, slot 2
-    uint8_t gear_bone[6];  // runtime/online_actors.c k_bones + 1: 1 Weapon_R, 2 Weapon_L, 3 Pod_A, 4 Pod_B, 5 Pod_C
-    float gear_rel[6][12];
-    uint8_t shots[1 + 8 * 51 + 4 * 15];  // (OnlineShots: none)
-    uint8_t effects;
-    struct { char name[40]; float from[3], m[12]; } grab;  // (OnlineGrab: what it holds with the Magnesis rune)
-    struct { char name[40]; float from[3], m[12]; } stop;  // (and what it stopped with Stasis: none)
-    uint8_t ice_n;  // (its Cryonis pillars: none)
-    float ice[3][12];
-    char map[32];  // (the map it is on: "" unknown, as on everyone's)
-    struct { uint32_t hash; char name[28]; int32_t life; } boss[2];  // (the bosses near it: none)
-    char fx[24];  // (its weapon's swing trail: none)
-    int16_t fx_anim[3];
-    float fx_frame[3];
-    char fxev[8][24];  // (its last effects: none)
-    uint32_t fx_props[24];  // (its ELink property values: none)
-    uint8_t weather;  // (the weather where it is: 255 unknown, set below)
-    int8_t dye[3];  // (its armour's dyes: none, set below)
-    uint16_t pvp_seq;  // (its blows on the others: none)
-    uint8_t pvp_target;
-    int16_t pvp_damage;
-    char horse[24];  // (the horse it rides: none)
-    float horse_m[12];
-    char horse_as[32];
-    char tack[2][24];  // (its horse's saddle and reins: none)
-    float tack_m[2][12];
-    uint32_t ground_props[16];  // (its ground's reaction values: none)
-    uint8_t collide;  // (its collisions setting: off, a bot isn't the host)
-    uint8_t revive;  // (its revival setting: off)
-    uint8_t nopause;  // (its menus setting: off)
-    float bloody_moon;  // (its Blood Moon timer: -1 unknown, set below)
-    uint32_t aggro_id;  // (the enemy it hit last: none)
-    uint16_t aggro_seq;
-    struct { uint32_t hash; float m[12]; } objs[8];  // (the objects moving near it: none)
-    uint32_t broken[8];  // (the objects it broke: none)
-    uint32_t trunks_gone[4];
-    struct { uint32_t hash; float m[12]; char as[28]; } movers[6];  // (the mechanisms moving near it: none)
-    uint8_t objs_trunk;
-    struct { char name[32]; uint8_t mode; float m[12]; } held[5];  // (the materials it holds: none)
-} WireState;
-typedef struct { uint32_t magic; uint16_t version; char name[24], pass[24]; } WireHello;
-// (the wire layouts of the host's OnlineEnemy and OnlineLoot, runtime/online.h)
-typedef struct {
-    uint32_t id; char name[40]; float m[12]; char as[32]; char weapon[40]; float wm[12]; int32_t life;
-    char shield[40]; float sm[12];
-    uint8_t wbone, sbone;
-    uint8_t owner;
-    uint32_t hash;
-} WireEnemy;
-typedef struct { uint32_t gid, lid; uint8_t origin; char name[40]; float pos[3]; float rot[9]; } WireLoot;
-#pragma pack(pop)
-// (the list of runtime/online.c, in its order)
-enum { M_HELLO = 1, M_WELCOME, M_REJECT, M_STATE, M_JOIN, M_LEAVE, M_CHAT, M_PING, M_PONG, M_EQUIP, M_SKEL, M_TIME, M_ENEMIES,
-       M_HIT, M_ESTATE, M_LOOT_ADD };
+#include "online_wire.h"
 
 static void msg(sock_t s, uint8_t type, const void *p, int n) {
     uint8_t b[3 + 16384];  // (the runtime's own limit, runtime/online.c send_msg: a STATE is 2969 bytes now)
@@ -114,7 +55,7 @@ int main(int argc, char **argv) {
     if (getaddrinfo(host, port, &hints, &res)) { fprintf(stderr, "bot: can't resolve %s\n", host); return 1; }
     sock_t s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (connect(s, res->ai_addr, (int)res->ai_addrlen)) { fprintf(stderr, "bot: can't connect to %s:%s\n", host, port); return 1; }
-    WireHello h = {.magic = 0x4c4f5753u, .version = 38};
+    WireHello h = {.magic = MAGIC, .version = PROTOCOL};
     snprintf(h.name, sizeof h.name, "%s", name);
     msg(s, M_HELLO, &h, sizeof h);
     float centre[3] = {0, 0, 0};
@@ -203,11 +144,12 @@ int main(int argc, char **argv) {
                 float br = getenv("BOT_BOOM_R") ? (float)atof(getenv("BOT_BOOM_R")) : 4;
                 float m[12] = {1, 0, 0, centre[0] + br * sinf(ang), 0, 1, 0, centre[1] + 0.3f, 0, 0, 1, centre[2] + br * cosf(ang)};
                 uint16_t id = (uint16_t)(1 + (int)(t / 10));
-                ws.shots[0] = 1, memcpy(ws.shots + 1, &id, 2), ws.shots[3] = 0, memcpy(ws.shots + 4, m, 48);
+                uint8_t *sh = (uint8_t *)&ws.shots;
+                sh[0] = 1, memcpy(sh + 1, &id, 2), sh[3] = 0, memcpy(sh + 4, m, 48);
                 memcpy(boom_at, m + 3, 4), boom_at[1] = m[7], boom_at[2] = m[11];
             }
             if (boom_seq && t - boom_t < 2) {
-                uint8_t *b0 = ws.shots + 1 + 8 * 51;
+                uint8_t *b0 = (uint8_t *)&ws.shots + 1 + 8 * 51;
                 memcpy(b0, &boom_seq, 2), b0[2] = 0, memcpy(b0 + 3, boom_at, 12);
             }
             // BOT_ICE=x,y,z: a Cryonis pillar of its there 10 s of every 20
@@ -233,7 +175,7 @@ int main(int argc, char **argv) {
                     memset(ev, 0, sizeof ev), memcpy(ev, &seq, 2), ev[2] = getenv("BOT_SOUND_WHO") ? atoi(getenv("BOT_SOUND_WHO")) : 2;
                     snprintf((char *)ev + 3, 21, "%s", getenv("BOT_SOUND"));
                 }
-                memcpy(ws.fxev[0], ev, sizeof ev);
+                memcpy(&ws.fxev[0], ev, sizeof ev);
             }
             // BOT_GRAB=<actor>,x,y,z: holds that actor (the one of that name nearest x y z) with the Magnesis rune 10 s
             // of every 20: lifted 3 m over where it was, going round a 2 m circle
@@ -261,7 +203,7 @@ int main(int argc, char **argv) {
             // BOT_LOOT=<actor>: a LOOT_ADD of that name at its position, once, 5 s in
             static int loot_sent, shield_sent;
             if (getenv("BOT_LOOT") && t > 5 && !loot_sent++) {
-                WireLoot l = {.gid = 0, .lid = 1};
+                OnlineLoot l = {.gid = 0, .lid = 1};
                 snprintf(l.name, sizeof l.name, "%s", getenv("BOT_LOOT"));
                 memcpy(l.pos, ws.pos, sizeof l.pos);
                 msg(s, M_LOOT_ADD, &l, sizeof l);
@@ -269,8 +211,8 @@ int main(int argc, char **argv) {
             }
             // BOT_SHIELD=1: an ESTATE (a count, then the enemies) of one whose shield has no terminator, once, 5 s in
             if (getenv("BOT_SHIELD") && t > 5 && !shield_sent++) {
-                uint8_t eb[1 + sizeof(WireEnemy)];
-                WireEnemy e = {.id = 1, .life = 100, .owner = (uint8_t)id};
+                uint8_t eb[1 + sizeof(OnlineEnemy)];
+                OnlineEnemy e = {.id = 1, .life = 100, .owner = (uint8_t)id};
                 snprintf(e.name, sizeof e.name, "Enemy_Bokoblin_Junior");
                 snprintf(e.as, sizeof e.as, "Wait");
                 memset(e.shield, 'A', sizeof e.shield);
