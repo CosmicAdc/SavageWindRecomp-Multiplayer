@@ -221,6 +221,25 @@ static void the_switch_button_comes_from_the_game_table(void) {
     assert(act_switch_button(ACT_COUNT) == -1 && act_switch_button(-1) == -1);
 }
 
+// The whole of f from the start, NUL-terminated. It reads until EOF instead of trusting ftell(): on Windows a stream in
+// text mode counts every "\n" written as "\r\n" but reads it back as one byte, so ftell() overshoots what fread() returns.
+static char *read_all(FILE *f) {
+    rewind(f);
+    size_t cap = 4096, len = 0;
+    char *buf = malloc(cap);
+    assert(buf);
+    for (size_t n; (n = fread(buf + len, 1, cap - len - 1, f)) > 0;) {
+        len += n;
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = realloc(buf, cap);
+            assert(buf);
+        }
+    }
+    buf[len] = 0;
+    return buf;
+}
+
 static void capture_and_settings(void) {
     SDL_Event e = {0};
     act_reset();
@@ -273,11 +292,7 @@ static void capture_and_settings(void) {
     // savagewind.ini: only what differs, and back
     FILE *f = tmpfile();  // not open_memstream: that is POSIX only and this also runs on Windows
     bind_settings_save(f);
-    long len = ftell(f);
-    char *buf = malloc((size_t)len + 1);
-    rewind(f);
-    assert(fread(buf, 1, (size_t)len, f) == (size_t)len);
-    buf[len] = 0;
+    char *buf = read_all(f);
     fclose(f);
     assert(strstr(buf, "act_key_2 = E\n") && strstr(buf, "act_key_3 = E\n") && strstr(buf, "act_pad_5 = south\n"));
     assert(strstr(buf, "act_key_9 = Mouse Back\n") && strstr(buf, "act_pad_3 = none\n"));
@@ -304,13 +319,7 @@ static char *save_bindings(void) {
     FILE *f = tmpfile();
     assert(f);
     bind_settings_save(f);
-    long len = ftell(f);
-    assert(len >= 0);
-    char *buf = malloc((size_t)len + 1);
-    assert(buf);
-    rewind(f);
-    assert(fread(buf, 1, (size_t)len, f) == (size_t)len);
-    buf[len] = 0;
+    char *buf = read_all(f);
     fclose(f);
     return buf;
 }
