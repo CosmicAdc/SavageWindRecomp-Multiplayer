@@ -245,8 +245,8 @@ oa_core.c:oa_g_trunks_gone                   partida   troncos que cortamos
 oa_core.c:oa_g_online_actor                  partida   qué ranuras tienen figura (online_has_actor; lo lee el overlay)
 oa_core.c:oa_actor_name:mod                  permitir  si el overlay tiene online_mod.txt: fichero del overlay mirado una vez (la ruta sale de una variable de entorno)
 oa_core.c:online_actors_on:on                permitir  versión 1.9.0 y overlay, mirados una vez: no cambian en el proceso
-oa_core.c:oa_call_f:saved                    puntero   copia de los registros del hilo del juego (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
-oa_core.c:oa_call_sret:saved                 puntero   como oa_call_f:saved
+oa_core.c:oa_call_f_saved                    puntero   copia de los registros del hilo del juego (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
+oa_core.c:oa_call_sret_saved                 puntero   como oa_call_f:saved
 oa_core.c:oa_g_pool                          puntero   piezas (actores) guardadas de cada jugador
 oa_core.c:g_orphan                           puntero   peticiones huérfanas (handles con unit del juego)
 oa_core.c:oa_g_pool_at                       partida   posición bajo el Link donde se esconden las piezas
@@ -263,7 +263,7 @@ oa_core.c:oa_g_dist                          partida   distancia del jugador que
 oa_core.c:oa_g_pvp                           partida   último golpe PvP
 oa_core.c:oa_g_piece_params                  puntero   puntero a los parámetros de la pieza siguiente (una local de oa_puppet; 0 fuera de ella)
 oa_core.c:glider_of:off                      permitir  desplazamiento del parapente dentro del jugador, descubierto una vez (el mismo en cada arranque de 1.9.0)
-oa_core.c:glider_of:miss                     partida   contador de reintentos de esa búsqueda
+oa_core.c:miss                               partida   contador de reintentos de esa búsqueda
 oa_core.c:oa_g_actors                        puntero   lista de actores del juego (oa_all_actors)
 oa_core.c:oa_g_theirs                        puntero   botín de los otros hecho aquí (Piece)
 # oa_gamedata.c
