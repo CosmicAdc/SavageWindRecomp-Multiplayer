@@ -7,6 +7,8 @@
 #   parar        cierra los dos con "swctl exit" (puertos 7777 y 7778) y comprueba que no queda savagewind.exe
 #   matar B      mata el proceso que escucha el puerto de control de B, sin cerrarlo limpio (también vale A)
 #   relanzar B   lanza de nuevo B (o A) con las mismas variables; su log se añade al anterior
+#   base B       guarda la partida de prueba de B (o A) como base común: copia guardado-B a guardado-base
+#   restaurar    deja guardado-A y guardado-B como guardado-base (con los dos juegos cerrados)
 #
 # Carpetas (fuera del repositorio; $SW = la carpeta que contiene coop/, juego/ y pruebas/, deducida de la ubicación
 # de este guion, o la variable de entorno SW si existe):
@@ -160,6 +162,30 @@ cmd_relanzar() {
     lanzar "$x" 0 ">>"
 }
 
+# Partida base para no empezar cada prueba de cero. Solo toca carpetas de $PRUEBAS, nunca la partida real.
+cmd_base() {
+    local x
+    x="$(echo "${1:-}" | tr a-z A-Z)"
+    puerto_de "$x" > /dev/null
+    [ "$(contar)" -eq 0 ] || die "hay savagewind.exe abiertos; cerrarlos antes (parar)"
+    [ -d "$PRUEBAS/guardado-$x/save_0" ] || die "guardado-$x no tiene save_0"
+    rm -rf "$PRUEBAS/guardado-base.nuevo"
+    cp -a "$PRUEBAS/guardado-$x" "$PRUEBAS/guardado-base.nuevo" || die "no se pudo copiar guardado-$x"
+    rm -rf "$PRUEBAS/guardado-base" && mv "$PRUEBAS/guardado-base.nuevo" "$PRUEBAS/guardado-base"
+    echo "guardado-base = copia de guardado-$x"
+}
+
+cmd_restaurar() {
+    local x
+    [ "$(contar)" -eq 0 ] || die "hay savagewind.exe abiertos; cerrarlos antes (parar)"
+    [ -d "$PRUEBAS/guardado-base/save_0" ] || die "no hay guardado-base (crearlo con: base B)"
+    for x in A B; do
+        rm -rf "$PRUEBAS/guardado-$x" || die "no se pudo borrar guardado-$x"
+        cp -a "$PRUEBAS/guardado-base" "$PRUEBAS/guardado-$x" || die "no se pudo copiar a guardado-$x"
+        echo "guardado-$x = guardado-base"
+    done
+}
+
 orden="${1:-}"
 case "$orden" in
     arrancar)  cmd_arrancar 0 ;;
@@ -167,8 +193,10 @@ case "$orden" in
     parar)     cmd_parar ;;
     matar)     cmd_matar "${2:-}" ;;
     relanzar)  cmd_relanzar "${2:-}" ;;
+    base)      cmd_base "${2:-}" ;;
+    restaurar) cmd_restaurar ;;
     *)
-        sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+        sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
         [ -z "$orden" ] && exit 2
         die "orden desconocida: '$orden'"
         ;;
