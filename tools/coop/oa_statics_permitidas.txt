@@ -1,0 +1,102 @@
+# Variables del codigo en linea que sobreviven a un reinicio en caliente sin limpiarse, con su motivo (T211).
+# Las comprueba tools/coop/oa_statics.py; la clasificacion completa esta en
+# specs/decisiones/ADR-026-inventario-estaticas.md. Una linea "clave  motivo": fichero:nombre (de fichero) o
+# fichero:funcion:nombre (de funcion; "#2" la segunda con ese nombre en la misma funcion).
+# Solo clase (c): tablas cargadas de un .txt, variables de entorno, desplazamientos descubiertos una vez,
+# mutex, constantes, ajustes del jugador y buferes de trabajo que no guardan direcciones del juego.
+# Nunca algo que guarde una direccion del juego.
+
+# oa_control.c
+oa_control.c:online_actors_control_init:cmds     tabla constante de órdenes de control
+oa_control.c:oa_control_tests_frame:m            tabla cargada de enemies.txt (prueba ENEMY_TEST)
+oa_control.c:oa_control_tests_frame:n            número de líneas de enemies.txt (va con m; -1 sin cargar)
+# oa_core.c
+oa_core.c:oa_actor_name:mod                      si el overlay tiene online_mod.txt: fichero del overlay mirado una vez (la ruta sale de una variable de entorno)
+oa_core.c:online_actors_on:on                    versión 1.9.0 y overlay, mirados una vez: no cambian en el proceso
+oa_core.c:g_gear_map                             tabla cargada de gear.txt
+oa_core.c:g_gear_n                               número de líneas de gear.txt (-1 sin cargar)
+oa_core.c:oa_map_load:line                       búfer de lectura de línea: se escribe antes de cada lectura
+oa_core.c:oa_armor_actor:m                       tabla cargada de armor.txt
+oa_core.c:oa_armor_actor:n                       número de líneas de armor.txt (-1 sin cargar)
+oa_core.c:oa_armor_bones:m                       tabla cargada de bones.txt
+oa_core.c:oa_armor_bones:n                       número de líneas de bones.txt (-1 sin cargar)
+oa_core.c:oa_armor_bones:cache                   caché de mapas de huesos sacados solo de bones.txt (nada del juego)
+oa_core.c:oa_armor_bones:next                    siguiente hueco de esa caché
+oa_core.c:glider_of:off                          desplazamiento del parapente dentro del jugador, descubierto una vez (el mismo en cada arranque de 1.9.0)
+# oa_gamedata.c
+oa_gamedata.c:oa_give_heart:name                 cadena constante
+# oa_enemies.c
+oa_enemies.c:enemy_actor:m                       tabla cargada de enemies.txt
+oa_enemies.c:enemy_actor:n                       número de líneas de enemies.txt (-1 sin cargar)
+oa_enemies.c:enemy_weapon:off                    desplazamiento del arma dentro de un enemigo, descubierto una vez (el mismo en cada arranque de 1.9.0)
+oa_enemies.c:k_hands                             tabla constante
+oa_enemies.c:k_elem_source                       tabla constante
+oa_enemies.c:mark_dead:maps                      tabla constante
+oa_enemies.c:oa_enemies_host:st                  búfer de trabajo: online_take_estates lo llena antes de cada lectura
+oa_enemies.c:weapon_scale:m                      tabla cargada de wscale.txt
+oa_enemies.c:weapon_scale:n                      número de líneas de wscale.txt (-1 sin cargar)
+oa_enemies.c:oa_attack_power:m                   tabla cargada de un .txt del overlay
+oa_enemies.c:oa_attack_power:n                   número de líneas (-1 sin cargar)
+oa_enemies.c:oa_our_defense:m                    tabla cargada de un .txt del overlay
+oa_enemies.c:oa_our_defense:n                    número de líneas (-1 sin cargar)
+oa_enemies.c:oa_enemies_client:e                 búfer de trabajo: online_enemies lo llena antes de cada lectura
+oa_enemies.c:oa_enemies_client:st                búfer de trabajo: se escribe entrada a entrada antes de enviarlo
+oa_enemies.c:oa_enemies_show:ht                  variable de entorno ELEM_HIT_TEST leída una vez
+oa_enemies.c:oa_enemies_show:ft                  variable de entorno FIRE_TEST leída una vez
+# oa_flags.c
+oa_flags.c:slate_rune:runes                      tabla constante
+oa_flags.c:korok_event:off                       desplazamiento del HashId dentro de un actor, descubierto una vez (el mismo en cada arranque de 1.9.0)
+oa_flags.c:oa_quests_update:m                    tabla de oa_map_load que no se usa (siempre 0)
+oa_flags.c:oa_quests_update:names                tabla cargada de quests.txt
+oa_flags.c:oa_quests_update:hash                 tabla cargada de quests.txt (CRC de cada nombre)
+oa_flags.c:oa_quests_update:revival              tabla cargada de quests.txt (qué flags renacen con la Luna de Sangre: sale solo del nombre)
+oa_flags.c:oa_quests_update:n                    número de líneas de quests.txt (-1 sin cargar)
+oa_flags.c:oa_quests_update:kinds                tabla constante
+# oa_loot.c
+oa_loot.c:oa_loot_update:list                    búfer de trabajo: se copia o lo llena online_loots antes de cada lectura
+oa_loot.c:oa_ground_update:at                    búfer de trabajo: posiciones de esta llamada, escritas antes de leerlas
+# oa_puppet.c
+oa_puppet.c:k_anims                              tabla constante
+oa_puppet.c:oa_puppet_frame:dp                   búfer de trabajo: se borra antes de cada uso (parámetros de tinte)
+oa_puppet.c:oa_puppet_frame:name                 búfer de trabajo: se escribe antes de cada uso
+oa_puppet.c:oa_puppet_frame:kinds                tabla constante
+oa_puppet.c:oa_puppet_frame:heap                 tabla constante
+# oa_rules.c
+oa_rules.c:oa_own_strikes_in_menu:log            variable de entorno MENU_LOG leída una vez
+oa_rules.c:rt_online_menu_live:still             variable de entorno MENU_STILL leída una vez
+oa_rules.c:rt_menu_draw_pause:still              variable de entorno MENU_STILL leída una vez
+oa_rules.c:oa_players_collide:off                variable de entorno NO_COLLIDE leída una vez
+# oa_runes.c
+oa_runes.c:oa_grab_update:kn                     cadena constante
+# oa_sample.c
+oa_sample.c:oa_k_channel                         tabla constante
+oa_sample.c:oa_k_bones                           tabla constante
+oa_sample.c:oa_k_shot_names                      tabla constante
+oa_sample.c:rt_online_xlink_emit:all             variable de entorno FX_ALL leída una vez
+oa_sample.c:rt_game_fmt:on                       variable de entorno EFF_ERR_LOG leída una vez
+oa_sample.c:continuous_sound:known               tabla constante
+oa_sample.c:oa_fx_update:rf_log                  variable de entorno RF_LOG leída una vez
+oa_sample.c:oa_fx_update:who                     tabla constante
+oa_sample.c:oa_sample_pose:pedestals             tabla constante
+oa_sample.c:oa_sample_skeleton:q                 búfer de trabajo: se escribe hueso a hueso antes de enviarlo
+oa_sample.c:oa_sample_skeleton:t                 búfer de trabajo: como q
+# oa_world.c
+oa_world.c:obj_kind:fixed                        tabla constante
+oa_world.c:oa_objs_update:ot                     variable de entorno OBJ_TEST leída una vez
+oa_world.c:oa_objs_update:theirs                 búfer de trabajo: se llena en esta llamada antes de leerlo (nt)
+oa_world.c:oa_objs_update:theirs_trunk           búfer de trabajo: como theirs
+oa_world.c:mover_kind:kinds                      tabla constante
+oa_world.c:oa_movers_update:log_on               variable de entorno MOVER_LOG leída una vez
+oa_world.c:oa_movers_update:mt                   variable de entorno MOVER_TEST leída una vez
+# online.c
+online.c:g_online                                ajustes del jugador (fichero de ajustes; hle.h: los ajustes se quedan). Hilos: menú, red-c, juego (oa_rules)
+online.c:net_init:done                           inicio de la pila de red, una vez por proceso. Hilos: menú (y main.c por línea de órdenes)
+online.c:g_pose_lock                             mutex. Hilos: juego, red-c
+online.c:g_drop_name                             tabla constante. Hilo: red-c
+online.c:cl_thread:lb                            búfer de envío: se escribe antes de cada envío. Hilo: red-c
+online.c:cl_thread:sb                            búfer de envío. Hilo: red-c
+online.c:cl_thread:eb                            búfer de envío. Hilo: red-c
+# online_actors.c
+online_actors.c:g_weapon_names                   tabla cargada de weapons.txt (lista de nombres de red permitidos)
+online_actors.c:g_item_names                     tabla cargada de items.txt
+online_actors.c:g_rupee_names                    tabla cargada de rupees.txt
