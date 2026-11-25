@@ -10,8 +10,9 @@ static OaPup g_pup[ONLINE_MAX];
 // player i's puppet state (oa_puppet_frame, the loop over the players, and rt_online_frame's steps 3 and 4 work on it)
 OaPup *oa_pup(int i) { return &g_pup[i]; }
 
-// player i's Link here (0: none), as made: maybe deleted by the game since (oa_link_live checks)
-uint64_t oa_puppet_link(int i) { return g_pup[i].link; }
+// player i's Link here, if the game still has it (0: none, or deleted by the game since it was made). Other modules
+// reach a remote Link through this (or oa_link_live, the same)
+uint64_t oa_puppet_link(int i) { return oa_link_live(i); }
 
 // player i's name, as his Link was made with
 const char *oa_puppet_name(int i) { return g_pup[i].name; }
@@ -245,6 +246,18 @@ static void animate(Cpu *c, int i, const OnlinePlayer *p) {
     g_pup[i].anim = -1;
 }
 
+// rt_online_frame, step 9b: a Link of theirs deleted by the game (the local Link died: game over; a load not seen by
+// where he is), seen before any later step uses it. Logged as step 18 logs it (his name as his Link was made with; the
+// distance step 18 last measured). True: rt_online_frame forgets everything and waits, as after step 18
+bool oa_puppets_validate(void) {
+    for (int i = 0; i < ONLINE_MAX; i++)
+        if (g_pup[i].link && !oa_alive(g_pup[i].link, g_pup[i].link_w)) {
+            LOG("[online] the game removed %s's Link: the world's actors are going, made again later (%.0f m away)\n", g_pup[i].name, oa_g_dist);
+            return true;
+        }
+    return false;
+}
+
 // rt_online_frame, step 18: each other player's Link here, made or dropped, placed and posed, with his armour, gear,
 // horse, effects, shots and bombs. True: a Link of theirs deleted by the game (logged): rt_online_frame forgets
 // everything and waits
@@ -273,7 +286,8 @@ bool oa_puppet_frame(Cpu *c, const float link[3], int me) {
             continue;
         }
         // his Link gone, deleted by the game: the world's actors are going (the local Link died: game over; a load
-        // not seen by where he is): all forgotten, made again two seconds later
+        // not seen by where he is): all forgotten, made again two seconds later (oa_puppets_validate saw it first, at
+        // step 9b: this is the second barrier, for a Link deleted during this frame's steps)
         if (oa_pup(i)->link && !oa_alive(oa_pup(i)->link, oa_pup(i)->link_w)) {
             LOG("[online] the game removed %s's Link: the world's actors are going, made again later (%.0f m away)\n", pl[i].name, oa_g_dist);
             return true;

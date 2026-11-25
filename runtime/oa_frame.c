@@ -139,6 +139,8 @@ static void frame_runes_boss(Cpu *c, uint64_t player, int me) {
 //  8. the pool, the blasts, the effects, the orphans                           oa_pool_update ... oa_orphans_update
 //  9. waiting: g_settle after a load; the local Link dead; 180 frames once     frame_wait                  ends
 //     he is back
+//  9b. a Link of theirs the game deleted: all forgotten, g_settle = 180,       oa_puppets_validate         ends
+//     before any step below uses it (step 18 still checks: a second barrier)
 // 10. the tests by environment variable (SAVAGEWIND_ONLINE_*_TEST, _LOG)       oa_control_tests_frame
 // 11. our enemies left, the loot, the quests                                   frame_owns_loot_quests
 // 12. weather, Blood Moon, PvP, the players' collision, our blows in a menu,   frame_near_players
@@ -174,6 +176,11 @@ void rt_online_frame(Cpu *c) {
     oa_fx_update(*(uint64_t *)(uintptr_t)(pinfo + 0x60));
     oa_orphans_update(c);
     if (frame_wait()) return;                                         // 9
+    if (oa_puppets_validate()) {                                      // 9b
+        forget_all();  // (a Link of theirs deleted by the game, logged there: made again later)
+        g_settle = 180;
+        return;
+    }
     oa_control_tests_frame(c, pinfo, link);                           // 10
     uint64_t player = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
     frame_owns_loot_quests(c, player, link, me);                      // 11

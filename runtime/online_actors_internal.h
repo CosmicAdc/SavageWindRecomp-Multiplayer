@@ -369,6 +369,7 @@ const char *oa_puppet_name(int i);
 void oa_puppet_pieces(Cpu *c, int i, void (*each)(Cpu *c, int i, Piece *p));
 void oa_puppet_drop(Cpu *c, int i);
 void oa_puppet_forget(void);
+bool oa_puppets_validate(void);
 bool oa_puppet_frame(Cpu *c, const float link[3], int me);
 
 // runtime/oa_runes.c
