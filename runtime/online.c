@@ -33,6 +33,7 @@ typedef int sock_t;
 
 #include "online.h"
 #include "online_wire.h"
+#include "online_validate.h"
 #include "game_sites.h"
 #include "platform.h"
 #include "rt.h"
@@ -860,56 +861,37 @@ static bool sample_equip(WireEquip *e) {
     return ok;
 }
 
-// What arrives is hostile until shown otherwise (specs/contratos/validacion-red.md): a number that is not finite, or
-// is far outside any world, never reaches a queue or a snapshot. A message (or, in a list, an entry) that fails is
-// dropped whole, never repaired; each kind is counted and logged the first time only.
-#define NUM_LIMIT 100000.0f  // (what sample_local already holds its own position to)
-enum { D_STATE, D_TIME, D_HIT, D_ENEMIES, D_ESTATE, D_LOOT_ADD, D_LOOTS, D_PICK, D_COUNT };
-static const char *const g_drop_name[D_COUNT] = {"STATE", "TIME", "HIT", "ENEMIES", "ESTATE", "LOOT_ADD", "LOOTS", "PICK"};
+// What arrives is hostile until shown otherwise (specs/contratos/validacion-red.md): every structure cl_message keeps
+// goes first through runtime/online_validate.h (its strings cut at their field's end, then each field checked), and
+// one that fails never reaches a queue or a snapshot. A message (or, in a list, an entry) that fails is dropped whole,
+// never repaired; each kind is counted and logged the first time only.
+enum { D_STATE, D_TIME, D_HIT, D_ENEMIES, D_ESTATE, D_LOOT_ADD, D_LOOTS, D_PICK, D_SKEL, D_EQUIP, D_COUNT };
+static const char *const g_drop_name[D_COUNT] = {"STATE", "TIME", "HIT", "ENEMIES", "ESTATE", "LOOT_ADD", "LOOTS", "PICK",
+                                                 "SKEL", "EQUIP"};
 static unsigned g_drop_n[D_COUNT];
 
-static bool floats_ok(const float *f, int n, float lim) {
-    for (int k = 0; k < n; k++)
-        if (!isfinite(f[k]) || fabsf(f[k]) > lim) return false;
-    return true;
-}
-
 static void drop_note(int kind) {
-    if (g_drop_n[kind]++ == 0) LOG("[online] dropped a %s with a number out of range (more are counted, not logged)\n", g_drop_name[kind]);
+    if (g_drop_n[kind]++ == 0) LOG("[online] dropped a %s that failed validation (more are counted, not logged)\n", g_drop_name[kind]);
 }
 
-static bool enemy_ok(const OnlineEnemy *e) {
-    return floats_ok(e->m, 12, NUM_LIMIT) && floats_ok(e->wm, 12, NUM_LIMIT) && floats_ok(e->sm, 12, NUM_LIMIT);
-}
-
-static bool loot_ok(const OnlineLoot *l) {
-    return floats_ok(l->pos, 3, NUM_LIMIT) && floats_ok(l->rot, 9, NUM_LIMIT);
-}
-
-static void remote_snap(int id, const WireState *w) {  // (lock held)
+static void remote_snap(int id, const WireState *w) {  // (lock held; w validated: online_validate_state)
     Remote *r = &g.r[id];
     Snap *s = &r->s[r->head];
     s->t = plat_now_ns();
     memcpy(s->pos, w->pos, sizeof s->pos);
-    s->yaw = w->yaw, s->flags = w->flags, s->anim = w->anim < ONLINE_A_COUNT ? w->anim : ONLINE_A_WAIT;
+    s->yaw = w->yaw, s->flags = w->flags, s->anim = w->anim;
     memcpy(s->pose.as, w->as, sizeof s->pose.as);
-    for (int k = 0; k < ONLINE_AS_CHANNELS; k++) s->pose.as[k][ONLINE_AS_MAX - 1] = 0;
     memcpy(s->pose.gear_bone, w->gear_bone, sizeof s->pose.gear_bone);
     memcpy(s->pose.gear_rel, w->gear_rel, sizeof s->pose.gear_rel);
     s->pose.shots = w->shots;
-    if (s->pose.shots.n > ONLINE_SHOTS) s->pose.shots.n = ONLINE_SHOTS;
     s->pose.yaw = w->yaw;
     s->pose.effects = w->effects;
     s->pose.grab = w->grab;
-    s->pose.grab.name[ONLINE_GRAB_NAME - 1] = 0;
     s->pose.stop = w->stop;
-    s->pose.ice_n = w->ice_n > 3 ? 3 : w->ice_n;
+    s->pose.ice_n = w->ice_n;
     memcpy(s->pose.map, w->map, sizeof s->pose.map);
     memcpy(s->pose.boss, w->boss, sizeof s->pose.boss);
-    for (int k = 0; k < ONLINE_BOSSES; k++) s->pose.boss[k].name[27] = 0;
-    s->pose.map[sizeof s->pose.map - 1] = 0;
     memcpy(s->pose.fx, w->fx, sizeof s->pose.fx);
-    s->pose.fx[ONLINE_FX_MAX - 1] = 0;
     memcpy(s->pose.fx_anim, w->fx_anim, sizeof s->pose.fx_anim);
     memcpy(s->pose.fx_frame, w->fx_frame, sizeof s->pose.fx_frame);
     memcpy(s->pose.fxev, w->fxev, sizeof s->pose.fxev);
@@ -920,7 +902,6 @@ static void remote_snap(int id, const WireState *w) {  // (lock held)
     memcpy(s->pose.horse, w->horse, sizeof s->pose.horse);
     memcpy(s->pose.horse_m, w->horse_m, sizeof s->pose.horse_m);
     memcpy(s->pose.horse_as, w->horse_as, sizeof s->pose.horse_as);
-    s->pose.horse[sizeof s->pose.horse - 1] = 0, s->pose.horse_as[sizeof s->pose.horse_as - 1] = 0;
     memcpy(s->pose.tack, w->tack, sizeof s->pose.tack);
     memcpy(s->pose.tack_m, w->tack_m, sizeof s->pose.tack_m);
     memcpy(s->pose.ground_props, w->ground_props, sizeof s->pose.ground_props);
@@ -930,15 +911,10 @@ static void remote_snap(int id, const WireState *w) {  // (lock held)
     memcpy(s->pose.objs, w->objs, sizeof s->pose.objs);
     s->pose.objs_trunk = w->objs_trunk;
     memcpy(s->pose.held, w->held, sizeof s->pose.held);
-    for (int k = 0; k < ONLINE_HELD; k++) s->pose.held[k].name[sizeof s->pose.held[k].name - 1] = 0;
     memcpy(s->pose.broken, w->broken, sizeof s->pose.broken);
     memcpy(s->pose.trunks_gone, w->trunks_gone, sizeof s->pose.trunks_gone);
     memcpy(s->pose.movers, w->movers, sizeof s->pose.movers);
-    for (int k = 0; k < ONLINE_MOVERS; k++) s->pose.movers[k].as[sizeof s->pose.movers[k].as - 1] = 0;
-    s->pose.tack[0][23] = 0, s->pose.tack[1][23] = 0;
-    for (int k = 0; k < ONLINE_FX_EVENTS; k++) s->pose.fxev[k].name[20] = 0;
     memcpy(s->pose.ice, w->ice, sizeof s->pose.ice);
-    s->pose.stop.name[ONLINE_GRAB_NAME - 1] = 0;
     s->pose.valid = w->as[0][0] != 0;
     r->head = (r->head + 1) % SNAPS;
     if (r->ns < SNAPS) r->ns++;
@@ -985,7 +961,8 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 1 + (int)sizeof(WireState) && p[0] < ONLINE_MAX && g.r[p[0]].used) {
             WireState w;
             memcpy(&w, p + 1, sizeof w);
-            if (!floats_ok(w.pos, 3, NUM_LIMIT) || !floats_ok(&w.yaw, 1, NUM_LIMIT)) {
+            online_terminate_state(&w);
+            if (!online_validate_state(&w)) {
                 drop_note(D_STATE);
                 break;
             }
@@ -993,10 +970,13 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         }
         break;
     case M_SKEL:
-        if (len >= 2 && p[0] < ONLINE_MAX && g.r[p[0]].used) {
+        if (len >= 1 && p[0] < ONLINE_MAX && g.r[p[0]].used) {
+            if (!online_validate_skel(p + 1, len - 1)) {  // (the counts, and the bytes they ask for)
+                drop_note(D_SKEL);
+                break;
+            }
             Remote *r = &g.r[p[0]];
-            int n = p[1], nbow = len >= 3 ? p[2] : 0;
-            if (n + nbow > ONLINE_BONES || len < 3 + (n + nbow) * SKEL_BONE_BYTES) break;
+            int n = p[1], nbow = p[2];
             r->sk[r->skh].t = plat_now_ns();
             r->sk[r->skh].n = n, r->sk[r->skh].nbow = nbow;
             for (int b = 0; b < n + nbow; b++)
@@ -1009,10 +989,13 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 1 + (int)sizeof(WireEquip) && p[0] < ONLINE_MAX && g.r[p[0]].used) {
             WireEquip e;
             memcpy(&e, p + 1, sizeof e);
+            online_terminate_equip(&e);
+            if (!online_validate_equip(&e)) {
+                drop_note(D_EQUIP);
+                break;
+            }
             memcpy(g.r[p[0]].armor, e.armor, sizeof e.armor);
             memcpy(g.r[p[0]].gear, e.gear, sizeof e.gear);
-            for (int k = 0; k < 3; k++) g.r[p[0]].armor[k][47] = 0;
-            for (int k = 0; k < ONLINE_GEAR; k++) g.r[p[0]].gear[k][47] = 0;
         }
         break;
     case M_CHAT:
@@ -1032,23 +1015,23 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             if (n > ONLINE_ENEMIES || len < 13 + n * (int)sizeof(OnlineEnemy)) break;
             float centre[3];
             memcpy(centre, p, 12);
-            if (!floats_ok(centre, 3, NUM_LIMIT)) {
+            if (!online_validate_floats(centre, 3, ONLINE_V_LIMIT)) {
                 drop_note(D_ENEMIES);
                 break;
             }
             g.en[0] = g.en[1];
             g.en[1].t = plat_now_ns();
-            memcpy(g.en[1].centre, p, 12);
+            memcpy(g.en[1].centre, centre, 12);
             int kept = 0;
             for (int k = 0; k < n; k++) {  // (an entry that fails goes alone)
-                OnlineEnemy *e = &g.en[1].e[kept];
-                memcpy(e, p + 13 + k * sizeof(OnlineEnemy), sizeof *e);
-                if (!enemy_ok(e)) {
+                OnlineEnemy e;
+                memcpy(&e, p + 13 + k * sizeof e, sizeof e);
+                online_terminate_enemy(&e);
+                if (!online_validate_enemy(&e)) {
                     drop_note(D_ENEMIES);
                     continue;
                 }
-                e->name[39] = e->as[31] = e->weapon[39] = e->shield[39] = 0;
-                kept++;
+                g.en[1].e[kept++] = e;
             }
             g.en[1].n = kept;
         }
@@ -1057,13 +1040,13 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 1 + (int)sizeof(OnlineLoot) && g.hosting && g.nla_in < 32) {
             OnlineLoot l;
             memcpy(&l, p + 1, sizeof l);
-            if (!loot_ok(&l)) {
+            l.origin = p[0];  // (whose drop it is: the slot the server put in front, not what the sender says)
+            online_terminate_loot(&l);
+            if (!online_validate_loot(&l)) {
                 drop_note(D_LOOT_ADD);
                 break;
             }
-            memcpy(&g.la_in[g.nla_in], p + 1, sizeof(OnlineLoot));
-            g.la_in[g.nla_in].origin = p[0], g.la_in[g.nla_in].name[39] = 0;
-            g.nla_in++;
+            g.la_in[g.nla_in++] = l;
         }
         break;
     case M_LOOT_TAKE:
@@ -1080,14 +1063,16 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         break;
     case M_PICK:
         if (len >= 52 && g.npick_in < 16) {
+            char name[40];
             float pos[3];
-            memcpy(pos, p + 40, 12);
-            if (!floats_ok(pos, 3, NUM_LIMIT)) {
+            memcpy(name, p, 40), memcpy(pos, p + 40, 12);
+            online_terminate_str(name, sizeof name);
+            if (!online_validate_pick(name, pos)) {
                 drop_note(D_PICK);
                 break;
             }
-            memcpy(g.pick_in[g.npick_in].name, p, 40), g.pick_in[g.npick_in].name[39] = 0;
-            memcpy(g.pick_in[g.npick_in].pos, p + 40, 12);
+            memcpy(g.pick_in[g.npick_in].name, name, 40);
+            memcpy(g.pick_in[g.npick_in].pos, pos, 12);
             g.npick_in++;
         }
         break;
@@ -1097,42 +1082,50 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             if (n > ONLINE_LOOT || len < 1 + n * (int)sizeof(OnlineLoot)) break;
             int kept = 0;
             for (int k = 0; k < n; k++) {  // (an entry that fails goes alone)
-                memcpy(&g.loots[kept], p + 1 + k * sizeof(OnlineLoot), sizeof(OnlineLoot));
-                if (!loot_ok(&g.loots[kept])) {
+                OnlineLoot l;
+                memcpy(&l, p + 1 + k * sizeof l, sizeof l);
+                online_terminate_loot(&l);
+                if (!online_validate_loot(&l)) {
                     drop_note(D_LOOTS);
                     continue;
                 }
-                g.loots[kept++].name[39] = 0;
+                g.loots[kept++] = l;
             }
             g.nloots = kept;
         }
         break;
     case M_ESTATE:
         if (len >= 2 && g.hosting) {
+            if (!online_validate_slot(p[0])) {  // (where they come from: the slot the server put in front)
+                drop_note(D_ESTATE);
+                break;
+            }
             int n = p[1];
             for (int k = 0; k < n && 2 + (k + 1) * (int)sizeof(OnlineEnemy) <= len && g.nest_in < 64; k++) {
-                memcpy(&g.est_in[g.nest_in], p + 2 + k * sizeof(OnlineEnemy), sizeof(OnlineEnemy));
-                if (!enemy_ok(&g.est_in[g.nest_in])) {  // (the next entry overwrites it)
+                OnlineEnemy e;
+                memcpy(&e, p + 2 + k * sizeof e, sizeof e);
+                online_terminate_enemy(&e);
+                if (!online_validate_enemy(&e)) {  // (an entry that fails goes alone)
                     drop_note(D_ESTATE);
                     continue;
                 }
-                g.est_in[g.nest_in].name[39] = g.est_in[g.nest_in].as[31] = g.est_in[g.nest_in].weapon[39] =
-                    g.est_in[g.nest_in].shield[39] = 0;
+                g.est_in[g.nest_in] = e;
                 g.est_from[g.nest_in++] = p[0];
             }
         }
         break;
     case M_HIT:
         if (len >= 9 && g.nhit_in < 64) {
+            uint32_t id;
             int32_t dmg;
-            memcpy(&dmg, p + 4, 4);
-            if (dmg < 0) {  // (a negative one would give the enemy life)
+            memcpy(&id, p, 4), memcpy(&dmg, p + 4, 4);
+            if (!online_validate_hit(dmg, p[8])) {  // (a negative one would give the enemy life)
                 drop_note(D_HIT);
                 break;
             }
-            memcpy(&g.hit_in[g.nhit_in].id, p, 4);
+            g.hit_in[g.nhit_in].id = id;
             g.hit_in[g.nhit_in].damage = dmg;
-            g.hit_in[g.nhit_in].element = p[8] < ONLINE_ELEM_COUNT ? p[8] : ONLINE_ELEM_NONE;
+            g.hit_in[g.nhit_in].element = p[8];
             g.nhit_in++;
         }
         break;
@@ -1140,7 +1133,7 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 4 && !g.hosting) {
             float h;
             memcpy(&h, p, 4);
-            if (!isfinite(h) || h < 0 || h > 24) {
+            if (!online_validate_time(h)) {
                 drop_note(D_TIME);
                 break;
             }

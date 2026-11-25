@@ -993,3 +993,14 @@ test-online-wire: $(B)/test_online_wire
 	$(B)/test_online_wire
 
 .PHONY: test-online-wire
+
+# The network validation layer (runtime/online_validate.h, T213) without the game or a network: each structure the
+# online client keeps, described again by the test; one bad value per field, and 100 000 random ones (a fixed seed)
+$(B)/test_online_validate: tools/test_online_validate.c runtime/online_validate.c $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -std=gnu11 -O1 -g -Wall $(OSFLAGS) -Iruntime -o $@ tools/test_online_validate.c runtime/online_validate.c -lm
+
+test-online-validate: $(B)/test_online_validate
+	$(B)/test_online_validate
+
+.PHONY: test-online-validate
