@@ -41,7 +41,7 @@ Tras integrar las tres ramas en `coop/main`:
 | 6. A cambia la hora (CU-03) | **PASA** | `1 lineas de hora en B` |
 | 7. A abre y cierra pausa (CU-03) | **PASA** | `pose en A: 0 lineas nuevas` |
 | 8. Ambos saltan lejos a la vez | **FALLA** | `A: 'goto hateno' fallo (Teleport in progress)` |
-| 9. Matar B (CU-03) | **FALLA** | `dos_juegos.sh matar B fallo: /bin/bash: C:UsersDELLDocumentsSavageWindcooptoolscoopdos_juegos.sh: No such file or directory` *(ruta Windows sin `/` en `subprocess.run(["bash", str(DOS_JUEGOS), ...])` de `recorrido.py:157`)* |
+| 9. Matar B (CU-03) | **FALLA** | `dos_juegos.sh matar B fallo: /bin/bash: C:Users...cooptoolscoopdos_juegos.sh (ruta de Windows sin barras): No such file or directory` *(ruta Windows sin `/` en `subprocess.run(["bash", str(DOS_JUEGOS), ...])` de `recorrido.py:157`)* |
 | 10. Relanzar B (CU-01) | **FALLA** | Mismo error de ruta en `recorrido.py:157` |
 | ENEMIGOS (a), (b), (c) (ADR-012) | **FALLA** | `B no ve ningun 'Enemy_' en el campamento` (arrastrado tras el fallo previo / sin enemigos presentes en esa pasada) |
 
