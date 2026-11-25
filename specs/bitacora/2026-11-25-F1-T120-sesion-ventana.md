@@ -37,6 +37,7 @@
 | Enemigo pasa al jugador cercano (ADR-012 (a)) | PASA | A: `Enemy_Golem_Junior 2144: slot 1's now (owner far, owner at 98 m, new one at 79 m)`; el Talus despertó y atacó a B (dueño) |
 | Muerte de B con la regla de revivir | PASA (dueño) | B murió dos veces y lo revivió un hada |
 | Muerte de A ×3 (caída desde 250 m, `god_mode` apagado) con B conectado | PASA | A: 3 × `Link died: revived by a fairy`, `a long jump: the players' actors still here, kept`; B respondió a `state` tras cada caída |
+| Cerrar el anfitrión con el invitado dentro | PASA | `swctl exit` en A: B siguió vivo 18 s (responde a `state`), su `OnlinePlayer` pasó de 1 a 0 al instante y el dueño confirmó el aviso de desconexión en F1 → Online. Sin reconexión automática (F3 T317-T319) |
 | FPS | estables (dueño) | "se han mantenido estables, sin ninguna caída"; A a 51-60 fps sin ventana |
 | Enemigo ataca a A cuando es de B (ADR-012 (b)) y traspaso al alejarse (c) | NO HECHO | Para la próxima sesión, desde el campamento |
 | Magnesis / Stasis; T113 con Magnesis sostenida | NO SE PUEDE | El guardado de prueba aún no tiene las runas |
@@ -50,7 +51,14 @@
 | N1 | El primer golpe de B a A registró `life 0` con A en modo dios y A siguió vivo; además los golpes del compañero matan a A aunque tenga `god_mode` (8 muertes revividas en el log mientras B le pegaba) | incorrecto (prueba) | F4 (CU-12 PvP / daño validado); anotar que `god_mode` no protege del daño online |
 | N2 | El compañero **no ve la animación del hada** al revivir: solo ve caer al otro y levantarse | cosmético | F4 (CU-11) |
 | N3 | `goto` fallido deja a Link congelado (ver incidencia 3) | incorrecto (herramienta) | F2/F3 herramientas |
+| N5 | Al golpear al otro Link con un arma, el empujón a veces lo lleva hacia delante y a veces **hacia el atacante** (dueño: "en general funciona bien") | incorrecto | F4 (CU-12: la dirección del retroceso debe salir de la posición del atacante) |
 | N4 | Revisión de cada animación del compañero para mejorarla (pedido del dueño) | mejora | spec nueva, F4 o F5 |
+
+## Decisión del dueño en la sesión
+
+Compañero en el minimapa: opción A (flecha de su color dibujada encima del minimapa, marca en el borde si está
+fuera), medir ya y programar en F4; mapa grande como investigación para después; pines reales descartados. Se
+registra en ADR-022 y CU-16 (en redacción por `specs-minimapa`; investigación de código T445 por `minimapa-t445`).
 
 ## NO verificado
 
