@@ -216,7 +216,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no reordenes pasos; no fusiones las ocho llamadas a `online_players` en una; no quites los ganchos de prueba por variable de entorno; no muevas la comprobación `alive` del bucle de jugadores (es T210).
   modelo sugerido: alto
 
-- [ ] T210 [oa] Validar los Links remotos al principio del fotograma (cambio de comportamiento).
+- [~] T210 [oa] Validar los Links remotos al principio del fotograma (cambio de comportamiento).
+  reclamada: agente Opus oa-t210 (integrada) — paso 9b `oa_puppets_validate`, el paso 4 ya no lee un Link borrado; compila, pruebas de red en 0; FALTA recorrido, firma y prueba en juego (A muere 5 veces con Magnesis)
   files: `runtime/oa_frame.c`, `runtime/oa_puppet.c`, `runtime/online_actors_internal.h`
   verify: `make -j8` compila; recorrido completo pasa; en juego, A muere con B a la vista y usando Magnesis, cinco veces, sin cuelgue; `firma_log.py --comparar`: la única diferencia admitida es el orden o el recuento de la línea `the game removed ...'s Link`; revisión: entre el paso nuevo y el final del fotograma ningún módulo usa un Link remoto sin pasar por `oa_puppet_link(i)`
   depende de: T209
