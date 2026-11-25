@@ -52,3 +52,7 @@
 | 13 | ¿Cuándo sale la invitación? | **Siempre**, cada vez que uno entra a un santuario: aviso aceptar/rechazar (≈ 30 s), con opción en ajustes para apagarlo |
 
 Consecuencia: tarea nueva **T465** (F4, invitación a santuario), que depende de la investigación **T540** (F5, adelantada).
+| 14 | Invitación: si la puerta está cerrada en la partida del compañero | **Se abre sola** al aceptar (queda activado el santuario en su partida). Resuelve T465d |
+| 15 | Alcance de la invitación | **Solo santuarios normales** (`CDungeon/DungeonNNN`); Bestias Divinas y otros interiores, después |
+| 16 | ¿A se entera de que B viene o rechazó? | **No**: sin mensaje nuevo (T465e cerrada; sin T409) |
+| 17 | ¿Se invita si el compañero ya estaba dentro al unirnos? | No (valor por defecto de T540, no preguntado) |
