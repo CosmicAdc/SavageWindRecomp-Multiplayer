@@ -90,6 +90,7 @@ static bool oa_objs_update_told;
 static float to[12];
 static int oa_objs_update_told_2;
 static int logged;
+static bool g_obj_body_told;  // (one of another's with no body: logged once)
 
 void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
     // ours moving: looked for among the actors twice a second, followed each 3 frames
@@ -170,7 +171,7 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
                 if (*(uint8_t *)(uintptr_t)(g_obj_seen[oa_objs_update_held].a + 0x64) != 1)  // (at rest a while: asleep)
                     oa_call(c, FN_ACTOR_WAKE, g_obj_seen[oa_objs_update_held].a, 0, 0, 0, 0, 0);
                 uint64_t body = *(uint64_t *)(uintptr_t)(g_obj_seen[oa_objs_update_held].a + 0x190);
-                if (VALID(body)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
+                if (oa_has_body(g_obj_seen[oa_objs_update_held].a)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
             }
         }
     }
@@ -238,7 +239,14 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
                 if (oa_objs_update_told_2++ < 8) LOG("[online] an object of another's %.1f m off his at rest: put there\n", sqrtf(dx * dx + dy * dy + dz * dz));
             }
         }
-        if (VALID(body)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
+        // (a trunk is followed without the body check the map's objects pass - trunks_near: ours of a cut, made here
+        // for his - so not every one followed has a physics body at +0x190: only one that has is moved through it)
+        if (oa_has_body(g_obj_seen[s].a)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
+        else if (!g_obj_body_told) {
+            char n[48];
+            oa_actor_name_of(g_obj_seen[s].a, n);
+            g_obj_body_told = true, LOG("[online] an object of another's with no body here (%s %u): not moved through it\n", n, g_obj_seen[s].hash);
+        }
         g_obj_seen[s].last[0] = hm[3], g_obj_seen[s].last[1] = hm[7], g_obj_seen[s].last[2] = hm[11];
         g_obj_seen[s].still = 1000;  // (moved by him: not ours to send)
     }
@@ -498,6 +506,13 @@ static struct { Handle *h; char name[48]; float m[12]; uint32_t hash; bool trunk
 static bool g_spawn_ours;  // (the next spawn_at's trunk ours, as a cut of ours: the break test's)
 static struct { uint32_t hash; uint64_t a; Watch w; uint64_t t; } g_their_trunk[8];  // (the others' cuts: the trunk made here)
 static struct { uint64_t a; Watch w; uint64_t t; } g_breaking[16];  // (broken here for another: gone, or taken away)
+// (break_here sets a breakable's life, ENEMY_LIFE, s32, to 0 only when what is there now could be one: 0 to this. The
+// modules keep an enemy's life there - its own, or its own + GUARD_LIFE (1000) while own_guard lasts - and the
+// validator takes 1000000 as above any enemy's life (ONLINE_V_DAMAGE_MAX); a crate's or an ore's is far less. What
+// another class keeps there mostly falls outside: read as s32, a negative float is below 0 and a positive one (not
+// tiny) 0x00800000 (8388608) and up; a pointer's low half lands in 0..1000000 about one time in 4000)
+#define BREAK_LIFE_MAX 1000000
+static bool g_break_life_told;  // (one with no life there: logged once)
 
 static uint64_t trunk_made_t(uint64_t a) {
     for (int k = 0; k < 8; k++)
@@ -673,7 +688,12 @@ static void break_here(Cpu *c, uint64_t a, const char *n, uint32_t h, const floa
     } else {  // (the game breaks it: its life to 0; one that stays is taken away a moment later)
         int32_t *life = (int32_t *)(uintptr_t)(a + ENEMY_LIFE);
         if (*(uint8_t *)(uintptr_t)(a + 0x64) != 1) oa_call(c, FN_ACTOR_WAKE, a, 0, 0, 0, 0, 0);  // (asleep: life 0 broke nothing)
-        *life = 0;
+        // (only a physical object whose life is plausible there, BREAK_LIFE_MAX: one of another class keeps something
+        // else at +0x848, and 0 written over it broke that. Not written, it doesn't break: g_breaking takes it away)
+        if (oa_has_body(a) && *life >= 0 && *life <= BREAK_LIFE_MAX) *life = 0;
+        else if (!g_break_life_told)
+            g_break_life_told = true, LOG("[online] %s broke %s (%u): no life of its own here (body %d, %d): taken away instead\n",
+                                          who, n, h, oa_has_body(a) ? 1 : 0, *life);
         for (int q2 = 0; q2 < 16; q2++)  // (one that doesn't break - asleep, no life of its own - goes in 1.5 s)
             if (!g_breaking[q2].a) {
                 g_breaking[q2].a = a, g_breaking[q2].w = oa_watch(a), g_breaking[q2].t = plat_now_ns();
@@ -980,6 +1000,7 @@ RT_ON_RESET(oa_world_reset) {
     oa_objs_update_told = false;
     memset(to, 0, sizeof to);
     oa_objs_update_told_2 = logged = 0;
+    g_obj_body_told = false;
     memset(g_mv, 0, sizeof g_mv);
     // oa_movers_update's
     oa_movers_update_tick = 0;
@@ -994,6 +1015,7 @@ RT_ON_RESET(oa_world_reset) {
     g_spawn_ours = false;
     memset(g_their_trunk, 0, sizeof g_their_trunk);
     memset(g_breaking, 0, sizeof g_breaking);
+    g_break_life_told = false;
     memset(g_cutting, 0, sizeof g_cutting);
     memset(g_world, 0, sizeof g_world);
     g_nworld = 0;
