@@ -116,7 +116,8 @@ y Bestias juntos, 14c = teletransporte entre mapas); ante la duda, cita por el n
 bloque es el primero de la fase. Hacer un santuario juntos es posible, no obligatorio: el monje no exige a los dos
 (ADR-007, decisión 3).
 
-- [ ] T540 [investigación] Qué pasa hoy cuando los dos entran al mismo santuario
+- [~] T540 [investigación] Qué pasa hoy cuando los dos entran al mismo santuario
+  reclamada: agente Sonnet ag-t540 (integrada, adelantada) — lectura del código y diseño de T465 (T465a-e) en la bitácora; FALTA la tabla "visto en el juego" (pruebas T540-0..5) y 4 preguntas al dueño
   files: specs/bitacora/F5-T540-santuario-a-duo-hoy.md
   verify: la bitácora contiene la tabla pedida en el paso 6, rellena con lo visto en los dos juegos, las órdenes usadas y la sección "lo que no se comprobó"
   depende de: F1 (dos juegos funcionando en un PC)
