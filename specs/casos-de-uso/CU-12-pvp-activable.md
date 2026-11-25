@@ -43,9 +43,10 @@ validación.
 | Daño declarado enorme | Se recorta a lo que puede hacer el arma que lleva el atacante | **Se acepta tal cual** hasta 32 767 (`int16_t`, NETH:107) menos la defensa (OA:2919-2920) |
 | Golpe declarado desde lejos | Se ignora | La víctima no comprueba distancia |
 | Ráfaga de golpes imposibles | Límite de golpes por segundo | Sin límite |
-| Muerte por PvP | Aplica la regla de revivir (CU-11); el PvP se apaga solo al morir [PROPUESTA] | Reanimación por hada si la regla está activa |
+| Muerte por PvP | **[DUEÑO]** (ADR-011, decisión 39): el duelo se apaga al morir y se aplica la reanimación normal (CU-11); no se pierde ningún objeto | Reanimación por hada si la regla está activa |
 | Desconexión o cambio de sesión | El PvP vuelve a apagado | El interruptor se guarda en `online.ini` y persiste (NET:1522, NET:1549-1552) |
 | El anfitrión prohíbe el PvP | No se puede proponer | No existe esa regla |
+| Duelo en un santuario o durante una escena | **[DUEÑO]** (ADR-011, decisión 40): no se puede abrir | No existe esa regla |
 | Flechas y runas | Sin daño entre jugadores: fuera de la primera entrega (ADR-008, decisión 17) | Así es: "Sin flechas PvP" (mapa 07 §2.2) |
 
 ## Estado actual en el PR: **PARCIAL**
@@ -107,7 +108,9 @@ Todo el trabajo de juego va en `pvp_update` (futuro módulo `oa_rules`, mapa 07 
   atacante). El alcance de las armas no cambia.
 - **[PROPUESTA]** Cualquiera puede terminar el duelo en cualquier momento sin permiso del otro.
 - **[PROPUESTA]** El acuerdo no se recuerda entre sesiones ni tras una reconexión.
-- **[PROPUESTA]** Al morir en un duelo, el PvP se apaga y se aplica CU-11.
+- **[DUEÑO] (ADR-011, decisión 39; Q-12-2)** Al morir en un duelo, **el duelo se apaga** y se aplica la reanimación normal
+  (CU-11). Sin pérdida de objetos.
+- **[DUEÑO] (ADR-011, decisión 40; Q-12-4)** **No se puede abrir un duelo en santuarios ni durante escenas.**
 
 ## Criterios de aceptación
 
@@ -160,10 +163,7 @@ Todo el trabajo de juego va en `pvp_update` (futuro módulo `oa_rules`, mapa 07 
 - Riesgo: cuando el atacante o la víctima es el propio anfitrión, valida su propio juego; un anfitrión manipulado
   no se puede detectar (el anfitrión manda, D3).
 - Preguntas ya contestadas por el dueño (Q-12-1 y Q-12-3): ver ADR-008 (decisión 17) en `../decisiones/`.
-- **Pregunta al dueño** (Q-12-2, abierta; por defecto: el duelo se apaga y se aplica la reanimación normal de
-  CU-11): al morir en un duelo, ¿hay otra regla?
-- **Pregunta al dueño** (Q-12-4, abierta; por defecto: no se puede abrir en santuarios ni durante escenas): ¿se
-  puede abrir un duelo en cualquier sitio?
+- Preguntas ya contestadas por el dueño (Q-12-2 y Q-12-4): ver ADR-011 (decisiones 39 y 40) en `../decisiones/`.
 
 ## Fase y dependencias
 

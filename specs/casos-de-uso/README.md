@@ -26,9 +26,10 @@ construir y cómo se comprueba. La lista y las fases salen de `../PLAN-APROBADO.
 `../mapa/07-pr294-integracion-juego.md` §7.
 
 Las preguntas que solo puede contestar el dueño están reunidas en [PREGUNTAS-ABIERTAS.md](PREGUNTAS-ABIERTAS.md).
-El dueño ya ha contestado tres rondas (28 decisiones): están en `../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
-`ADR-008-respuestas-del-dueno-ronda-2.md` y `ADR-009-respuestas-del-dueno-ronda-3.md`, y **mandan** sobre cualquier
-texto de un caso que diga otra cosa. Las que siguen abiertas llevan su valor por defecto.
+El dueño ya ha contestado cuatro rondas (47 decisiones): están en `../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
+`ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md` y
+`ADR-011-respuestas-del-dueno-ronda-4.md`, y **mandan** sobre cualquier texto de un caso que diga otra cosa. La única
+que sigue abierta es Q-10-5 (botón del ping), una comprobación técnica; lleva su valor por defecto.
 
 Orden dentro de F5 (ADR-008, decisión 20): jugar los santuarios juntos (CU-14b) va antes que el tinte 3D (CU-13) y
 que la historia con los dos presentes (CU-14a).
@@ -119,8 +120,9 @@ Propuestas P1–P8 tras las respuestas: ya son decisión del dueño la vida del 
 27), revivir automático con rescate manual planificado para después (P3, ADR-007, 7; ADR-008, 15), recompensas de
 santuario para los dos y cofre para quien lo abre (P4), invocar con consentimiento (P5, ADR-008, 16), el plazo de
 reconexión (P6, ADR-008, 18), las ocho frases rápidas (P7, ADR-009, 28) y color y forma por orden de entrada,
-editables en Opciones (P8, ADR-009, 26). Siguen como propuesta: el marcador en el mapa del juego (resto de P1), los
-pings (P2) y los demás detalles de la reconexión (P6).
+editables en Opciones (P8, ADR-009, 26). Siguen como propuesta: los
+pings (P2) y los demás detalles de la reconexión (P6). El marcador en el mapa del juego quedó decidido: no en F4
+(ADR-011, decisión 41).
 
 ## Montaje común de prueba (dos juegos en un PC)
 

@@ -84,13 +84,13 @@ baja y no bloquea el cierre de F4.
 1. Arreglar el refresco de la regla: mover las líneas OA:2838-2839 antes del `return` de OA:2837 (o a una función
    propia en `oa_rules`).
 2. Condicionar `rt_online_has_fairy` (OA:2825-2831): responde sí solo si hay **otro jugador vivo** en la sesión
-   (ningún otro con AS `Dead*`) y no se ha superado un límite de reanimaciones seguidas. Si los dos están muertos,
+   (ningún otro con AS `Dead*`). **Sin límite de reanimaciones** (**[DUEÑO]** ADR-011, decisión 33: sin límite de usos
+   mientras el compañero siga vivo). Si los dos están muertos,
    responde no → fin de partida normal.
 3. Publicar "he caído" en el estado (un bit nuevo en `pose.effects` o campo propio; cambia el protocolo) y avisar al
    compañero con texto, sonido y marcador (CU-10).
-4. Penalización configurable por el anfitrión tras la reanimación automática (por ejemplo, volver con 3 corazones)
-   [sin verificar: la reanimación del hada repone la vida que decide el juego; para cambiarla habría que escribir la
-   vida después, en `player + 0x848`, como hace PvP en OA:2907-2921].
+4. **Sin penalización** tras la reanimación automática (**[DUEÑO]** ADR-011, decisión 33): revive con la vida que da el
+   hada del juego. No se escribe la vida después y no hay ajuste del anfitrión.
 
 **Entrega 2 — caído real con rescate (planificada para después, prioridad baja; requiere Ghidra)**
 
@@ -112,7 +112,12 @@ baja y no bloquea el cierre de F4.
   el último guardado.
 - **[DUEÑO] D4**: los corazones son de cada jugador: revivir no transfiere vida del rescatador.
 - **[DUEÑO] D8**: es un juego cooperativo por defecto; morir no debería separar a los jugadores.
-- **[PROPUESTA]** (entrega 2) Contador de 30 s; revivir cuesta 3 s de botón mantenido; se vuelve con 3 corazones.
+- **[PROPUESTA]** (entrega 2) Contador de 30 s; revivir cuesta 3 s de botón mantenido.
+- **[DUEÑO] (ADR-011, decisión 34; Q-11-3)** (entrega 2) Con el contador agotado, el caído **revive en el sitio con 3
+  corazones**.
+- **[DUEÑO] (ADR-011, decisión 33; Q-11-4)** (entrega 1) Se vuelve con la vida que da el hada del juego, **sin límite de
+  usos** mientras el compañero siga vivo.
+- **[DUEÑO] (ADR-011, decisión 35; Q-11-5)** Revivir **no cuesta nada** a quien rescata.
 - La entrega 1 es suficiente para cerrar F4 (consecuencia de la decisión 7).
 - **[PROPUESTA]** Un hada propia se sigue usando primero y no cuenta como reanimación del compañero.
 
@@ -153,15 +158,12 @@ baja y no bloquea el cierre de F4.
 
 - Riesgo alto: la zona de código alrededor de la muerte es la que más cuelgues ha dado (DOC:732-734; mapa 07 A5).
 - Riesgo: la entrega 2 puede no ser viable sin mucha ingeniería inversa; por eso hay entrega 1.
-- Riesgo: reanimación ilimitada quita toda dificultad al juego.
+- Riesgo (aceptado por el dueño, ADR-011, decisión 33): reanimación ilimitada mientras el compañero siga vivo quita
+  dificultad al juego.
 - Preguntas ya contestadas por el dueño (Q-11-1 y Q-11-2): ver ADR-007 (decisión 7) y ADR-008 (decisión 15) en
   `../decisiones/`.
-- **Pregunta al dueño** (Q-11-3, abierta; solo afecta a la entrega 2; por defecto: revive solo en el sitio con 3
-  corazones): ¿qué pasa si el contador se agota?
-- **Pregunta al dueño** (Q-11-4, abierta; por defecto: entrega 1, lo que da el hada del juego y sin límite;
-  entrega 2, 3 corazones y espera de 60 s): ¿con cuántos corazones se vuelve, y hay límite de reanimaciones?
-- **Pregunta al dueño** (Q-11-5, abierta; solo afecta a la entrega 2; por defecto: nada): ¿revivir cuesta algo al
-  rescatador?
+- Preguntas ya contestadas por el dueño (Q-11-3, Q-11-4 y Q-11-5): ver ADR-011 (decisiones 33, 34 y 35) en
+  `../decisiones/`.
 
 ## Fase y dependencias
 

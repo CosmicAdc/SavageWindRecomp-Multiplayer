@@ -32,8 +32,8 @@ santuarios se pueden hacer juntos pero no es obligatorio: no son "momento de his
 
 **14a — Historia con los dos presentes**
 
-1. El iniciador llega a un momento de historia de la lista (por ejemplo, examinar un pedestal o hablar con un
-   personaje clave).
+1. El iniciador llega a un momento de historia de la lista (por ejemplo, examinar el pedestal de la piedra
+   Sheikah o la primera torre).
 2. Si el compañero **no** está presente (mismo mapa y a menos de 30 m), el momento no arranca. El iniciador ve
    "Esperando a <nombre> para continuar" y el compañero ve "<nombre> te espera en <lugar>", con un marcador y la
    **oferta de teletransportarse** hasta él (CU-08 / 14c).
@@ -68,15 +68,15 @@ santuarios se pueden hacer juntos pero no es obligatorio: no son "momento de his
 | El compañero ya está en una escena | El iniciador espera; hoy solo pasa en pedestales Sheikah (A bloqueado) |
 | El compañero está muerto o caído | No cuenta como presente; primero CU-11 |
 | El compañero se desconecta mientras se espera | El anfitrión puede continuar solo de inmediato, tras confirmarlo; sin plazo (ADR-007, decisión 6). El sitio del compañero sigue reservado 10 minutos (CU-05) |
-| Quien inicia el momento es el invitado y el anfitrión no está presente | No arranca; la confirmación para continuar solo es únicamente del anfitrión |
+| Quien inicia el momento es el invitado y el anfitrión no está presente | No arranca; la confirmación para continuar solo es únicamente del anfitrión `[PROPUESTA]` (deducida de la decisión 6) |
 | Uno de los dos entra solo a un santuario y habla con el monje | Se permite sin espera: los santuarios no son momento de historia (ADR-007, decisión 3). El otro recibe el orbe igualmente |
 | Uno se desconecta en mitad de la escena | La escena termina en el juego del que sigue; el progreso se aplica al otro al volver (CU-05) |
 | El anfitrión sale | Fin de sesión; el invitado no avanza la historia del anfitrión |
 | El momento arranca por entrar en una zona, no por un botón | No hay forma conocida de retenerlo: **[sin verificar]**, requiere ingeniería inversa. Mientras tanto, esos momentos quedan fuera de la lista |
-| Uno se salta la escena | En la versión 1 no aplica: solo uno la ve (Q-14-5, abierta) |
+| Uno se salta la escena | En la versión 1 no aplica: solo uno la ve. En la versión 2 (futura), cada uno se salta la suya (**[DUEÑO]** ADR-011, decisión 42) |
 | El evento se lanza fuera de contexto en el otro juego | Riesgo de cuelgue conocido (DOC:751-752): por defecto **no** se lanza; se aplican solo los flags |
 | Dentro de un santuario, un mecanismo no tiene cuerpo físico | No se mueve y se registra (arreglo `has_body`, CU-03) |
-| 14c con el destino en una Bestia Divina o en una escena | Deshabilitado hasta probarlo |
+| 14c con el destino en una Bestia Divina | Deshabilitado hasta probarlo. Un compañero en una escena **no** deshabilita el viaje (**[DUEÑO]** ADR-011, decisión 37) |
 | Versión distinta | No hay sesión (CU-01) |
 
 ## Estado actual en el PR: **FALTA** (hay piezas)
@@ -264,8 +264,8 @@ santuarios se pueden hacer juntos pero no es obligatorio: no son "momento de his
 - Riesgo: algunos efectos de flags solo se ven tras una carga (DOC:441-442).
 - Preguntas ya contestadas por el dueño (Q-14-1, Q-14-2, Q-14-3, Q-14-4, Q-14-6 y Q-14-7): ver ADR-007
   (decisiones 2, 3, 4 y 6), ADR-008 (decisión 20) y ADR-009 (decisión 21) en `../decisiones/`.
-- **Pregunta al dueño** (Q-14-5, abierta; por defecto: no aplica en la versión 1, porque solo uno ve la escena; en
-  una versión 2, cada uno la suya): si uno se salta la escena, ¿se salta para los dos?
+- **[DUEÑO] (ADR-011, decisión 42; Q-14-5)** Si uno se salta la escena (versión futura con escena compartida), **cada
+  jugador salta la suya**.
 
 ## Fase y dependencias
 

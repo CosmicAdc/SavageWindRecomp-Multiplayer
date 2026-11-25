@@ -92,7 +92,10 @@ hay que unirse a mano y se entra como jugador nuevo.
 - **[DUEÑO] (ADR-007, decisiones 1 y 5)** Lo que el invitado conserva tras un corte es su perfil cooperativo,
   guardado en su PC; su partida individual no interviene.
 - **[PROPUESTA]** Reintentos cada 1, 2, 4, 8… s hasta 15 s entre intentos, durante todo el plazo de reserva.
-- **[PROPUESTA]** Sin migración de anfitrión: si cae el anfitrión, la sesión termina.
+- **[DUEÑO] (ADR-011, decisión 32; Q-05-4)** Si cae el anfitrión, **termina la sesión**: el invitado ve un aviso y puede
+  reintentar. Sin traspaso de anfitrión.
+- **[DUEÑO] (ADR-011, decisión 31; Q-05-3)** Lo que el invitado hace en el mundo durante un corte **se pierde**: al volver
+  recibe el mundo del anfitrión y conserva solo su inventario.
 - **[PROPUESTA]** Durante el corte, el invitado sigue jugando en solitario en su mundo (no se le congela).
 
 ## Criterios de aceptación
@@ -133,10 +136,7 @@ hay que unirse a mano y se entra como jugador nuevo.
   volver; la resincronización del punto 4 debe aguantar un corte así de largo.
 - Preguntas ya contestadas por el dueño (Q-05-1 y Q-05-2): ver ADR-008 (decisión 18) y ADR-007 (decisión 6) en
   `../decisiones/`.
-- **Pregunta al dueño** (Q-05-3, abierta; por defecto: sí, conserva solo su inventario): lo que el invitado hizo en
-  el mundo durante el corte, ¿se pierde siempre?
-- **Pregunta al dueño** (Q-05-4, abierta; por defecto: la sesión termina y el invitado puede reintentar): si cae
-  el anfitrión, ¿basta con terminar la sesión o quieres que el invitado pueda seguir solo con lo que tenía?
+- Preguntas ya contestadas por el dueño (Q-05-3 y Q-05-4): ver ADR-011 (decisiones 31 y 32) en `../decisiones/`.
 
 ## Fase y dependencias
 

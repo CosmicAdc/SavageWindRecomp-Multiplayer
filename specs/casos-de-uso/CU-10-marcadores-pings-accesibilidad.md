@@ -124,13 +124,13 @@ el menú cerrado debe añadirse a `menu_draws()` (`runtime/ui/menu.mm:2500`).
   ayuda", "Gracias", "Sí", "No", "Vamos", "Mira esto".
 - **[DUEÑO] (ADR-009, decisión 22)** El nombre en color y el marcador con forma de este caso son la **salida
   aceptada** si el tinte 3D de CU-13 no resulta viable. Por eso este caso no puede depender de CU-13.
-- **[PROPUESTA] P1**: marcador del compañero también en el mapa del juego (ver última propuesta: no entra en F4).
+- **[DUEÑO] (ADR-011, decisión 41; Q-10-3; P1)** **No hay marcador en el mapa del propio juego en F4**: flecha en
+  pantalla, distancia y nombre del mapa del compañero. Se estudia después.
 - **[PROPUESTA] P2**: pings.
 - **[PROPUESTA]** Las frases rápidas son una lista cerrada traducible, no texto libre (funciona entre idiomas y no
   necesita teclado).
 - **[PROPUESTA]** Ningún dato se comunica solo por color: siempre color + forma + texto.
 - **[PROPUESTA]** Límite de 2 pings por segundo y 5 s de vida por ping.
-- **[PROPUESTA]** El marcador en el mapa del juego no entra en F4.
 
 ## Criterios de aceptación
 
@@ -182,8 +182,7 @@ que el overlay dibujaría (nombre, distancia, vida, forma, pings activos); es pa
 - Riesgo: cada campo nuevo en el estado sube la versión de protocolo y hay que repetirlo en el bot.
 - Preguntas ya contestadas por el dueño (Q-10-1, Q-10-2 y Q-10-4): ver ADR-009 (decisiones 26, 27 y 28) en
   `../decisiones/`.
-- **Pregunta al dueño** (Q-10-3, abierta; por defecto: no es imprescindible en F4): ¿el marcador en el mapa del
-  juego es imprescindible, o basta con la flecha y la distancia?
+- Pregunta ya contestada por el dueño (Q-10-3): ver ADR-011 (decisión 41) en `../decisiones/`.
 - **Q-10-5 (abierta, no es de diseño)**: ¿con qué botón se lanza el ping y se abre la rueda? Hay que revisar qué
   botones están libres (punto 5b) y proponer una combinación al dueño.
 

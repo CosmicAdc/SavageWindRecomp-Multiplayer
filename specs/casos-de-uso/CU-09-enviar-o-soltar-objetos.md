@@ -43,7 +43,7 @@ directo no existen.
 
 | Situación | Comportamiento esperado | Hoy |
 |---|---|---|
-| Bolsa del receptor llena | El envío se **devuelve** al emisor con aviso; nada se pierde | `give_item` registra "doesn't fit in the pouch" y no entrega (OA:3751-3757) |
+| Bolsa del receptor llena | Objeto soltado marcado (primera entrega): **se queda en el suelo**, con aviso (**[DUEÑO]** ADR-011, decisión 38). Envío directo (después): `[PROPUESTA]` se **devuelve** al emisor con aviso; nada se pierde; **pendiente de confirmar con el dueño** (la decisión 38 no dice qué pasa en el envío directo) | `give_item` registra "doesn't fit in the pouch" y no entrega (OA:3751-3757) |
 | Receptor en menú, escena o cargando | La entrega espera en cola hasta que vuelva al juego; si pasa el plazo, se devuelve | La cola de `items_request` espera sola (mapa 03 §1.3) |
 | Receptor en otro mapa | Envío directo: permitido. Soltar: no ve el objeto | Botín solo a menos de 150 m en el mismo mundo |
 | Receptor muerto o caído | El envío espera a que reviva | — |
@@ -176,8 +176,10 @@ Falta o es débil:
   quedar sin efecto por ese camino si no se hace el punto 2b.
 - Preguntas ya contestadas por el dueño (Q-09-1, Q-09-2 y Q-09-3): ver ADR-007 (decisión 10) y ADR-009
   (decisiones 24 y 25) en `../decisiones/`.
-- **Pregunta al dueño** (Q-09-4, abierta; por defecto: llega sin preguntar y, si no cabe, se devuelve; solo afecta
-  al envío directo): ¿hay que pedir confirmación al receptor antes de recibir?
+- **[DUEÑO] (ADR-011, decisión 38; Q-09-4)** Recibir un objeto marcado **no pide confirmación**: entra con un aviso y, si
+  no cabe, se queda en el suelo. Errata: ADR-011 la presenta como confirmación del valor por defecto, pero el valor por
+  defecto era "se devuelve". **Pregunta pendiente para el dueño:** ¿vale "se queda en el suelo" también para el envío
+  directo, donde el objeto no está en el suelo?
 
 ## Fase y dependencias
 

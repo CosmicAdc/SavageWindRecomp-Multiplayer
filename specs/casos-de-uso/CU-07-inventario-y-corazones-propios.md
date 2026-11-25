@@ -31,7 +31,7 @@ contenedores a los presentes, pero falta la entrega al unirse a un mundo avanzad
 4. El daño que recibe cada uno baja solo sus corazones; correr o trepar gasta solo su resistencia.
 5. Cuando uno cambia orbes en una estatua de la Diosa, elige él si sube corazón o resistencia, y solo le sube a él.
 6. Las rupias y el contenido de los cofres son de quien los consigue; puede soltar un objeto marcado para el
-   compañero (CU-09).
+   compañero (CU-09), **solo materiales y comida** (ADR-009, decisión 24); las rupias no se envían (decisión 25).
 7. Al terminar la sesión cada uno conserva su inventario y sus estadísticas tal como quedaron: el anfitrión en su
    partida, el invitado en su perfil cooperativo, en su PC.
 
@@ -86,7 +86,7 @@ En contra (regalos automáticos al llegar un flag que hizo otro, OA:3987-3997):
    - *Llave de progreso* (los dos la necesitan para seguir): piedra, runas, paravela. Se entregan a los dos.
    - *Recompensa de progreso* (sube estadísticas): orbes, contenedores de corazón y habilidades de campeón. Regla
      del dueño: para los dos, siempre, también para quien se une tarde (ADR-007, decisión 2). Semillas Kolog: una
-     para cada uno, como hoy (valor por defecto de Q-07-3, sin respuesta del dueño todavía).
+     para cada uno, como hoy (ADR-011, decisión 30).
    - *Estado del mundo* (sin objeto): cofres abiertos, enemigos muertos, puertas.
 2. **Aplicar la regla** en el bloque de entrega de `quests_update` (OA:3986-3997; futuro `oa_flags`), usando las
    funciones que ya hay: `give_item` (OA:3751-3759) y `give_heart` (OA:3763-3769).
@@ -118,11 +118,13 @@ En contra (regalos automáticos al llegar un flag que hizo otro, OA:3987-3997):
   mismo número de contenedores de corazón y de mejoras de resistencia, más las habilidades de campeón ya ganadas.
   Entra sin objetos pero con la misma vida y resistencia.
 - **[DUEÑO] (ADR-008, decisión 14; Q-07-6)** El contenido de un cofre es **para quien lo abre**; puede soltarlo
-  marcado para el compañero (CU-09). Se revisa después de probarlo. (Sustituye a la parte de cofres de P4.) Hoy el
+  marcado para el compañero (CU-09), con el límite de la decisión 24 (ADR-009): solo materiales y comida; las rupias
+  no se envían (decisión 25). Se revisa después de probarlo. (Sustituye a la parte de cofres de P4.) Hoy el
   cofre queda abierto para todos y el contenido es de quien lo abrió [sin verificar en juego].
 - **[DUEÑO] (ADR-008, decisión 19; Q-07-5)** Las rupias son **de cada jugador**; no hay monedero común.
 - **[PROPUESTA]** Las llaves de progreso (piedra, runas, paravela) se entregan siempre a los dos.
-- **[PROPUESTA]** Semillas Kolog: una para cada uno, como hoy (Q-07-3, sin respuesta del dueño).
+- **[DUEÑO] (ADR-011, decisión 30; Q-07-3)** Semillas Kolog: **una para cada uno** cuando alguien encuentra un kolog
+  (como hoy).
 
 ## Criterios de aceptación
 
@@ -176,8 +178,7 @@ En contra (regalos automáticos al llegar un flag que hizo otro, OA:3987-3997):
 - Riesgo: la semántica de `PlayerInfo +0xa0` (vida actual o máxima) es dudosa (mapa 03 §1.1).
 - Preguntas ya contestadas por el dueño (Q-07-1, Q-07-2, Q-07-4, Q-07-5, Q-07-6 y Q-07-7): ver ADR-007
   (decisiones 1, 2 y 5) y ADR-008 (decisiones 13, 14 y 19) en `../decisiones/`.
-- **Pregunta al dueño** (Q-07-3, abierta; por defecto: una para cada uno, como hoy): las semillas Kolog, ¿una por
-  jugador o una para quien lo encuentra?
+- Pregunta ya contestada por el dueño (Q-07-3): ver ADR-011 (decisión 30) en `../decisiones/`.
 
 ## Fase y dependencias
 

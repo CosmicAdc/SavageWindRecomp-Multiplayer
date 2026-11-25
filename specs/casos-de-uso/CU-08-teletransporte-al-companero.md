@@ -34,9 +34,9 @@ para no perderse y para reunirse rápido: está siempre disponible, también en 
 
 | Situación | Comportamiento esperado |
 |---|---|
-| Compañero en otro mapa (santuario, Bestia Divina) | Opción deshabilitada con el motivo "está en <mapa>". El viaje entre mapas es CU-14 |
+| Compañero en otro mapa (santuario, Bestia Divina) | **En F4**: opción deshabilitada con el motivo "está en <mapa>". El viaje entre mapas es CU-14 (F5), que lo habilita |
 | Compañero cargando o sin estado reciente (3 s) | Deshabilitado: "está cargando" |
-| Compañero en una escena, diálogo o menú | Se permite [PROPUESTA]; el viajero aparece cerca sin interrumpirle |
+| Compañero en una escena o conversación | Se permite **[DUEÑO]** (ADR-011, decisión 37); el viajero aparece cerca sin interrumpirle |
 | Compañero muerto o caído | Se permite, para poder revivirlo (CU-11) |
 | Compañero en el aire, trepando, nadando o sobre lava | El viajero aparece en la última posición segura conocida del compañero (en suelo), no en el aire |
 | Viajero montado, en escena, cargando o muerto | Deshabilitado con el motivo |
@@ -45,7 +45,7 @@ para no perderse y para reunirse rápido: está siempre disponible, también en 
 | Ya hay un teletransporte en curso | La petición se rechaza (`control_tp_request` devuelve `false`) |
 | El terreno no termina de cargar | La máquina de teletransporte agota su plazo (120 s) y da fallo; se informa |
 | Se corta la conexión durante el viaje | El viaje termina en el destino pedido; después aplica CU-05 |
-| Invocación rechazada o sin respuesta en 20 s | No pasa nada; se avisa a quien la pidió |
+| Invocación rechazada o sin respuesta en 15 s | No pasa nada; se avisa a quien la pidió |
 
 ## Estado actual en el PR: **FALTA** (piezas listas)
 
@@ -80,7 +80,8 @@ para no perderse y para reunirse rápido: está siempre disponible, también en 
 5. **Validar el destino**: coordenadas finitas y dentro de límites razonables antes de llamar (viene de la red).
 6. **Invocación con consentimiento (P5)**: mensaje nuevo de petición y respuesta; diálogo en el overlay; plazo.
 7. **Tiempo de espera de 30 s entre usos** (ADR-008, decisión 16), contado en el juego del viajero. No hay
-   bloqueo por combate ni interruptor del anfitrión que lo apague: la ayuda está siempre disponible.
+   bloqueo por combate ni interruptor del anfitrión que lo apague (el interruptor es `[PROPUESTA]`: la decisión 16 no
+   lo menciona): la ayuda está siempre disponible. Sin otro coste (ADR-011, decisión 36).
 8. Textos traducidos; ajuste en `online.ini`.
 
 ## Reglas y decisiones de diseño
@@ -104,13 +105,13 @@ para no perderse y para reunirse rápido: está siempre disponible, también en 
   su altura difiere menos de 3 m de la de A.
 - **CA-3** Dado el viaje anterior, entonces tras llegar `swctl.py --port 7778 actors OnlinePlayer` devuelve
   exactamente 1 actor (sin duplicados) en menos de 10 s.
-- **CA-4** Dado B dentro de un santuario y A fuera, entonces la acción está deshabilitada en ambos y, si se fuerza
+- **CA-4** (en F4; CU-14 lo cambia en F5) Dado B dentro de un santuario y A fuera, entonces la acción está deshabilitada en ambos y, si se fuerza
   por comando, responde con error sin mover a nadie.
 - **CA-5** Dado B en una escena (`swctl.py --port 7778 event <flujo>`), cuando B pide viajar, entonces se rechaza con
   motivo y no se cuelga.
 - **CA-6** Dado un juego sin modo desarrollador (sin `SAVAGEWIND_CONTROL` ni `SAVAGEWIND_DEV`), cuando el jugador usa
   "Ir con …" en sesión, entonces funciona; y fuera de sesión, la pestaña Teleport sigue oculta como hoy.
-- **CA-7** (P5) Dado A que invoca a B, cuando B no responde en 20 s, entonces B no se mueve; cuando acepta, se cumple
+- **CA-7** (P5) Dado A que invoca a B, cuando B no responde en 15 s, entonces B no se mueve; cuando acepta, se cumple
   CA-1 para B.
 - **CA-8** Dado un bot que publica una posición con NaN o a 1e9 m, cuando el jugador pide viajar hacia él, entonces
   se rechaza.
@@ -140,10 +141,9 @@ para no perderse y para reunirse rápido: está siempre disponible, también en 
 - Riesgo: abrir la máquina de teletransporte fuera del modo desarrollador toca código de la base (`control_game.c`),
   que puede chocar con cambios de upstream.
 - Preguntas ya contestadas por el dueño (Q-08-1 y Q-08-3): ver ADR-008 (decisión 16) en `../decisiones/`.
-- **Pregunta al dueño** (Q-08-2, abierta; por defecto: no cuesta nada más que la espera de 30 s): ¿debe costar algo
-  (un objeto, por ejemplo)?
-- **Pregunta al dueño** (Q-08-4, abierta; por defecto: sí, sin interrumpirle): ¿se permite viajar hacia un
-  compañero que está en plena escena o diálogo?
+- **[DUEÑO] (ADR-011, decisión 36; Q-08-2)** El teletransporte **no cuesta nada**, aparte de la espera de 30 s.
+- **[DUEÑO] (ADR-011, decisión 37; Q-08-4)** Se puede viajar hacia un compañero en plena escena o conversación, **sin
+  interrumpirle**: el viajero aparece cerca.
 
 ## Fase y dependencias
 

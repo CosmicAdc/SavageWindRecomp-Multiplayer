@@ -113,7 +113,8 @@ armadura no se ve, "the colour has to go on its materials" (DOC:1007-1008).
 - **[DUEÑO] (ADR-009, decisión 22; Q-13-3)** Si el tinte 3D no es viable (paso 0 negativo), CU-13 se aparca y D2
   se cumple con el **nombre en color y el marcador con forma** de CU-10. **No bloquea el resto de F5.**
 - **[PROPUESTA]** Intensidad del tinte ajustable y apagable en Opciones.
-- **[PROPUESTA]** No se toca el traductor de sombreadores sin un ADR aprobado por el dueño.
+- **[DUEÑO] (ADR-011, decisión 43; Q-13-4)** Un cambio que obligue a recompilar sombreadores se hace **solo con la
+  aprobación del dueño, presentando antes el coste**. No se toca el traductor de sombreadores sin ella.
 
 ## Criterios de aceptación
 
@@ -156,8 +157,7 @@ armadura no se ve, "the colour has to go on its materials" (DOC:1007-1008).
 - Riesgo: constantes ligadas a 1.9.0 y al backend Vulkan.
 - Preguntas ya contestadas por el dueño (Q-13-1, Q-13-2 y Q-13-3): ver ADR-007 (decisión 8) y ADR-009
   (decisión 22) en `../decisiones/`.
-- **Pregunta al dueño** (Q-13-4, abierta; por defecto: solo con un ADR aprobado): ¿aceptas un cambio que obligue a
-  todos los usuarios a recompilar sombreadores una vez?
+- Pregunta ya contestada por el dueño (Q-13-4): ver ADR-011 (decisión 43) en `../decisiones/`.
 
 ## Fase y dependencias
 
