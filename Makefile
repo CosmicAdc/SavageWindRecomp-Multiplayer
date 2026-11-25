@@ -959,3 +959,13 @@ test-online-net: $(B)/test_online_net
 	$(B)/test_online_net
 
 .PHONY: test-online-net
+
+# The online version gate (runtime/online_gate.h): online play's fixed 1.9.0 addresses only on 1.9.0.
+$(B)/test_online_gate: tools/test_online_gate.c runtime/online_gate.h
+	@mkdir -p $(B)
+	$(CC) -std=gnu11 -O1 -g -Wall $(OSFLAGS) -Iruntime -o $@ tools/test_online_gate.c
+
+test-online-gate: $(B)/test_online_gate
+	$(B)/test_online_gate
+
+.PHONY: test-online-gate
