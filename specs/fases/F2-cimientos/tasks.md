@@ -30,7 +30,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## FASE 0 — Cadena OA, primer paso (antes de tocar nada)
 
-- [ ] T201 [oa] Firma de comportamiento de referencia.
+- [~] T201 [oa] Firma de comportamiento de referencia.
+  reclamada: agente Sonnet firma-t201 (integrada `7b53d18`, adelantada) — `--autoprueba` 0; FALTA etiqueta, tres pasadas y comparar
   files: `tools/coop/firma_log.py`; referencia en `specs/bitacora/<fecha>-F2-firma-referencia.md`
   verify: `$PY tools/coop/firma_log.py "$SW/pruebas/logs/A.log" "$SW/pruebas/logs/B.log"` imprime una tabla "tipo de línea → recuento" por juego y termina con 0; la bitácora contiene la referencia de tres pasadas (mínimo y máximo por tipo); `$PY tools/coop/firma_log.py --comparar <referencia> A.log B.log` termina con 0 contra una cuarta pasada sin cambios de código
   depende de: F1 cerrada (T121)
@@ -48,7 +49,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## FASE 0 — Cadena NET (en serie, un dueño)
 
-- [ ] T202 [net] Una sola definición de los mensajes, compartida con el bot.
+- [~] T202 [net] Una sola definición de los mensajes, compartida con el bot.
+  reclamada: agente Sonnet cable-t202 (integrada `2f38cc9`, adelantada) — make -j8 0, bot sin avisos, test-online-net 162/0; FALTA bot contra el juego y Docker
   files: `runtime/online_wire.h` (nuevo), `runtime/online.c`, `tools/online_bot.c`
   verify: `make -j8` compila; `cc -O2 -Wall -Iruntime -o build/online_bot.exe tools/online_bot.c -lws2_32` compila; `grep -n "typedef struct" tools/online_bot.c` ya no muestra `WireState` ni `WireHello`; `grep -n "version = 38" tools/online_bot.c` no devuelve nada; `make test-online-net` sigue en 0; el bot se une al juego A y camina como antes
   depende de: T201 (para tener F1 cerrada y etiquetada)
@@ -64,7 +66,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies ningún campo, orden ni tipo de las estructuras; no subas `PROTOCOL`; no muevas a esta cabecera nada que no sea formato de cable; no toques `runtime/online.h` salvo que una aserción demuestre un error del mapa (entonces avisa).
   modelo sugerido: medio
 
-- [ ] T203 [net] Pruebas de trama y codificación sin el juego.
+- [~] T203 [net] Pruebas de trama y codificación sin el juego.
+  reclamada: agente Sonnet trama-t203 (coop/T203, en curso)
   files: `tools/test_online_wire.c` (nuevo), `tools/test_online_net.c`, `Makefile` (bloque al final)
   verify: `make test-online-wire test-online-net` terminan con 0 en Windows; en Docker: `docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas sh -c 'make B=/tmp/b GEN=/nonexistent test-online-wire test-online-net'` termina con 0
   depende de: T202
@@ -79,7 +82,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies `runtime/online.c` para que una prueba pase; si una prueba descubre un fallo real, déjala escrita, desactívala con un comentario que diga por qué, y anótalo; no abras sockets.
   modelo sugerido: medio
 
-- [ ] T204 [net] Pruebas de la máquina de estados de sesión.
+- [~] T204 [net] Pruebas de la máquina de estados de sesión.
+  reclamada: agente Sonnet sesion-t204 (coop/T204, en curso)
   files: `tools/test_online_session.c` (nuevo), `Makefile` (bloque al final)
   verify: en Docker: `docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas sh -c 'make B=/tmp/b GEN=/nonexistent test-online-session'` termina con 0 y lista al menos los nueve casos de `pasos`; en Windows `make test-online-session` imprime que la prueba es solo POSIX y termina con 0
   depende de: T203
@@ -127,7 +131,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## FASE 0 — Cadena OA (estrictamente en serie, un dueño, un worktree)
 
-- [ ] T206 [oa] Reordenar `online_actors.c` por módulos, dentro del mismo fichero.
+- [~] T206 [oa] Reordenar `online_actors.c` por módulos, dentro del mismo fichero.
+  reclamada: agente Opus oa-t206 (coop/T206, en curso; base `7b53d18`)
   files: `runtime/online_actors.c`, `tools/coop/oa_check.py` (nuevo), `specs/decisiones/<n>-reparto-oa.md`
   verify: `$PY tools/coop/oa_check.py --antes f1-cerrada:runtime/online_actors.c --despues runtime/online_actors.c` termina con 0; `make -j8` compila sin avisos nuevos; `make test-online-gate` en 0; recorrido corto (pasos 1-3) pasa
   depende de: T201
