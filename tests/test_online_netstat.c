@@ -92,15 +92,16 @@ int main(void) {
     seq = 0;
     first_bad = 0;
     for (int i = 0; i <= 120; i++) {  // 100 ms steps, 12 s
-        t =(uint64_t)i * 100 * MS;
+        t = (uint64_t)i * 100 * MS;
         for (int k = 0; k < 4; k++) online_netstat_state(&ns, seq++, t + (uint64_t)k * 25 * MS);
-        online_netstat_ping(&ns, t < 6000 * MS ? 40.0f : 400.0f, t);
+        if (i % 5 == 0) online_netstat_ping(&ns, t < 6000 * MS ? 40.0f : 400.0f, t);  // 2 per second, like the real PING
         online_netstat_get(&ns, t + 75 * MS, NULL, NULL, NULL, NULL, &level);
         if (t == 7000 * MS) CHECK(level == ONLINE_NETSTAT_GOOD);
         if (level == ONLINE_NETSTAT_BAD && !first_bad) first_bad = t;
     }
-    // the mean passes 250 at ~8.9 s; the shown level follows 2 s later
-    CHECK(first_bad >= 10800 * MS && first_bad <= 11300 * MS);
+    // 10 pings in the window: the mean passes 250 when 6 of them are 400 ms (t = 8.5 s); FAIR was pending since 6.5 s
+    // but the raw level changed to BAD before FAIR was shown, so BAD waits 2 s from 8.5 s: 10.5 s
+    CHECK(first_bad >= 10400 * MS && first_bad <= 10700 * MS);
 
     // sequence wrap: 65530 ... 65535, 0 ... 10 with nothing missing
     online_netstat_init(&ns);
