@@ -63,3 +63,15 @@ Con `revisor` y `oa-t209` (Opus) trabajando, la pasada completa de dos juegos (`
 `0fbcfa1`) la cortó Claude Code por memoria crítica antes del primer paso (el anfitrión ya ocupaba 4,2 GB). Se cerraron
 los dos juegos (6,2 GB libres después). **No se relanzó automáticamente**: queda para cuando el dueño lo pida o con
 menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un agente abierto.
+
+## 2026-11-25 · Pasada de dos juegos con T209 (build `69fa86c`, sin ventana)
+
+- Pasos 1, 3, 4 (1 traspaso), 5, 6, 7, 8 y 9 **PASAN**. En la pasada de T208 fallaban el 4 y el 5.
+- Paso 2 y paso de enemigos **FALLAN** por el teletransporte (`Position verification failed`): herramienta (HE-13).
+- Paso 10 **FALLA** por tiempo: B se relanzó y volvió a unirse (tercera línea `joined` en A.log), pero con 0 GB libres
+  tardó más de los 180 s que espera el guion. Igual en el paso 1 de los dos primeros intentos.
+- Logs: ningún `dropped a STATE` ni otro descarte; ningún cierre. B.log: 166 líneas `made again` (HE-23, T453; ya
+  ocurría antes de T208).
+- `recorrido.py`: desde PowerShell `shutil.which("bash")` daba el de WSL; ahora prefiere Git Bash o MSYS2 (commit
+  `557990f`). La pasada se lanza en un panel de Herdr para que el recortador de memoria de Claude Code no la corte.
+- Firma (`firma_log.py --comparar`): sin referencia todavía (T201 pendiente). T209 queda `[~]` hasta tenerla.
