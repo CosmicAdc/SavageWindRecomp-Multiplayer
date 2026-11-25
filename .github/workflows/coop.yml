@@ -1,0 +1,47 @@
+# Coop tests (T205): the online and coop tests that need no game files: the wire, the client's message handling, the
+# validation layer, the server's session state machine (POSIX), the version gate, the network name lists, and the pure
+# logic modules of F3 and F4 (runtime/online_*.c and runtime/coop_*.c with their tests).
+name: Coop tests
+
+on:
+  push:
+    branches: [coop/main]
+  pull_request:
+    branches: [coop/main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the compiler
+        run: sudo apt-get update && sudo apt-get install -y clang make
+      - name: Online tests
+        run: >
+          make CC=clang B=/tmp/b GEN=/nonexistent
+          test-online-gate test-online-wire test-online-net test-online-validate test-online-session
+          test-online-names
+      - name: Pure modules (F3 and F4)
+        run: |
+          set -e
+          mkdir -p /tmp/b
+          for m in ratelimit invite netstat; do
+            clang -Wall -Iruntime tests/test_online_$m.c runtime/online_$m.c -lm -o /tmp/b/test_online_$m
+            /tmp/b/test_online_$m
+          done
+          for m in threat world rewards revive pvp; do
+            clang -Wall -Iruntime tests/test_coop_$m.c runtime/coop_$m.c -lm -o /tmp/b/test_coop_$m
+            /tmp/b/test_coop_$m
+          done
+          clang -Wall -Iruntime tests/test_coop_palette.c runtime/coop_palette.c runtime/colour_vision.c -lm \
+            -o /tmp/b/test_coop_palette
+          /tmp/b/test_coop_palette
