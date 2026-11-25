@@ -1,6 +1,7 @@
 // Online play's actors, oa_rules: the session's rules: players colliding, PvP, the fairy, menus that don't pause, A
 // held back. What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 volatile int oa_g_nopause_now;  // (a menu is up and the world goes on: rt_scene_state says playing)
 
@@ -10,11 +11,13 @@ volatile int oa_g_nopause_now;  // (a menu is up and the world goes on: rt_scene
 // SAVAGEWIND_ONLINE_MENU_LOG=1 logs their AS as they change
 enum { MENU_LIVE_AFTER = 4 };  // (frames: rt_online_menu_live)
 volatile int oa_g_nopause_frames;  // (frames the menu has been up with the world going on)
+// oa_own_strikes_in_menu's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static char last[OWNS][32];
+static int wait[OWNS], arrow[OWNS];
+static float arrow_d[OWNS];
+static bool shot[OWNS];
+
 void oa_own_strikes_in_menu(Cpu *c, uint64_t player) {
-    static char last[OWNS][32];
-    static int wait[OWNS], arrow[OWNS];
-    static float arrow_d[OWNS];
-    static bool shot[OWNS];
     static int log = -1;
     if (log < 0) log = getenv("SAVAGEWIND_ONLINE_MENU_LOG") != NULL;
     for (int k = 0; k < OWNS; k++) {
@@ -151,10 +154,12 @@ void oa_players_collide(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me)
     rp[0] += push[0], rp[2] += push[1];
 }
 
+// oa_pvp_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint64_t swing_seen;
+static uint16_t seen[ONLINE_MAX];
+static bool init[ONLINE_MAX];
+
 void oa_pvp_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
-    static uint64_t swing_seen;
-    static uint16_t seen[ONLINE_MAX];
-    static bool init[ONLINE_MAX];
     if (!VALID(player) || me < 0) return;
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
     // his blow
@@ -331,4 +336,29 @@ void oa_rules_block_a_frame(const float link[3], int me) {
     if (framepace_in_event()) block = 0;
     if (block != g_online_block_a) LOG("[online] %s\n", block ? "another player is at a Sheikah pedestal near: A held back" : "A back");
     g_online_block_a = block;
+}
+
+// A reboot (runtime/main.c teardown): no session and no menu now - the rules back to "not in a session" (-1), A no
+// longer held back (else runtime/hle/input.c would keep it from the next boot), the menus' and PvP's state and the
+// logs as in a fresh process
+RT_ON_RESET(oa_rules_reset) {
+    oa_g_nopause_now = 0;
+    oa_g_nopause_frames = 0;
+    memset(last, 0, sizeof last);
+    memset(wait, 0, sizeof wait);
+    memset(arrow, 0, sizeof arrow);
+    memset(arrow_d, 0, sizeof arrow_d);
+    memset(shot, 0, sizeof shot);
+    g_revive_rule = -1;
+    oa_g_nopause_rule = -1;
+    swing_seen = 0;
+    memset(seen, 0, sizeof seen);
+    memset(init, 0, sizeof init);
+    g_online_block_a = 0;
+    g_game_buttons = 0;
+    logged = 0;
+    held_stop = x_was = false;
+    memset(seen_ps, 0, sizeof seen_ps);
+    told = 0;
+    dlog = 0;
 }

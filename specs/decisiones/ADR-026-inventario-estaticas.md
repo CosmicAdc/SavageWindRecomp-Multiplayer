@@ -408,20 +408,20 @@ oa_puppet.c:oa_puppet_frame:heap             permitir  tabla constante
 # oa_rules.c
 oa_rules.c:oa_g_nopause_now                  partida   hay un menú sin pausa abierto (lo leen rt_scene_state y el backend)
 oa_rules.c:oa_g_nopause_frames               partida   fotogramas con ese menú
-oa_rules.c:oa_own_strikes_in_menu:last       partida   último AS de cada enemigo nuestro
-oa_rules.c:oa_own_strikes_in_menu:wait       partida   espera de golpe
-oa_rules.c:oa_own_strikes_in_menu:arrow      partida   flecha
-oa_rules.c:oa_own_strikes_in_menu:arrow_d    partida   flecha
-oa_rules.c:oa_own_strikes_in_menu:shot       partida   flecha
+oa_rules.c:last                              partida   último AS de cada enemigo nuestro
+oa_rules.c:wait                              partida   espera de golpe
+oa_rules.c:arrow                             partida   flecha
+oa_rules.c:arrow_d                           partida   flecha
+oa_rules.c:shot                              partida   flecha
 oa_rules.c:oa_own_strikes_in_menu:log        permitir  variable de entorno MENU_LOG leída una vez
 oa_rules.c:g_revive_rule                     partida   regla de hada de la sesión (-1 fuera de sesión)
 oa_rules.c:oa_g_nopause_rule                 partida   regla de menús sin pausa de la sesión (-1 fuera de sesión)
 oa_rules.c:rt_online_menu_live:still         permitir  variable de entorno MENU_STILL leída una vez
 oa_rules.c:rt_menu_draw_pause:still          permitir  variable de entorno MENU_STILL leída una vez
 oa_rules.c:oa_players_collide:off            permitir  variable de entorno NO_COLLIDE leída una vez
-oa_rules.c:oa_pvp_update:swing_seen          partida   hora de la última estela vista
-oa_rules.c:oa_pvp_update:seen                partida   último golpe PvP visto de cada jugador
-oa_rules.c:oa_pvp_update:init                partida   va con seen
+oa_rules.c:swing_seen                        partida   hora de la última estela vista
+oa_rules.c:seen                              partida   último golpe PvP visto de cada jugador
+oa_rules.c:init                              partida   va con seen
 oa_rules.c:g_online_block_a                  partida   A retenido (lo lee runtime/hle/input.c): sin limpiar, A seguiría bloqueado tras el reinicio
 oa_rules.c:g_game_buttons                    partida   botones que se dan al juego (lo escribe runtime/hle/input.c)
 oa_rules.c:logged                            partida   contador de log de oa_rules_nopause_frame
