@@ -441,7 +441,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no metas la contraseña ni el nombre en el código; no reserves memoria dinámica; no leas más allá de `cap`.
   modelo sugerido: bajo
 
-- [ ] T323 [P] [módulo] Descubrimiento de partidas en la red local
+- [~] T323 [P] [módulo] Descubrimiento de partidas en la red local
+  reclamada: agente Sonnet ag-t323 (integrada) — módulo y prueba OK (Windows), en CI; `lan.sh` en Docker: 1 partida en 11 ms en la misma red, 0 en redes distintas (S8); FALTA cablearlo (T308/T309) y el Makefile
   files: runtime/online_discovery.c, runtime/online_discovery.h, tests/test_online_discovery.c, tools/nettest/scenarios/lan.sh
   verify: `clang -Wall -Iruntime tests/test_online_discovery.c runtime/online_discovery.c -o build/test_online_discovery && build/test_online_discovery` sale con 0 **y** `sh tools/nettest/run.sh lan` sale con 0
   depende de: T301, T308
