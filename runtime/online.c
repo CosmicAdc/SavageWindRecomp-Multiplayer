@@ -126,6 +126,17 @@ static void sock_nodelay(sock_t s) {
     setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (const char *)&one, sizeof one);
 }
 
+// a send to a peer that closed returns an error instead of raising SIGPIPE, which would end the process (macOS; Linux
+// has MSG_NOSIGNAL in send_all; Windows has no SIGPIPE)
+static void sock_nosigpipe(sock_t s) {
+#ifdef SO_NOSIGPIPE
+    int one = 1;
+    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (const char *)&one, sizeof one);
+#else
+    (void)s;
+#endif
+}
+
 static void sock_nonblock(sock_t s, bool on) {
 #ifdef _WIN32
     u_long m = on;
@@ -139,8 +150,12 @@ static void sock_nonblock(sock_t s, bool on) {
 // the whole buffer, blocking (false: the connection is gone)
 static bool send_all(sock_t s, const void *p, int n) {
     const char *c = p;
+    int flags = 0;
+#ifdef MSG_NOSIGNAL
+    flags = MSG_NOSIGNAL;  // (a peer that closed: an error, not SIGPIPE)
+#endif
     while (n > 0) {
-        int k = send(s, c, n, 0);
+        int k = send(s, c, n, flags);
         if (k <= 0) return false;
         c += k, n -= k;
     }
@@ -361,6 +376,7 @@ static void srv_loop(Server *sv) {
                 int i = 0;
                 while (i < ONLINE_MAX && sv->c[i].used) i++;
                 sock_nodelay(s);
+                sock_nosigpipe(s);
                 if (i == ONLINE_MAX) {
                     uint8_t why = R_FULL;
                     send_msg(s, M_REJECT, &why, 1, NULL, 0);
@@ -1153,6 +1169,7 @@ static sock_t cl_connect(const char *host, int port) {
         }
         sock_nonblock(s, false);
         sock_nodelay(s);
+        sock_nosigpipe(s);
     }
     freeaddrinfo(res);
     return s;
