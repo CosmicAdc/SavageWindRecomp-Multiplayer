@@ -41,7 +41,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## A. Requisitos del dueño
 
-- [ ] T001 [P] [dueño] Crear el fork de `Revivedx/SavageWindRecomp` en la cuenta CosmicAdc, con todas las ramas.
+- [~] T001 [P] [dueño] Crear el fork de `Revivedx/SavageWindRecomp` en la cuenta CosmicAdc, con todas las ramas.
+  reclamada: orquestador (Opus), 2026-11-24 — fork existe (`main`); falta subir `test` (credencial HTTPS de CosmicAdc caducada)
   files: ninguno (web de GitHub)
   verify: `git ls-remote --heads https://github.com/CosmicAdc/SavageWindRecomp-Multiplayer.git` lista `refs/heads/test` y `refs/heads/main`
   depende de: —
@@ -69,7 +70,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no mezcles los DLC dentro de `romfs/` (provoca una carga infinita tras un jefe de Bestia Divina, `docs/game-files.md`); no pongas la carpeta dentro del clon; no la compartas ni la subas.
   modelo sugerido: bajo (tarea humana)
 
-- [ ] T003 [P] [dueño] Liberar disco.
+- [x] T003 [P] [dueño] Liberar disco.
+  reclamada: orquestador (Opus), 2026-11-24 — 128 GB libres; ver bitacora/2026-11-24-F0-arranque.md
   files: ninguno
   verify: `df -h "$SW"` muestra al menos 60 GB libres (ideal 100 GB); cifra anotada en la bitácora
   depende de: —
@@ -85,7 +87,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## B. Herramientas y repositorio (en serie)
 
-- [ ] T004 [entorno] Clonar el fork, fijar remotos y traer la rama del PR #294.
+- [x] T004 [entorno] Clonar el fork, fijar remotos y traer la rama del PR #294.
+  reclamada: orquestador (Opus), 2026-11-24 — pr-294-online = 350c5f8; ver bitacora/2026-11-24-F0-arranque.md
   files: `$SW/coop/` (clon nuevo), `$SW/coop/.git/config`
   verify: `git remote -v` muestra `origin` → CosmicAdc y `upstream` con URL de push no válida; `git push upstream --dry-run` falla; `git log -1 --format=%h pr-294-online` imprime un hash (esperado `350c5f8`)
   depende de: T001
@@ -118,7 +121,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no instales paquetes fuera de la lista del script; no uses el Python de MSYS2 para el venv (el script explica que no compila unicorn/capstone); no instales Go.
   modelo sugerido: bajo
 
-- [ ] T006 [git] Crear `coop/main` desde la rama del PR y restaurar el CI.
+- [x] T006 [git] Crear `coop/main` desde la rama del PR y restaurar el CI.
+  reclamada: orquestador (Opus), 2026-11-24 — commit 0cbc5af
   files: `.github/workflows/activity-feed.yml`, `checks.yml`, `linux-distros.yml`, `macos-dmg.yml`, `macos.yml`, `tests.yml`, `windows.yml`, `.github/dependabot.yml`
   verify: `git branch --show-current` da `coop/main`; `git diff --stat upstream/test -- .github` no lista ficheros borrados
   depende de: T004
@@ -148,7 +152,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no generes ni guardes claves privadas en el repositorio; no cambies `runtime/update_core.c` (lo cubre una prueba); no borres el código del actualizador.
   modelo sugerido: medio
 
-- [ ] T008 [git] Hacer que el CI corra en `coop/main` y apagar los flujos de issues en el fork.
+- [~] T008 [git] Hacer que el CI corra en `coop/main` y apagar los flujos de issues en el fork.
+  reclamada: orquestador (Opus), 2026-11-24 — ficheros hechos (19eda12); falta la parte web del dueño (desactivar triage, stale, crash-save, macos-dmg)
   files: `.github/workflows/checks.yml`, `tests.yml`, `windows.yml`, `macos.yml`
   verify: `grep -n "coop/main" .github/workflows/checks.yml .github/workflows/tests.yml .github/workflows/windows.yml .github/workflows/macos.yml` da al menos una línea por fichero
   depende de: T006
@@ -162,7 +167,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no añadas secretos; no cambies los pasos de los jobs; no borres flujos.
   modelo sugerido: bajo
 
-- [ ] T009 [specs] Mover `specs/` al fork.
+- [x] T009 [specs] Mover `specs/` al fork.
+  reclamada: agente Sonnet t009-specs, 2026-11-24, rama coop/T009 (0e62884), integrada en db22ccb
   files: `specs/**`
   verify: las dos órdenes de `plan.md` §8 terminan con `1` (sin coincidencias) sobre lo preparado; tras el commit, `git status --short specs | wc -l` da 0
   depende de: T006
