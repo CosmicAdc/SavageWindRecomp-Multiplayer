@@ -335,8 +335,8 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
             for (int t = 0; t < THEIRS; t++) {
                 Piece *lp = &oa_g_theirs[t].p;
                 if (!oa_g_theirs[t].gid || oa_g_theirs[t].gone || oa_g_theirs[t].origin != i || !lp->actor ||
-                    strcmp(lp->name, g->name) || !oa_alive(lp->actor, lp->w))
-                    continue;
+                    strcmp(lp->name, g->name) || !oa_alive(lp->actor, lp->w) || !oa_has_body(lp->actor))
+                    continue;  // (no body: "not found", as the by-name search below: FN_BODY_TO needs one)
                 const float *m = (const float *)(uintptr_t)(lp->actor + 0x398);
                 float d = (m[3] - g->from[0]) * (m[3] - g->from[0]) + (m[7] - g->from[1]) * (m[7] - g->from[1]) +
                           (m[11] - g->from[2]) * (m[11] - g->from[2]);
