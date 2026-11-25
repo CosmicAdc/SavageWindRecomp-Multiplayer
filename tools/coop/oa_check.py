@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Red de seguridad para reordenar runtime/online_actors.c sin cambiar nada (T206).
+"""Red de seguridad para reordenar runtime/online_actors.c sin cambiar nada (T206) y para cortarlo en
+runtime/oa_*.c con una cabecera interna (T207, --modulos y --nombres).
 
 Parte un fichero C en "elementos" de nivel superior: cada definicion (funcion,
 variable, tipo, macro, #include) con el comentario pegado encima (sin linea en
@@ -50,11 +51,47 @@ Usos:
   oa_check.py --usos RUTA
       Para cada definicion, que elementos la usan (para decidir el reparto).
 
+  oa_check.py --antes COMMIT:RUTA|RUTA --modulos "DIR/oa_*.c" [--nombres TABLA]
+      (T207) Compara el "antes" (un solo fichero, el de T206) con su corte en
+      modulos: DIR/online_actors_internal.h, DIR/online_actors.c (las listas
+      de nombres) y los DIR/oa_*.c. Mismo multiconjunto de elementos, texto
+      exacto, con estas diferencias admitidas y solo estas:
+        - la palabra "static" al principio de la linea de codigo de un
+          elemento (lo que cruza de modulo la pierde);
+        - en la cabecera se ignoran sus comentarios propios, sus #include y
+          #pragma, sus prototipos y sus declaraciones "extern";
+        - en cada .c se ignoran el comentario de cabecera (lo que va antes de
+          su #include "online_actors_internal.h") y ese #include; como antes,
+          los prototipos "static ...;" sueltos;
+        - del "antes" se ignoran el #ifndef ONLINE_NAMES_ONLY y su #endif (las
+          regiones #if desaparecen: cada modulo es su propio fichero);
+        - una variable de tipo struct anonimo que cruza de modulo lleva su
+          tipo con nombre en la cabecera ("typedef struct {...} Nombre;",
+          que no estaba en el "antes"): se le vuelve a poner el struct a la
+          variable ("Nombre g_x[...]" -> "struct {...} g_x[...]") y se compara
+          eso.
+      Lo de online_actors.c debe ser lo de antes del #ifndef, en el mismo
+      orden. Y, por unidad de compilacion (la cabecera mas cada .c), cada
+      elemento expande las mismas macros del fichero que en el "antes"
+      (las que nombra y estan definidas antes de el, y las que nombran esas
+      al expandirse). Con --nombres, los renombrados de TABLA (bloque
+      "oa-nombres:" ... "fin", "viejo nuevo" por linea) se aplican al "antes"
+      antes de comparar (ver --renombrar). Sale con 0 (iguales) o 1.
+
+  oa_check.py --renombrar TABLA FICHERO...
+      Aplica los renombrados de TABLA a los ficheros, en su sitio: sustitucion
+      por palabra completa solo en el codigo (no en comentarios, cadenas ni
+      caracteres) y nunca tras "." o "->" (un campo de struct que se llame
+      igual no cambia). Es la misma funcion que usa --nombres.
+
   oa_check.py --autoprueba
       Casos sinteticos: igual -> 0, linea, espacio, linea en blanco o comentario
       cambiados -> 1, bloque movido con su comentario -> 0, elemento sacado de su
       #ifndef -> 1, macro movida debajo de su uso -> 1; y la comprobacion de
-      orden con una variable y una funcion usadas antes de definirse.
+      orden con una variable y una funcion usadas antes de definirse. Para
+      --modulos, un corte sintetico en dos modulos (bien -> 0; con un cambio,
+      un static de mas en una funcion o una macro que deja de verse -> 1) y
+      el renombrado (comentarios, cadenas y campos intactos).
 
 Bloque "oa-reparto" (en un bloque de codigo del .md, entre "oa-reparto:" y la
 linea "fin"): una orden por linea. Una orden por nombre manda sobre cualquier
@@ -609,7 +646,111 @@ def cmd_selftest():
             detail += ", orden=%d (esperado %d)" % (go, want_order)
         print("%s  %s: %s" % ("ok   " if ok else "FALLO", name, detail))
         rc |= 0 if ok else 1
+    rc |= selftest_modules()
     print("autoprueba: %s" % ("bien" if rc == 0 else "MAL"))
+    return rc
+
+
+SELFTEST_ANTES = """// cabecera
+#include <stdio.h>
+#define LIM 2
+static int lim(void) { return LIM; }
+
+#ifndef SOLO
+#define FN_X 0x7000ull
+#define N 4
+static int g_a[N];
+int g_c;  // (ya global)
+// suma
+static int suma(int x) {
+    int s = 0;
+    for (int i = 0; i < N; i++) s += g_a[i] + x;  // (suma)
+    return s;
+}
+static struct { int a; } g_b = {1};
+static int uso(void) { return suma(g_b.a) + (int)FN_X + lim(); }
+#endif  // SOLO
+"""
+
+SELFTEST_CAB = """// la cabecera
+#pragma once
+#include <stdio.h>
+
+#define FN_X 0x7000ull
+#define N 4
+
+typedef struct { int a; } OaB;
+
+extern int g_a[N];
+int suma(int x);
+extern OaB g_b;
+int lim(void);
+"""
+
+SELFTEST_NOMBRES = """// cabecera
+#include <stdio.h>
+#include "online_actors_internal.h"
+#define LIM 2
+int lim(void) { return LIM; }
+"""
+
+SELFTEST_A = """// oa_a: lo de a
+#include "online_actors_internal.h"
+
+int g_a[N];
+int g_c;  // (ya global)
+// suma
+int suma(int x) {
+    int s = 0;
+    for (int i = 0; i < N; i++) s += g_a[i] + x;  // (suma)
+    return s;
+}
+OaB g_b = {1};
+"""
+
+SELFTEST_B = """#include "online_actors_internal.h"
+
+static int uso(void) { return suma(g_b.a) + (int)FN_X + lim(); }
+"""
+
+
+def selftest_modules():
+    """Casos sinteticos de --modulos y del renombrado."""
+    sink = lambda *a, **k: None
+    a, h, nm, ma, mb = SELFTEST_ANTES, SELFTEST_CAB, SELFTEST_NOMBRES, SELFTEST_A, SELFTEST_B
+
+    def run(a=a, h=h, nm=nm, ma=ma, mb=mb):
+        return modules_compare(a, [("oa_a.c", ma), ("oa_b.c", mb)], h, nm, sink)
+
+    ren = {"suma": "oa_suma", "g_a": "oa_g_a"}
+    cases = [
+        ("modulos: corte bien hecho", run(), 0),
+        ("modulos: una linea cambiada", run(ma=ma.replace("+ x;", "- x;")), 1),
+        ("modulos: un static de mas", run(ma=ma.replace("int g_c;", "static int g_c;")), 1),
+        ("modulos: tipo anonimo con otro cuerpo", run(h=h.replace("int a; } OaB", "long a; } OaB")), 1),
+        ("modulos: macro que el otro modulo ya no ve", run(
+            h=h.replace("#define FN_X 0x7000ull\n", ""), ma=ma + "#define FN_X 0x7000ull\n"), 1),
+        ("modulos: online_actors.c en otro orden", run(nm=nm.replace("#define LIM 2\n", "").replace(
+            "// cabecera\n", "// cabecera\n#define LIM 2\n")), 1),
+        ("modulos: un #if en un modulo", run(mb="#ifdef X\n" + mb + "#endif\n"), 1),
+        ("modulos: falta un modulo", modules_compare(a, [("oa_a.c", ma)], h, nm, sink), 1),
+        ("nombres: el antes renombrado igual que los modulos", modules_compare(
+            rename_text(a, ren), [("oa_a.c", rename_text(ma, ren)), ("oa_b.c", rename_text(mb, ren))], h, nm, sink), 0),
+        ("nombres: modulos renombrados sin la tabla", run(ma=rename_text(ma, ren), mb=rename_text(mb, ren)), 1),
+        ("renombrado: comentarios, cadenas y campos intactos",
+         0 if rename_text('a.suma = suma(x); // suma\n"suma"; s->suma; s-> suma; suma2; /* suma */ 1.suma',
+                          ren) == 'a.suma = oa_suma(x); // suma\n"suma"; s->suma; s-> suma; suma2; /* suma */ 1.suma'
+         else 1, 0),
+        ("renombrado: un campo de struct que se llama como la funcion",
+         0 if rename_text("static struct { int suma; struct { int g_a; } in; } t[2] = {{0}};\nint f(void) { return suma(t[0].suma); }",
+                          ren) == "static struct { int suma; struct { int g_a; } in; } t[2] = {{0}};\n"
+                                 "int f(void) { return oa_suma(t[0].suma); }" else 1, 0),
+    ]
+    rc = 0
+    for name, got, want in cases:
+        ok = got == want
+        print("%s  %s: %d (esperado %d)" % ("ok   " if ok else "FALLO", name, got, want))
+        rc |= 0 if ok else 1
     return rc
 
 
@@ -833,6 +974,282 @@ def cmd_reorder(table, antes, salida, only_table=False):
     return 0
 
 
+# ---------------------------------------------------------------- modulos y nombres (T207)
+
+HEADER_NAME = "online_actors_internal.h"
+NAMES_FILE = "online_actors.c"
+
+
+def parse_names(path):
+    """Tabla de renombrados {viejo: nuevo} del bloque "oa-nombres:" ... "fin" de un .md."""
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"^oa-nombres:\s*$(.*?)^fin\s*$", text, re.S | re.M)
+    if not m:
+        sys.exit("oa_check: %s no tiene el bloque oa-nombres: ... fin" % path)
+    table = {}
+    for raw in m.group(1).split("\n"):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        w = line.split()
+        if len(w) != 2 or not all(re.fullmatch(r"[A-Za-z_]\w*", x) for x in w):
+            sys.exit("oa_check: linea de oa-nombres no valida: %r" % raw)
+        if w[0] in table:
+            sys.exit("oa_check: %s renombrado dos veces" % w[0])
+        table[w[0]] = w[1]
+    news = list(table.values())
+    if len(set(news)) != len(news) or set(news) & set(table):
+        sys.exit("oa_check: oa-nombres: un nombre nuevo repetido o que tambien es viejo")
+    return table
+
+
+def rename_text(text, table):
+    """Sustitucion por palabra completa en el codigo: no en comentarios, cadenas ni caracteres, ni tras . o ->, ni
+    dentro del cuerpo de un struct o union (ahi solo hay campos: uno que se llame como una funcion no cambia)."""
+    out, i, n = [], 0, len(text)
+    braces = []  # por cada { abierta: si es el cuerpo de un struct/union
+    while i < n:
+        c = text[i]
+        if c == "{":
+            braces.append(bool(re.search(r"\b(struct|union)\s*([A-Za-z_]\w*\s*)?$", text[max(0, i - 200):i])))
+        elif c == "}" and braces:
+            braces.pop()
+        if text.startswith("//", i):
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+        elif c in "\"'":
+            j = i + 1
+            while j < n and text[j] != c and text[j] != "\n":
+                j += 2 if text[j] == "\\" else 1
+            j += 1
+        elif c.isdigit() or (c == "." and text[i + 1: i + 2].isdigit()):
+            j = re.compile(r"\.?\d[\w.]*").match(text, i).end()
+        elif c.isalpha() or c == "_":
+            j = IDENT_RE.match(text, i).end()
+            w = text[i:j]
+            k = i - 1
+            while k >= 0 and text[k] in " \t\r\n":
+                k -= 1
+            member = k >= 0 and (text[k] == "." or (text[k] == ">" and k > 0 and text[k - 1] == "-"))
+            out.append(table[w] if w in table and not member and not any(braces) else w)
+            i = j
+            continue
+        else:
+            j = i + 1
+        out.append(text[i:j])
+        i = j
+    return "".join(out)
+
+
+def cmd_rename(table_path, files):
+    table = parse_names(table_path)
+    for p in files:
+        with open(p, "r", encoding="utf-8", newline="") as f:
+            t = f.read()
+        r = rename_text(t, table)
+        with open(p, "w", encoding="utf-8", newline="") as f:
+            f.write(r)
+        print("%s: %s" % (p, "renombrado" if r != t else "sin cambios"))
+    return 0
+
+
+def is_header_include(it):
+    """#include "online_actors_internal.h" (en el codigo las cadenas van vaciadas: se mira el texto)."""
+    return bool(re.search(r'^\s*#\s*include\s+"%s"' % re.escape(HEADER_NAME), it.text, re.M))
+
+
+def has_static(it):
+    return it.code_start is not None and it.lines[it.code_start - it.start].startswith("static ")
+
+
+def unstatic_text(it):
+    """El texto del elemento sin "static " al principio de su linea de codigo."""
+    if it.code_start is None:
+        return it.text
+    ls = list(it.lines)
+    k = it.code_start - it.start
+    if ls[k].startswith("static "):
+        ls[k] = ls[k][len("static "):]
+    return "\n".join(ls)
+
+
+def expansions(seq):
+    """Para cada elemento de una unidad de compilacion (lista en su orden), las macros del fichero que se expanden en
+    el: las que nombra y estan definidas antes, y lo que nombran esas al expandirse."""
+    defined, res = {}, []
+    for it in seq:
+        ids = set(IDENT_RE.findall(it.codetext))
+        if it.kind == "pp":
+            ids -= set(it.names)
+        exp, todo = set(), [x for x in ids if x in defined]
+        while todo:
+            x = todo.pop()
+            if x not in exp:
+                exp.add(x)
+                todo += [y for y in defined[x] if y in defined]
+        res.append(frozenset(exp))
+        if it.kind == "pp" and it.names:
+            defined[it.names[0]] = item_uses(it, set(), set())
+    return res
+
+
+def modules_texts(antes_text, paths, header_text, names_text):
+    """(antes, despues, mensajes): para cada lado, lista de (texto comparable, macros expandidas o None, origen)
+    y las listas ordenadas de lo de antes del #ifndef / de online_actors.c."""
+    msgs = []
+    a_items, _ = split_items(antes_text, drop_separators=True)
+    a_first = next((k for k, it in enumerate(a_items) if it.kind == "pp" and re.match(r"\s*#\s*if", it.codetext)), None)
+    a_last = max((k for k, it in enumerate(a_items) if it.kind == "pp" and re.match(r"\s*#\s*endif", it.codetext)),
+                 default=None)
+    a_exp = expansions(a_items)
+    antes, a_pre = [], []
+    for k, it in enumerate(a_items):
+        if k in (a_first, a_last) or is_bare(it):
+            continue
+        if it.kind == "partial":
+            msgs.append("antes: elemento sin terminar en la linea %d" % (it.start + 1))
+        e = None if it.kind in ("pp", "comment") else a_exp[k]
+        antes.append((unstatic_text(it), e, "antes:%d" % (it.start + 1), has_static(it)))
+        if a_first is not None and k < a_first:
+            a_pre.append(unstatic_text(it))
+    a_texts = Counter(t for t, _, _, _ in antes)
+
+    h_items, _ = split_items(header_text)
+    # los tipos con nombre que no estaban en el "antes" (los de una variable de struct anonimo)
+    anon = {}
+    for it in h_items:
+        if (it.kind == "decl" and getattr(it, "typedef", False) and re.match(r"\s*typedef\s+struct\s*\{", it.codetext)
+                and unstatic_text(it) not in a_texts and len(it.names) == 1):
+            raw = "\n".join(it.lines[it.code_start - it.start:])
+            suf = " %s;" % it.names[0]
+            if raw.startswith("typedef ") and raw.endswith(suf):
+                anon[it.names[0]] = [it, raw[len("typedef "): -len(suf)], False]
+
+    def h_ignored(it):
+        c = it.codetext.strip()
+        return (it.kind in ("comment", "proto") or (it.kind == "pp" and re.match(r"#\s*(include|pragma)\b", c))
+                or (it.kind == "decl" and c.startswith("extern ")) or it.names[:1] and it.names[0] in anon
+                and it is anon[it.names[0]][0])
+
+    h_exp = expansions(h_items)
+    despues = []
+    for k, it in enumerate(h_items):
+        if it.kind == "partial":
+            msgs.append("%s: elemento sin terminar en la linea %d" % (HEADER_NAME, it.start + 1))
+        if h_ignored(it):
+            continue
+        despues.append((unstatic_text(it), None if it.kind == "pp" else h_exp[k], "%s:%d" % (HEADER_NAME, it.start + 1),
+                        has_static(it)))
+
+    d_pre = None
+    for path, text in [(NAMES_FILE, names_text)] * (names_text is not None) + paths:
+        items, seps = split_items(text)
+        if seps:
+            msgs.append("%s: tiene separadores // ==== ... ====" % path)
+        inc = next((k for k, it in enumerate(items) if it.kind == "pp" and is_header_include(it)), None)
+        if inc is None:
+            msgs.append("%s: no incluye %s" % (path, HEADER_NAME))
+        exp = expansions(h_items + items)[len(h_items):]
+        pre = []
+        for k, it in enumerate(items):
+            if it.kind == "partial":
+                msgs.append("%s: elemento sin terminar en la linea %d" % (path, it.start + 1))
+            if it.kind == "pp" and re.match(r"\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b", it.codetext):
+                msgs.append("%s:%d: un #if en un fichero cortado" % (path, it.start + 1))
+            if k == inc or is_bare(it) or (path != NAMES_FILE and inc is not None and k < inc):
+                continue
+            t, e = unstatic_text(it), None if it.kind in ("pp", "comment") else exp[k]
+            if it.kind == "decl" and it.code_start is not None:
+                line = it.lines[it.code_start - it.start]
+                line = line[len("static "):] if line.startswith("static ") else line
+                m = re.match(r"([A-Za-z_]\w*)\b", line)
+                if m and m.group(1) in anon:
+                    a = anon[m.group(1)]
+                    a[2] = True
+                    ls = it.lines[: it.code_start - it.start]
+                    t = "\n".join(ls + [a[1] + line[len(m.group(1)):]] + it.lines[it.code_start - it.start + 1:])
+                    e = e | h_exp[h_items.index(a[0])]
+            despues.append((t, e, "%s:%d" % (path, it.start + 1), has_static(it)))
+            pre.append(t)
+        if path == NAMES_FILE:
+            d_pre = pre
+    for n, (it, _, used) in anon.items():
+        if not used:
+            despues.append((unstatic_text(it), None, "%s:%d" % (HEADER_NAME, it.start + 1), has_static(it)))
+    return antes, despues, a_pre, d_pre, msgs
+
+
+def cmd_modules(antes_spec, pattern, names_path, print=print):
+    import glob
+    paths = sorted(glob.glob(pattern))
+    if not paths:
+        sys.exit("oa_check: --modulos %s: ningun fichero" % pattern)
+    d = os.path.dirname(pattern)
+    hp, np_ = os.path.join(d, HEADER_NAME), os.path.join(d, NAMES_FILE)
+    antes_text = read_source(antes_spec)
+    table = parse_names(names_path) if names_path else {}
+    if table:
+        antes_text = rename_text(antes_text, table)
+        hits = Counter(IDENT_RE.findall(antes_text))
+        for old, new in table.items():
+            if not hits.get(new):
+                print("AVISO: %s -> %s no aparece en el codigo del antes" % (old, new))
+    texts = [(p.replace("\\", "/"), read_source(p)) for p in paths]
+    rc = modules_compare(antes_text, texts, read_source(hp), read_source(np_) if os.path.exists(np_) else None, print)
+    print("modulos: %s" % ", ".join(os.path.basename(p) for p, _ in texts))
+    if table:
+        print("nombres: %d renombrados aplicados al antes (%s)" % (len(table), names_path))
+    print("resultado: %s" % ("IGUALES" if rc == 0 else "DISTINTOS"))
+    return rc
+
+
+def modules_compare(antes_text, texts, header_text, names_text, print):
+    antes, despues, a_pre, d_pre, msgs = modules_texts(antes_text, texts, header_text, names_text)
+    rc = 0
+    for m in msgs:
+        rc = 1
+        print(m)
+    ca = Counter(t for t, _, _, _ in antes)
+    cd = Counter(t for t, _, _, _ in despues)
+    where_a = {}
+    for t, _, w, _ in antes:
+        where_a.setdefault(t, w)
+    where_d = {}
+    for t, _, w, _ in despues:
+        where_d.setdefault(t, w)
+    # "static" se puede quitar (lo que cruza de modulo), no poner
+    sa = Counter(t for t, _, _, st in antes if st)
+    sd = Counter(t for t, _, _, st in despues if st)
+    for t, n in (sd - sa).items():
+        rc = 1
+        print("STATIC de mas en despues (%s):\n    %s" % (where_d[t], t.split("\n")[0][:200]))
+    for t, n in (cd - ca).items():
+        rc = 1
+        print("SOBRA en despues (x%d, %s):\n    %s" % (n, where_d[t], t.replace("\n", "\n    ")[:2000]))
+    for t, n in (ca - cd).items():
+        rc = 1
+        print("FALTA en despues (x%d, %s):\n    %s" % (n, where_a[t], t.replace("\n", "\n    ")[:2000]))
+    if ca == cd:
+        ea = Counter((t, e) for t, e, _, _ in antes if e is not None)
+        ed = Counter((t, e) for t, e, _, _ in despues if e is not None)
+        for (t, e), n in (ed - ea).items():
+            rc = 1
+            was = [x for (tt, x) in ea if tt == t]
+            print("MACROS distintas en %s: expande %s; en el antes %s\n    %s" % (
+                where_d[t], ",".join(sorted(e)) or "-", " / ".join(",".join(sorted(x)) or "-" for x in was),
+                t.split("\n")[0][:200]))
+    if names_text is not None and a_pre != d_pre:
+        rc = 1
+        print("%s no es lo de antes del #ifndef, en el mismo orden" % NAMES_FILE)
+    print("antes: %d elementos comparados; despues: %d (cabecera, %s y %d modulos)" % (
+        len(antes), len(despues), NAMES_FILE if names_text is not None else "-", len(texts)))
+    return rc
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--antes")
@@ -843,10 +1260,22 @@ def main():
     ap.add_argument("--reordenar")
     ap.add_argument("--tabla")
     ap.add_argument("--salida")
+    ap.add_argument("--modulos")
+    ap.add_argument("--nombres")
+    ap.add_argument("--renombrar")
+    ap.add_argument("ficheros", nargs="*")
     ap.add_argument("--autoprueba", action="store_true")
     a = ap.parse_args()
     if a.autoprueba:
         return cmd_selftest()
+    if a.renombrar:
+        if not a.ficheros:
+            ap.error("--renombrar necesita ficheros")
+        return cmd_rename(a.renombrar, a.ficheros)
+    if a.modulos:
+        if not a.antes:
+            ap.error("--modulos necesita --antes")
+        return cmd_modules(a.antes, a.modulos, a.nombres)
     if a.listar:
         return cmd_list(a.listar)
     if a.orden:
