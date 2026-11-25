@@ -28,7 +28,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ---
 
-- [ ] T222 [net] Validación por entrada en STATE y cotas que faltan (revisión de F2: I-1, I-2, I-3, C-1, C-2).
+- [~] T222 [net] Validación por entrada en STATE y cotas que faltan (revisión de F2: I-1, I-2, I-3, C-1, C-2).
+  reclamada: agente Opus oa-t222 (integrada) — validate 181510/0, net 309/0; compila; FALTA recorrido sin `dropped a STATE` y prueba BM_TEST=5000
   files: `runtime/online_validate.h`, `runtime/online_validate.c`, `runtime/online.c` (`sample_local` y el `case` de STATE), `tools/test_online_validate.c`, `specs/contratos/validacion-red.md`
   verify: `make test-online-validate test-online-wire test-online-net` en 0; casos nuevos: (a) un STATE con una entrada mala en cada lista se acepta con esa entrada anulada y el resto intacto; (b) un STATE con `pos` o `yaw` malos se descarta entero; (c) `bloody_moon = 5000` se acepta; (d) `fx_anim[k]` y `dye[k]` fuera de cota anulan su entrada; `make -j8` compila; recorrido completo sin `dropped a STATE` en los logs; con `SAVAGEWIND_ONLINE_BM_TEST=5000` en A, B sigue viendo moverse a A
   depende de: T213
@@ -185,7 +186,7 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   modelo sugerido: alto
 
 - [~] T208 [oa] Partir `g_act[]` por dueño.
-  reclamada: agente Opus oa-t208 (coop/T208 `23051ec`, sin integrar) — compila y pruebas en 0; pasada con dos juegos: pasos 4-5 fallan y B recrea enemigos en bucle: en diagnóstico (diag-t208)
+  reclamada: agente Opus oa-t208 (integrada) — diagnóstico: sin regresión (el bucle de enemigos es HE-23, anterior a T208, ahora T453); pasada con T209: pasos 4 y 5 PASAN; FALTA firma
   files: `runtime/oa_puppet.c`, `runtime/oa_runes.c`, `runtime/oa_world.c`, `runtime/oa_rules.c`, `runtime/oa_frame.c`, `runtime/oa_core.c`, `runtime/online_actors_internal.h`
   verify: `grep -rn "g_act\[" runtime/` no devuelve nada; `make -j8` compila; `$PY tools/coop/firma_log.py --comparar ...` en 0 tras el recorrido completo; en juego: Magnesis, Stasis y Cryonis de B se ven en A
   depende de: T207
