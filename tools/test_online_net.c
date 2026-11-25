@@ -571,6 +571,100 @@ static void test_estate_counts(void) {
     stop_all();
 }
 
+// ---- two sessions in one process (T218)
+// A Link for sample_local: g_site.player_info points at a pointer to a PlayerInfo of the test's, Link's position at
+// +0x88 (what the network thread reads there in the game)
+static uint8_t fake_pinfo[0x100];
+static uint64_t fake_pinfo_ptr;
+
+static void link_at(float x, float y, float z) {
+    float p[3] = {x, y, z};
+    memcpy(fake_pinfo + 0x88, p, sizeof p);
+}
+
+// sample_local over these positions, one STATE each, as the network thread sends them 20 times a second
+static void sample_run(const float (*pos)[3], int n, WireState *out) {
+    for (int k = 0; k < n; k++) {
+        link_at(pos[k][0], pos[k][1], pos[k][2]);
+        memset(&out[k], 0, sizeof out[k]);
+        if (!sample_local(&out[k])) out[k].flags |= ONLINE_F_LOADING;
+    }
+}
+
+static bool same_samples(const WireState *a, const WireState *b, int n) {
+    for (int k = 0; k < n; k++)
+        if (memcmp(a[k].pos, b[k].pos, sizeof a[k].pos) || a[k].yaw != b[k].yaw || a[k].anim != b[k].anim ||
+            a[k].flags != b[k].flags)
+            return false;
+    return true;
+}
+
+// Two sessions one after the other in the same process: the second sees nothing of the first. What a session left
+// (players, chat, notices, queues, the host's lists, and the network thread's own: where Link was, his heading and
+// animation, the send timers and buffers) is gone after stop_all: g is byte for byte what a clean start leaves, and
+// Link sampled in the second session gives what he gives in a fresh process
+static void test_two_sessions(void) {
+    static const char *const off = "Not connected";
+    static const float second[][3] = {{500, 0, 500}, {500.1f, 0, 500}, {501, 0, 500.5f}, {503, 0, 501}};
+    static const float first[][3] = {{100, 0, 100}, {110, 0, 110}, {120, 0, 120}, {130, 0, 130}};  // (a dash)
+    enum { N = 4 };
+    static WireState fresh[N], again[N], w[N];
+    static unsigned char clean[sizeof g];
+    fake_pinfo_ptr = (uint64_t)(uintptr_t)fake_pinfo;
+    g_site.player_info = (uint64_t)(uintptr_t)&fake_pinfo_ptr;
+
+    // a clean start: what stop_all leaves, and what the second session's Link gives there
+    stop_all();
+    set_status(ONLINE_OFF, off, NULL);
+    sample_run(second, N, fresh);
+    stop_all();
+    set_status(ONLINE_OFF, off, NULL);
+    pthread_mutex_lock(&g.lock);
+    memcpy(clean, &g, sizeof g);
+    pthread_mutex_unlock(&g.lock);
+    CHECK(fresh[0].yaw == 0 && fresh[0].anim == ONLINE_A_WAIT);  // (a first sample: no heading, standing)
+
+    // the first session: a guest's game with another player, chat, the host's lists, and Link dashing
+    set_connected();
+    CHECK(send_join(1, "Bot"));
+    CHECK(send_state(1, 10.0f, 20.0f, -30.0f, 1.5f));
+    memset(cbuf, 0, 64);
+    cbuf[0] = 1;
+    memcpy(cbuf + 1, "hi", 3);
+    CHECK(cl_message(M_CHAT, cbuf, 4));
+    memset(cbuf, 0, ONLINE_QUEST_BYTES);
+    cbuf[7] = 0x40;
+    CHECK(cl_message(M_QUESTS, cbuf, ONLINE_QUEST_BYTES));
+    online_send_hit(1, 5, ONLINE_ELEM_NONE);
+    online_chat_send("hello");
+    sample_run(first, N, w);
+    CHECK(g.smp.have && g.smp.cur == ONLINE_A_DASH && g.smp.yaw != 0);  // (it left something: the test means it)
+    // (what cl_thread keeps between rounds, as it leaves it: no thread runs here)
+    g.snd.next_loots = g.snd.next_enemies = g.snd.next_equip = clock_ns + 2000000000ull;
+    snprintf(g.snd.last.armor[0], sizeof g.snd.last.armor[0], "%s", "Armor_Test");
+    memset(g.snd.lb, 0x11, sizeof g.snd.lb), memset(g.snd.sb, 0x22, sizeof g.snd.sb), memset(g.snd.eb, 0x33, sizeof g.snd.eb);
+
+    // the second session
+    stop_all();
+    set_status(ONLINE_OFF, off, NULL);
+    pthread_mutex_lock(&g.lock);
+    bool same = !memcmp(clean, &g, sizeof g);
+    pthread_mutex_unlock(&g.lock);
+    CHECK(same);
+    CHECK(!g.smp.have && g.smp.cur == 0 && g.snd.next_equip == 0 && !g.snd.last.armor[0][0]);
+    set_connected();
+    OnlinePlayer out[ONLINE_MAX];
+    CHECK(online_players(out));
+    for (int i = 0; i < ONLINE_MAX; i++) CHECK(!out[i].used);
+    uint8_t q[ONLINE_QUEST_BYTES];
+    CHECK(!online_quests(q) && q[7] == 0);
+    sample_run(second, N, again);
+    CHECK(same_samples(fresh, again, N));
+
+    g_site.player_info = 0;
+    stop_all();
+}
+
 int main(void) {
     test_state_reaches_players();
     test_state_without_join_ignored();
@@ -586,6 +680,7 @@ int main(void) {
     test_enemies_counts();
     test_loots_counts();
     test_estate_counts();
+    test_two_sessions();
     stop_all();
     printf("test_online_net: %d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
