@@ -89,6 +89,17 @@ class Ctx:
             raise Falla(f"{x}: '{' '.join(map(str, orden))}' fallo ({err or 'codigo ' + str(cod)})")
         return data or {}
 
+    def esperar_respuesta(self, x, maximo=None):
+        """Reintenta `state` hasta `maximo` s (ESPERA_ARRANQUE). `swctl --wait` solo reintenta la conexion: un juego
+        recien lanzado abre su puerto de control enseguida pero no contesta mientras carga (2026-11-25, paso 10)."""
+        maximo = ESPERA_ARRANQUE if maximo is None else maximo
+        ini = time.monotonic()
+        while time.monotonic() - ini < maximo:
+            if self.sw(x, "state", espera=min(30, maximo), timeout=8)[0] == 0:
+                return True
+            time.sleep(3)
+        return False
+
     def responde(self, x):
         return self.sw(x, "state", timeout=8)[0] == 0
 
@@ -167,7 +178,13 @@ class Ctx:
         """goto a unas coordenadas en los juegos `xs` a la vez; espera a que cada uno quede quieto y comprueba que
         esta alli. `teleport status` = done solo mira x y z (control_tp.c:near_pos), asi que un destino sin suelo
         debajo tambien dice "Arrived" aunque Link caiga decenas de metros."""
-        tp = {x: self.mover(x, "goto", *destino) for x in xs}
+        tp = {}
+        for x in xs:  # ya alli (A empieza en el punto de carga): un salto a la propia posicion falla al verificar
+            cod, d, _ = self.sw(x, "pos", timeout=8)
+            if cod == 0 and d and math.hypot(float(d["x"]) - destino[0], float(d["z"]) - destino[2]) <= margen_xz                     and abs(destino[1] - float(d["y"])) <= margen_y:
+                tp[x] = False
+                continue
+            tp[x] = self.mover(x, "goto", *destino)
         res = {}
         for x in xs:
             p = self._quieto_reintentando(x, tp[x], ("teleport", *destino))
@@ -235,7 +252,7 @@ class Ctx:
 def paso1(c):
     """Arrancar A y B (CU-01): los dos responden y A registra la sesion y las dos entradas."""
     for x in ("A", "B"):
-        if c.sw(x, "state", espera=ESPERA_ARRANQUE, timeout=8)[0] != 0:
+        if not c.esperar_respuesta(x):
             raise JuegoCaido(f"el juego {x} no responde a state en {ESPERA_ARRANQUE} s")
     t = time.monotonic()
     while time.monotonic() - t < 120 and c.cuenta("A", LOG_UNION) < 2:
@@ -385,7 +402,7 @@ def paso10(c):
     antes = c.cuenta("A", LOG_UNION)
     c.dos_juegos("relanzar", "B")
     c.vivo["B"] = True
-    if c.sw("B", "state", espera=ESPERA_ARRANQUE, timeout=8)[0] != 0:
+    if not c.esperar_respuesta("B"):
         raise JuegoCaido("B no responde a state tras relanzarlo")
     _en_mundo(c, "B", 240)
     c.god("B", True)
