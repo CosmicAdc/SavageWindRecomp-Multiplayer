@@ -277,7 +277,7 @@ oa_enemies.c:oa_g_refused_enemy              partida   nombres de enemigo rechaz
 oa_enemies.c:oa_g_refused_weapon             partida   igual, armas
 oa_enemies.c:oa_g_refused_loot               partida   igual, botín
 oa_enemies.c:enemy_weapon:off                permitir  desplazamiento del arma dentro de un enemigo, descubierto una vez (el mismo en cada arranque de 1.9.0)
-oa_enemies.c:enemy_weapon:miss               partida   contador de reintentos de esa búsqueda
+oa_enemies.c:miss                            partida   contador de reintentos de esa búsqueda
 oa_enemies.c:k_hands                         permitir  tabla constante
 oa_enemies.c:oa_g_own                        puntero   enemigos nuestros (actor, Watch)
 oa_enemies.c:g_own_left                      puntero   enemigos que dejamos (actor, Watch)
@@ -288,21 +288,21 @@ oa_enemies.c:oa_g_reg_out                    partida   lista de enemigos enviada
 oa_enemies.c:oa_g_reg_n                      partida   su longitud
 oa_enemies.c:mark_dead:maps                  permitir  tabla constante
 oa_enemies.c:oa_enemies_host:st              permitir  búfer de trabajo: online_take_estates lo llena antes de cada lectura
-oa_enemies.c:oa_enemies_host:t0              partida   hora de inicio de la prueba KILL_TEST
-oa_enemies.c:oa_enemies_host:done            partida   prueba KILL_TEST hecha
-oa_enemies.c:oa_enemies_host:t0#2            partida   hora de inicio de la prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:until           partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:next            partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:src             puntero   Piece (actor) de la prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:who             partida   prueba ELEMENT_TEST (-1 al empezar)
-oa_enemies.c:oa_enemies_host:last_life       partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:turn            partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:used            partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:name            partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:last_as         partida   prueba ELEMENT_TEST
-oa_enemies.c:oa_enemies_host:could           partida   si cada jugador podía tener enemigos (para el log)
-oa_enemies.c:oa_enemies_host:aggro_seen      partida   último número de golpe visto de cada jugador
-oa_enemies.c:oa_enemies_host:aggro_init      partida   va con aggro_seen
+oa_enemies.c:oa_enemies_host_t0              partida   hora de inicio de la prueba KILL_TEST
+oa_enemies.c:done                            partida   prueba KILL_TEST hecha
+oa_enemies.c:oa_enemies_host_t0_2            partida   hora de inicio de la prueba ELEMENT_TEST
+oa_enemies.c:until                           partida   prueba ELEMENT_TEST
+oa_enemies.c:next                            partida   prueba ELEMENT_TEST
+oa_enemies.c:src                             puntero   Piece (actor) de la prueba ELEMENT_TEST
+oa_enemies.c:who                             partida   prueba ELEMENT_TEST (-1 al empezar)
+oa_enemies.c:last_life                       partida   prueba ELEMENT_TEST
+oa_enemies.c:oa_enemies_host_turn            partida   prueba ELEMENT_TEST
+oa_enemies.c:used                            partida   prueba ELEMENT_TEST
+oa_enemies.c:name                            partida   prueba ELEMENT_TEST
+oa_enemies.c:last_as                         partida   prueba ELEMENT_TEST
+oa_enemies.c:could                           partida   si cada jugador podía tener enemigos (para el log)
+oa_enemies.c:aggro_seen                      partida   último número de golpe visto de cada jugador
+oa_enemies.c:aggro_init                      partida   va con aggro_seen
 oa_enemies.c:g_puppet                        puntero   copias de enemigos del anfitrión (Piece y efecto)
 oa_enemies.c:weapon_scale:m                  permitir  tabla cargada de wscale.txt
 oa_enemies.c:weapon_scale:n                  permitir  número de líneas de wscale.txt (-1 sin cargar)
@@ -311,30 +311,30 @@ oa_enemies.c:oa_attack_power:n               permitir  número de líneas (-1 si
 oa_enemies.c:oa_our_defense:m                permitir  tabla cargada de un .txt del overlay
 oa_enemies.c:oa_our_defense:n                permitir  número de líneas (-1 sin cargar)
 oa_enemies.c:oa_enemies_client:e             permitir  búfer de trabajo: online_enemies lo llena antes de cada lectura
-oa_enemies.c:oa_enemies_client:tick          partida   contador
+oa_enemies.c:oa_enemies_client_tick          partida   contador
 oa_enemies.c:oa_enemies_client:st            permitir  búfer de trabajo: se escribe entrada a entrada antes de enviarlo
-oa_enemies.c:oa_enemies_show:gone_logged     partida   contador de avisos en el log
-oa_enemies.c:oa_enemies_show:marked          partida   enemigos ya marcados como muertos
-oa_enemies.c:oa_enemies_show:nm              partida   índice de marked
-oa_enemies.c:oa_enemies_show:slog2           partida   contador de log (SCALE_LOG)
-oa_enemies.c:oa_enemies_show:plog            partida   contador de log (PUPPET_LOG)
+oa_enemies.c:gone_logged                     partida   contador de avisos en el log
+oa_enemies.c:marked                          partida   enemigos ya marcados como muertos
+oa_enemies.c:nm                              partida   índice de marked
+oa_enemies.c:slog2                           partida   contador de log (SCALE_LOG)
+oa_enemies.c:plog                            partida   contador de log (PUPPET_LOG)
 oa_enemies.c:oa_enemies_show:ht              permitir  variable de entorno ELEM_HIT_TEST leída una vez
-oa_enemies.c:oa_enemies_show:t0              partida   prueba ELEM_HIT_TEST
-oa_enemies.c:oa_enemies_show:turn            partida   prueba ELEM_HIT_TEST
-oa_enemies.c:oa_enemies_show:done_ids        partida   prueba ELEM_HIT_TEST
-oa_enemies.c:oa_enemies_show:logged          partida   prueba ELEM_HIT_TEST
+oa_enemies.c:oa_enemies_show_t0              partida   prueba ELEM_HIT_TEST
+oa_enemies.c:oa_enemies_show_turn            partida   prueba ELEM_HIT_TEST
+oa_enemies.c:done_ids                        partida   prueba ELEM_HIT_TEST
+oa_enemies.c:logged                          partida   prueba ELEM_HIT_TEST
 oa_enemies.c:oa_enemies_show:ft              permitir  variable de entorno FIRE_TEST leída una vez
-oa_enemies.c:oa_enemies_show:t0#2            partida   prueba FIRE_TEST
-oa_enemies.c:oa_enemies_show:fire            puntero   Piece (actor) de la prueba FIRE_TEST
-oa_enemies.c:oa_enemies_show:placed          partida   prueba FIRE_TEST
-oa_enemies.c:oa_enemies_show:at              partida   prueba FIRE_TEST (-1 al empezar)
+oa_enemies.c:oa_enemies_show_t0_2            partida   prueba FIRE_TEST
+oa_enemies.c:fire                            puntero   Piece (actor) de la prueba FIRE_TEST
+oa_enemies.c:placed                          partida   prueba FIRE_TEST
+oa_enemies.c:at                              partida   prueba FIRE_TEST (-1 al empezar)
 oa_enemies.c:g_boss                          puntero   jefes cerca (actor, Watch)
 oa_enemies.c:g_btrack                        puntero   seguimiento de la vida de los jefes (actor)
 oa_enemies.c:g_bseen                         partida   daño de cada jugador a cada jefe, visto la última vez
-oa_enemies.c:oa_boss_sample:tick             partida   contador
-oa_enemies.c:oa_boss_sample:t                partida   prueba BOSS_HIT/BOSS_KILL
-oa_enemies.c:oa_boss_sample:last             partida   prueba BOSS_HIT/BOSS_KILL
-oa_enemies.c:oa_boss_sample:logt             partida   contador de log (BOSS_LOG)
+oa_enemies.c:oa_boss_sample_tick             partida   contador
+oa_enemies.c:t                               partida   prueba BOSS_HIT/BOSS_KILL
+oa_enemies.c:last                            partida   prueba BOSS_HIT/BOSS_KILL
+oa_enemies.c:logt                            partida   contador de log (BOSS_LOG)
 oa_enemies.c:tick                            partida   contador de oa_enemies_frame
 # oa_flags.c
 oa_flags.c:oa_bloody_moon_follow:tested      partida   prueba BM_TEST hecha

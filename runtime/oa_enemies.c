@@ -1,6 +1,7 @@
 // Online play's actors, oa_enemies: the enemies: the host's, sent and shown in the others' games, owned, their blows;
 // the bosses. What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 // ---- The host's enemies (protocol 11, ENEMIES): his game sends those near any player, each by its id, as it is (its
 // name, matrix, the AS it plays); the others delete their own near his Link and show his with OnlineEnemy_* actors
@@ -40,10 +41,13 @@ static bool enemy_name_ok(const char *n) {
     return !strncmp(n, "Enemy_", 6) && !is_boss(n) && enemy_actor(n);
 }
 
+// enemy_weapon's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int miss;
+
 // what an enemy holds: a weapon actor it links (the link's place in an enemy found once, by looking through one
 // holding a Weapon_*; again every second while none is found)
 static uint64_t enemy_weapon(uint64_t a) {
-    static int off = -1, miss;
+    static int off = -1;
     char n[48];
     if (off >= 0) {
         uint64_t w = oa_linked(a + off);
@@ -363,6 +367,17 @@ static bool can_own(const OnlinePlayer *p, int i, int me) {
            oa_same_map(p);
 }
 
+// oa_enemies_host's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint64_t oa_enemies_host_t0;
+static bool done;
+static uint64_t oa_enemies_host_t0_2, until, next;
+static Piece src;
+static int who = -1, last_life, oa_enemies_host_turn, used[OWNS];
+static char name[40], last_as[40];
+static int8_t could[ONLINE_MAX];
+static uint16_t aggro_seen[ONLINE_MAX];
+static bool aggro_init[ONLINE_MAX];
+
 void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
     own_hits(c);
     // the owners' states of theirs
@@ -398,11 +413,9 @@ void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlineP
             break;
         }
     {   // (test: SAVAGEWIND_ONLINE_KILL_TEST=<s>: ours die that many seconds in, all at once)
-        static uint64_t t0;
-        static bool done;
         const char *kt = getenv("SAVAGEWIND_ONLINE_KILL_TEST");
-        if (kt && !t0) t0 = plat_now_ns();  // (seconds from the first time here: it was counted in calls, whose rate varies)
-        if (kt && !done && plat_now_ns() - t0 >= (uint64_t)(atof(kt) * 1e9) && (done = true))
+        if (kt && !oa_enemies_host_t0) oa_enemies_host_t0 = plat_now_ns();  // (seconds from the first time here: it was counted in calls, whose rate varies)
+        if (kt && !done && plat_now_ns() - oa_enemies_host_t0 >= (uint64_t)(atof(kt) * 1e9) && (done = true))
             for (int k = 0; k < OWNS; k++)
                 if (oa_g_own[k].state == OWN_HAVE && oa_alive(oa_g_own[k].actor, oa_g_own[k].w))
                     *(int32_t *)(uintptr_t)(oa_g_own[k].actor + ENEMY_LIFE) = 0, LOG("[online] kill test: %u\n", oa_g_own[k].gid);
@@ -411,17 +424,13 @@ void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlineP
         // source: a rod's bullet, a field, an arrow) made at another enemy we have for real, 8 s apart, its life and AS
         // logged for 6 s: which of them sets an enemy burning, frozen or shocked, for a player's element arrow on a
         // puppet in another game)
-        static uint64_t t0, until, next;
-        static Piece src;
-        static int who = -1, last_life, turn, used[OWNS];
-        static char name[40], last_as[40];
         const char *et = getenv("SAVAGEWIND_ONLINE_ELEMENT_TEST");
-        if (et && !t0) t0 = plat_now_ns();
+        if (et && !oa_enemies_host_t0_2) oa_enemies_host_t0_2 = plat_now_ns();
         const char *comma = et ? strchr(et, ',') : NULL;
-        if (et && who < 0 && name[0] != '-' && plat_now_ns() - t0 >= (uint64_t)((comma ? atof(comma + 1) : 120) * 1e9) &&
+        if (et && who < 0 && name[0] != '-' && plat_now_ns() - oa_enemies_host_t0_2 >= (uint64_t)((comma ? atof(comma + 1) : 120) * 1e9) &&
             plat_now_ns() >= next) {
             const char *s = et;  // (the turn-th name of the list)
-            for (int k = 0; k < turn && s; k++) s = strchr(s, '|'), s = s ? s + 1 : NULL;
+            for (int k = 0; k < oa_enemies_host_turn && s; k++) s = strchr(s, '|'), s = s ? s + 1 : NULL;
             if (!s || (comma && s > comma)) name[0] = '-';
             else {
                 const char *e = s;
@@ -433,7 +442,7 @@ void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlineP
         }
         if (until && plat_now_ns() >= until) {  // (this one done: the next in 8 s)
             oa_delete_piece(c, &src);
-            who = -1, until = 0, turn++, next = plat_now_ns() + 2000000000ull;
+            who = -1, until = 0, oa_enemies_host_turn++, next = plat_now_ns() + 2000000000ull;
         }
         if (who >= 0 && !until) {
             oa_piece_update(c, 0, &src, name, "element test");
@@ -505,7 +514,6 @@ void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlineP
         g_reg[free_r].e.owner = (uint8_t)me;
     }
     // (each player's can-own changes, with why: a flicker here hands his enemies back and forth)
-    static int8_t could[ONLINE_MAX];
     for (int i = 0; i < ONLINE_MAX; i++) {
         if (i == me) continue;
         int8_t now = (int8_t)(can_own(&pl[i], i, me) ? 1 : 0);
@@ -516,8 +524,6 @@ void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlineP
     }
     // (blows: a player who hits one another's game has gets it, so it turns on him, as an enemy turns on whoever
     // strikes it; within OWN_SAFE of it, and not again for 6 s)
-    static uint16_t aggro_seen[ONLINE_MAX];
-    static bool aggro_init[ONLINE_MAX];
     uint32_t aggro_of[ONLINE_MAX] = {0};
     for (int i = 0; i < ONLINE_MAX; i++) {
         uint16_t s = i == me ? oa_g_aggro_seq : pl[i].used && pl[i].pose.valid ? pl[i].pose.aggro_seq : 0;
@@ -724,6 +730,9 @@ void oa_puppets_forget(void) {
     memset(g_puppet, 0, sizeof g_puppet);
 }
 
+// oa_enemies_client's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_enemies_client_tick;
+
 // a game not the host's: the host's enemies, each ours for real or shown
 void oa_enemies_client(Cpu *c, uint64_t player, int me) {
     static OnlineEnemy e[ONLINE_ENEMIES];
@@ -748,8 +757,7 @@ void oa_enemies_client(Cpu *c, uint64_t player, int me) {
             if (!mine) LOG("[online] %u is not ours now\n", oa_g_own[k2].gid), own_drop(c, &oa_g_own[k2]);
         }
         // and their state, for the host's game (gone: died here)
-        static int tick;
-        if (tick++ % 3 == 0) {
+        if (oa_enemies_client_tick++ % 3 == 0) {
             static OnlineEnemy st[ONLINE_ENEMIES];
             int ns = 0;
             for (int k2 = 0; k2 < OWNS && ns < ONLINE_ENEMIES; k2++) {
@@ -771,6 +779,21 @@ void oa_enemies_client(Cpu *c, uint64_t player, int me) {
     oa_enemies_show(c, player, e, n, fresh, centre, me, true);
 }
 
+// oa_enemies_show's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int gone_logged;
+static uint32_t marked[64];
+static int nm;
+static int slog2;
+static int plog;
+static uint64_t oa_enemies_show_t0;
+static int oa_enemies_show_turn;
+static uint32_t done_ids[ONLINE_ELEM_COUNT];
+static bool logged[ONLINE_ELEM_COUNT];
+static uint64_t oa_enemies_show_t0_2;
+static Piece fire;
+static bool placed;
+static int at = -1;
+
 void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, const float centre[3], int me,
                          bool suppress) {
     // his area: our own enemies go (each frame: those the game makes there go as they come), but those we have for
@@ -786,13 +809,10 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
         enemy_delete(c, a);
         gone++;
     }
-    static int gone_logged;
     if (gone && gone_logged++ < 20) LOG("[online] %d of our enemies gone: the host's are there\n", gone);
     // his: each one's actor, where his is, playing what his plays (his feed stopped: they stay as they are)
     for (int k = 0; fresh && k < n; k++) {
         if (e[k].life <= 0 && suppress) {  // (died, wherever: dead here too, once)
-            static uint32_t marked[64];
-            static int nm;
             bool done = false;
             for (int q = 0; q < 64 && !done; q++) done = marked[q] == e[k].id;
             if (!done) marked[nm++ % 64] = e[k].id, mark_dead(c, e[k].name, e[k].hash);
@@ -835,7 +855,6 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
             if (w->name[0] && strcmp(w->name, ga ? ga : "")) oa_delete_piece(c, w);
             oa_piece_update(c, 0, w, ga ? ga : "", "host");
             if (!w->actor) continue;
-            static int slog2;
             if (getenv("SAVAGEWIND_ONLINE_SCALE_LOG") && slog2++ % 300 == 0) {
                 const float *am = (const float *)(uintptr_t)(w->actor + 0x398);
                 LOG("[online] copy %s's %s: want %.2f, its matrix %.2f\n", e[k].name, gn, weapon_scale(e[k].name, gn),
@@ -856,7 +875,6 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
             }
         }
         if (!p->actor) continue;
-        static int plog;
         if (getenv("SAVAGEWIND_ONLINE_PUPPET_LOG") && plog++ % 300 == 0) {  // (where a frame of the game left it)
             const float *am = (const float *)(uintptr_t)(p->actor + 0x398);
             LOG("[online] puppet %s: his at %.1f %.1f %.1f, ours at %.1f %.1f %.1f\n", e[k].name, e[k].m[3], e[k].m[7],
@@ -933,58 +951,50 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
         // then ice, then electric, each on another copy 8 s apart, as our element arrows on them would send: its owner's
         // game gives the enemy the element's state)
         static const char *ht;
-        static uint64_t t0;
-        static int turn;
-        static uint32_t done_ids[ONLINE_ELEM_COUNT];
         if (!ht) ht = getenv("SAVAGEWIND_ONLINE_ELEM_HIT_TEST") ? getenv("SAVAGEWIND_ONLINE_ELEM_HIT_TEST") : "";
-        if (*ht && !t0)
-            for (int j = 0; j < PUPPETS && !t0; j++)
-                if (g_puppet[j].id && g_puppet[j].p.actor) t0 = plat_now_ns();
-        static bool logged[ONLINE_ELEM_COUNT];
-        for (int q = 0; *ht && t0 && q < turn; q++)  // (4 s after each: its life in the host's list, once)
-            if (!logged[q] && plat_now_ns() - t0 >= (uint64_t)((atof(ht) + 8.0 * q + 4.0) * 1e9))
+        if (*ht && !oa_enemies_show_t0)
+            for (int j = 0; j < PUPPETS && !oa_enemies_show_t0; j++)
+                if (g_puppet[j].id && g_puppet[j].p.actor) oa_enemies_show_t0 = plat_now_ns();
+        for (int q = 0; *ht && oa_enemies_show_t0 && q < oa_enemies_show_turn; q++)  // (4 s after each: its life in the host's list, once)
+            if (!logged[q] && plat_now_ns() - oa_enemies_show_t0 >= (uint64_t)((atof(ht) + 8.0 * q + 4.0) * 1e9))
                 for (int k = 0; k < n; k++)
                     if (e[k].id == done_ids[q]) {
                         LOG("[online] element hit test: %u now at %d life (element %d)\n", e[k].id, e[k].life, q + 1);
                         logged[q] = true;
                         break;
                     }
-        if (*ht && t0 && turn < ONLINE_ELEM_COUNT - 1 &&
-            plat_now_ns() - t0 >= (uint64_t)((atof(ht) + 8.0 * turn) * 1e9))
+        if (*ht && oa_enemies_show_t0 && oa_enemies_show_turn < ONLINE_ELEM_COUNT - 1 &&
+            plat_now_ns() - oa_enemies_show_t0 >= (uint64_t)((atof(ht) + 8.0 * oa_enemies_show_turn) * 1e9))
             for (int pick = 0; pick < 1; pick++) {  // (the nearest copy not hit yet)
                 int k = -1;
                 float bd = 1e30f;
                 for (int j = 0; j < n; j++) {
                     bool used = false;
-                    for (int q = 0; q < turn; q++) used |= done_ids[q] == e[j].id;
+                    for (int q = 0; q < oa_enemies_show_turn; q++) used |= done_ids[q] == e[j].id;
                     if (used || e[j].owner == me || e[j].life <= 1) continue;
                     const float *lm = (const float *)(uintptr_t)(player + 0x398);
                     float lp[3] = {lm[3], lm[7], lm[11]}, d = dist3(e[j].m, lp);
                     if (d < bd) bd = d, k = j;
                 }
                 if (k < 0) break;
-                uint8_t elem = (uint8_t)(ONLINE_ELEM_FIRE + turn);
+                uint8_t elem = (uint8_t)(ONLINE_ELEM_FIRE + oa_enemies_show_turn);
                 online_send_hit(e[k].id, 1, elem);
                 oa_g_aggro_id = e[k].id;
                 if (!++oa_g_aggro_seq) oa_g_aggro_seq = 1;
                 LOG("[online] element hit test: %u, element %d\n", e[k].id, elem);
-                done_ids[turn++] = e[k].id;
+                done_ids[oa_enemies_show_turn++] = e[k].id;
                 break;
             }
     }
     {   // (test: SAVAGEWIND_ONLINE_FIRE_TEST=<s>: that many seconds after the first copy here, a lit campfire, FireWood,
         // under it, made in this game only: what the copy loses in it is no player's, and its owner's enemy isn't in it)
         static const char *ft;
-        static uint64_t t0;
-        static Piece fire;
-        static bool placed;
-        static int at = -1;
         if (!ft) ft = getenv("SAVAGEWIND_ONLINE_FIRE_TEST") ? getenv("SAVAGEWIND_ONLINE_FIRE_TEST") : "";
         if (*ft && !placed) {
             if (at < 0)
                 for (int j = 0; j < PUPPETS && at < 0; j++)
-                    if (g_puppet[j].id && !g_puppet[j].dying && g_puppet[j].p.actor) at = j, t0 = plat_now_ns();
-            if (at >= 0 && plat_now_ns() - t0 >= (uint64_t)(atof(ft) * 1e9)) {
+                    if (g_puppet[j].id && !g_puppet[j].dying && g_puppet[j].p.actor) at = j, oa_enemies_show_t0_2 = plat_now_ns();
+            if (at >= 0 && plat_now_ns() - oa_enemies_show_t0_2 >= (uint64_t)(atof(ft) * 1e9)) {
                 oa_piece_update(c, 0, &fire, "FireWood", "fire test");
                 uint64_t a = g_puppet[at].p.actor;
                 if (fire.actor && a && oa_alive(a, g_puppet[at].p.w)) {
@@ -1029,9 +1039,14 @@ static int btrack(uint64_t a, uint32_t hash, int32_t life) {
     return k;
 }
 
+// oa_boss_sample's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_boss_sample_tick;
+static int t;
+static char last[28];
+static int logt;
+
 void oa_boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
-    static int tick;
-    if (tick++ % 6 == 0) {
+    if (oa_boss_sample_tick++ % 6 == 0) {
         memset(g_boss, 0, sizeof g_boss);
         float best[ONLINE_BOSSES] = {500.0f * 500.0f, 500.0f * 500.0f};
         int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
@@ -1064,8 +1079,6 @@ void oa_boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
     }
     {   // (test: SAVAGEWIND_ONLINE_BOSS_HIT=<s>: the nearest boss's life halved that many seconds after it is first here,
         // and again every 20 s, to 0; SAVAGEWIND_ONLINE_BOSS_KILL=<s>: to 0 then, each boss)
-        static int t;
-        static char last[28];
         if (g_boss[0].a && strcmp(last, g_boss[0].name)) t = 0, snprintf(last, sizeof last, "%s", g_boss[0].name);
         const char *bk = getenv("SAVAGEWIND_ONLINE_BOSS_KILL"), *bh = getenv("SAVAGEWIND_ONLINE_BOSS_HIT");
         bool here = g_boss[0].a && oa_alive(g_boss[0].a, g_boss[0].w);
@@ -1077,7 +1090,6 @@ void oa_boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
             LOG("[online] boss hit test: %s at %d\n", g_boss[0].name, *l);
         }
     }
-    static int logt;
     for (int k = 0; getenv("SAVAGEWIND_ONLINE_BOSS_LOG") && logt++ % 60 == 0 && k < ONLINE_BOSSES; k++)
         if (g_boss[k].a && oa_alive(g_boss[k].a, g_boss[k].w)) {
             const float *m = (const float *)(uintptr_t)(g_boss[k].a + 0x398);
@@ -1148,4 +1160,53 @@ void oa_enemies_frame(Cpu *c, uint64_t player, const float link[3], int me) {
         if (tick++ % 3 == 0) oa_enemies_host(c, player, link, epl, me);
         oa_enemies_show(c, player, oa_g_reg_out, oa_g_reg_n, true, link, me, false);  // (the others': shown here)
     } else if (VALID(player)) oa_enemies_client(c, player, me);
+}
+
+// A reboot (runtime/main.c teardown): the enemies, puppets, element sources and bosses here were actors of the last
+// boot, gone with its memory - forgotten, never deleted (nothing here calls the game); the host's register, the lists,
+// the counters and the tests start again as in a fresh process
+RT_ON_RESET(oa_enemies_reset) {
+    memset(&oa_g_refused_enemy, 0, sizeof oa_g_refused_enemy);
+    memset(&oa_g_refused_weapon, 0, sizeof oa_g_refused_weapon);
+    memset(&oa_g_refused_loot, 0, sizeof oa_g_refused_loot);
+    miss = 0;
+    memset(oa_g_own, 0, sizeof oa_g_own);
+    memset(g_own_left, 0, sizeof g_own_left);
+    memset(g_esrc, 0, sizeof g_esrc);
+    memset(g_reg, 0, sizeof g_reg);
+    memset(oa_g_reg_out, 0, sizeof oa_g_reg_out);
+    oa_g_reg_n = 0;
+    // oa_enemies_host's
+    oa_enemies_host_t0 = 0;
+    done = false;
+    oa_enemies_host_t0_2 = until = next = 0;
+    memset(&src, 0, sizeof src);
+    who = -1;
+    last_life = oa_enemies_host_turn = 0;
+    memset(used, 0, sizeof used);
+    memset(name, 0, sizeof name);
+    memset(last_as, 0, sizeof last_as);
+    memset(could, 0, sizeof could);
+    memset(aggro_seen, 0, sizeof aggro_seen);
+    memset(aggro_init, 0, sizeof aggro_init);
+    memset(g_puppet, 0, sizeof g_puppet);
+    oa_enemies_client_tick = 0;
+    // oa_enemies_show's
+    gone_logged = 0;
+    memset(marked, 0, sizeof marked);
+    nm = slog2 = plog = 0;
+    oa_enemies_show_t0 = 0;
+    oa_enemies_show_turn = 0;
+    memset(done_ids, 0, sizeof done_ids);
+    memset(logged, 0, sizeof logged);
+    oa_enemies_show_t0_2 = 0;
+    memset(&fire, 0, sizeof fire);
+    placed = false;
+    at = -1;
+    memset(g_boss, 0, sizeof g_boss);
+    memset(g_btrack, 0, sizeof g_btrack);
+    memset(g_bseen, 0, sizeof g_bseen);
+    oa_boss_sample_tick = t = logt = 0;
+    memset(last, 0, sizeof last);
+    tick = 0;
 }
