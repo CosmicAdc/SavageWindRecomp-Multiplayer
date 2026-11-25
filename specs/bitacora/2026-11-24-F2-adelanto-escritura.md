@@ -108,3 +108,17 @@ menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un a
 - **N6 (dueño):** el ataque giratorio con espada no golpea al otro jugador; los golpes normales sí. Causa probable:
   `oa_pvp_update` evalúa una vez al empezar la estela y solo en un cono frontal. Tarea **T466** (F4).
 - **PE-T454-1 (hada) con el dueño:** el hada se ve en B y no en A; es un actor aparte (bitácora F4-T454).
+
+## 2026-11-25 · Desviación en T201: la referencia de la firma es la del build de cierre de F2
+
+- Intento: compilar `savagewind.exe` en `f1-cerrada` (el generador y el `Makefile` no cambiaron: mismo `GAMELIB_ID`
+  `9bc886f8314dd42b`) y lanzarlo con el `swgame.dll` actual (`dos_juegos.sh` con `SW_EXE`). **Se cierra al arrancar**
+  (`exception c0000005`): `swgame.dll` se enlaza contra el ejecutable (`savagewind.dll.a`), así que un ejecutable de
+  otra versión del runtime no sirve con la biblioteca actual. Hacer la referencia pre-F2 exigiría recompilar la
+  biblioteca del juego en otra carpeta (lo más caro de la compilación).
+- Decisión del orquestador: la referencia (tres pasadas) se toma con el build de **cierre de F2** y sirve para
+  detectar regresiones desde ahí (F3, F4). Que la refactorización de F2 (T206-T209) no cambió el comportamiento lo
+  sostienen: `oa_check.py` (mismos elementos por módulo), las comparaciones de ensamblador de los agentes (T212:
+  funciones idénticas a -O2), y las pasadas de dos juegos de T209 y T210+T222 (pasos 4 y 5 vuelven a pasar). Lo que
+  no cubre: una diferencia de comportamiento sutil de T206-T209 que no rompa ningún paso del recorrido.
+- `dos_juegos.sh` conserva `SW_EXE` (útil para otro ejecutable compilado con la misma biblioteca).
