@@ -151,7 +151,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## B. Herramientas de reproducción (en paralelo entre sí)
 
-- [ ] T109 [P] [bot] Modos hostiles del bot para reproducir fallos.
+- [~] T109 [P] [bot] Modos hostiles del bot para reproducir fallos.
+  reclamada: agente Sonnet t109-bot (coop/T109, integrada) — compila sin avisos; FALTA juego (depende de T108)
   files: `tools/online_bot.c`
   verify: `cc -O2 -Wall -o build/online_bot.exe tools/online_bot.c -lws2_32` compila sin avisos nuevos; con el juego A arrancado, `BOT_LOOT=Enemy_Bokoblin_Junior build/online_bot.exe 127.0.0.1 52530 Malo` produce en `A.log` una línea `loot` con ese nombre; sin variables `BOT_*` el bot se comporta como antes
   depende de: T108
@@ -167,7 +168,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies `runtime/online.c` ni `runtime/online.h`; no cambies el comportamiento por defecto del bot; no uses un nombre de actor que cuelgue el juego para la prueba (`GameROMPlayer` es un cuelgue documentado en `docs/ONLINE.md`).
   modelo sugerido: medio
 
-- [ ] T110 [P] [pruebas] Arnés mínimo de `runtime/online.c` sin el juego.
+- [x] T110 [P] [pruebas] Arnés mínimo de `runtime/online.c` sin el juego.
+  reclamada: agente Opus carril-net (integrada) — make test-online-net 0 (58 checks; 96 tras T116/T118)
   files: `tools/test_online_net.c`, `Makefile` (un bloque nuevo **al final**)
   verify: `make test-online-net` compila y termina con 0; el arnés ejecuta al menos: un STATE válido llega a `online_players`; un mensaje con ranura 8 se ignora
   depende de: T108
@@ -185,7 +187,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## C. Carril OA — `runtime/online_actors.c` (en serie, un solo dueño)
 
-- [ ] T111 [oa] Puerta de versión: nada de direcciones fijas si el juego no es 1.9.0.
+- [~] T111 [oa] Puerta de versión: nada de direcciones fijas si el juego no es 1.9.0.
+  reclamada: agente Opus carril-oa (integrada) — test-online-gate 0; compila; en juego el log muestra una vez "[online] game version 1.9.0: actors on"; FALTA recorrido pasos 1-3 (T108)
   files: `runtime/online_gate.h` (nuevo), `runtime/online_actors.c`, `tools/test_online_gate.c` (nuevo), `Makefile` (bloque al final)
   verify: `make test-online-gate` termina con 0; `make -j8` compila; con el juego 1.9.0, el log muestra una vez `[online] game version 1.9.0: actors on` y los pasos 1-3 del recorrido pasan
   depende de: T108
@@ -201,7 +204,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no conviertas direcciones fijas en sitios por patrón (es otro trabajo); no toques `tools/game_sites.py`; no pongas la comprobación dentro de bucles por actor (una vez por fotograma basta).
   modelo sugerido: alto
 
-- [ ] T112 [oa] `has_body()` antes de `FN_BODY_TO` en los mecanismos.
+- [~] T112 [oa] `has_body()` antes de `FN_BODY_TO` en los mecanismos.
+  reclamada: agente Opus carril-oa (integrada) — compila; has_body(a) en las dos llamadas de movers_update; FALTA juego
   files: `runtime/online_actors.c`
   verify: `grep -n "FN_BODY_TO" runtime/online_actors.c` — en `movers_update` las dos llamadas quedan dentro de un `if (has_body(a))`; `make -j8` compila; prueba en juego: un mecanismo de santuario movido en A se mueve en B (anotar cuál)
   depende de: T111
@@ -216,7 +220,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no añadas `has_body` a `objs_update` ni a `grab_update` en esta tarea (F2); no cambies qué mecanismos se eligen.
   modelo sugerido: medio
 
-- [ ] T113 [oa] Runas: usar el Link remoto solo si sigue vivo.
+- [~] T113 [oa] Runas: usar el Link remoto solo si sigue vivo.
+  reclamada: agente Opus carril-oa (integrada) — compila; FALTA juego (Magnesis/Stasis y muerte de A x3)
   files: `runtime/online_actors.c`
   verify: `make -j8` compila; en juego, B usa Magnesis y Stasis y A lo ve como antes; A muere (`god_mode` apagado) mientras B sostiene un objeto con Magnesis, tres veces, sin cuelgue; revisión: ninguna ruta de `grab_update`, `stop_update`, `rune_pieces`, `rune_keep` usa `g_act[i].link` sin pasar por el ayudante
   depende de: T112
@@ -265,7 +270,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies tamaños ni campos de los mensajes; no cortes la conexión por un valor malo (solo descartar); no filtres en el lado emisor.
   modelo sugerido: medio
 
-- [ ] T116 [net] Limpiar todo el estado de sesión al cortar.
+- [~] T116 [net] Limpiar todo el estado de sesión al cortar.
+  reclamada: agente Opus carril-net (integrada) — test_stop_clears_session pasa (online_enemies devuelve -1 = proceso recién arrancado; el verify decía 0); FALTA juego
   files: `runtime/online.c`, `tools/test_online_net.c`
   verify: `make test-online-net` termina con 0 con un caso nuevo: entregar `M_QUESTS`, `M_LOOTS`, `M_ENEMIES` y un `M_PICK`; llamar a `stop_all`; después `online_quests` devuelve falso, `online_loots` 0, `online_enemies` 0 y `online_take_picks` 0
   depende de: T115
@@ -280,7 +286,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no hagas `memset` de toda `g` (destruirías el mutex y el hilo); no toques las variables `static` dentro de funciones (F2); no cambies el orden de los `pthread_join`.
   modelo sugerido: alto
 
-- [ ] T117 [net] `SIGPIPE`: que un envío a un par cerrado no mate el proceso.
+- [x] T117 [net] `SIGPIPE`: que un envío a un par cerrado no mate el proceso.
+  reclamada: agente Opus carril-net (integrada) — distro_build 0; servidor vivo tras 10 docker kill de bot-a. No se reprodujo el fallo "antes"
   files: `runtime/online.c`
   verify: `ENGINE=docker JOBS=4 tools/linux/distro_build.sh debian:13` termina con 0; con `tools/docker/compose.yml` (F0 T023), matar un bot con `docker kill` diez veces seguidas: el contenedor `servidor` sigue en ejecución (`docker compose ps`); `make -j8` en Windows compila
   depende de: T116
@@ -295,7 +302,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no instales un manejador global de señales (`signal(SIGPIPE, ...)`); no cambies los sockets a no bloqueantes (F3).
   modelo sugerido: medio
 
-- [ ] T118 [net] Terminar el campo `shield` en ESTATE.
+- [x] T118 [net] Terminar el campo `shield` en ESTATE.
+  reclamada: agente Opus carril-net (integrada) — test_estate_strings_terminated pasa; make test-online-net 0 (96 checks)
   files: `runtime/online.c`, `tools/test_online_net.c`
   verify: `make test-online-net` termina con 0 con un caso nuevo: un `M_ESTATE` con `shield` de 40 bytes sin NUL; tras `online_take_estates`, `strlen(e.shield) <= 39`
   depende de: T117
@@ -310,7 +318,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## E. Carril UI (en paralelo con C y D)
 
-- [ ] T119 [P] [ui] Contraseña oculta en pantalla.
+- [~] T119 [P] [ui] Contraseña oculta en pantalla.
+  reclamada: agente Sonnet t119-ui (integrada) — compila; i18n sin textos nuevos faltantes (243 = línea base); FALTA captura en pantalla
   files: `runtime/ui/option_rows.h`, `runtime/ui/option_rows.mm`, `runtime/ui/online_ui.mm`
   verify: `make -j8` compila; `$PY tools/i18n_check.py` no lista textos **nuevos** como faltantes respecto a la línea base; captura de F1 → Online con una contraseña puesta: se ven asteriscos en la fila y al editar; unirse a una sesión con contraseña sigue funcionando (T103 paso 3)
   depende de: T108

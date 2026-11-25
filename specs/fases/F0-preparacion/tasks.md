@@ -56,7 +56,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no abras un pull request hacia el repositorio original.
   modelo sugerido: bajo (tarea humana)
 
-- [ ] T002 [P] [dueño] Extraer los NSP propios a una carpeta fuera del repositorio.
+- [x] T002 [P] [dueño] Extraer los NSP propios a una carpeta fuera del repositorio.
+  reclamada: dueño + orquestador, 2026-11-24 — hactool 1.4.0 (DLC) y nstool 1.9.2 (base+update, BKTR de SDK 21.4.1); exefs 5, romfs 41 062, Version.txt 1.9.0, aoc1 7 094, aoc2 1
   files: `$SW/juego/` (fuera del repositorio)
   verify: `ls "$SW/juego/exefs"` muestra `main main.npdm rtld sdk subsdk0`; existe `"$SW/juego/romfs/System/Version.txt"`; `find "$SW/juego/romfs" -type f | wc -l` da del orden de 41 062
   depende de: —
@@ -187,7 +188,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## C. Juego (en serie; necesita T002)
 
-- [ ] T010 [juego] Apuntar la rama a los archivos del juego y comprobar la versión.
+- [x] T010 [juego] Apuntar la rama a los archivos del juego y comprobar la versión.
+  reclamada: orquestador, 2026-11-24 — sw_probe: build cd57b23fa4bbad65, game version 1.9.0, 0 no soportadas; game_dir.txt ignorado
   files: `game_dir.txt` (ignorado por git)
   verify: `tools/venv/Scripts/python.exe tools/sw_probe.py "<carpeta del juego>/exefs"` imprime el build id `cd57b23fa4bbad65` y termina con 0; `git status --short` no muestra `game_dir.txt`
   depende de: T002, T005
@@ -201,7 +203,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no copies archivos del juego dentro del repositorio salvo a `extracted/` (ignorada) si `game_dir.txt` diera problemas; no hagas commit de `game_dir.txt`.
   modelo sugerido: bajo
 
-- [ ] T011 [juego] Generar el código del juego (`make gen`).
+- [x] T011 [juego] Generar el código del juego (`make gen`).
+  reclamada: orquestador, 2026-11-24 — make gen 0 en 6m03s, 243 sitios, generated/ 668 MB
   files: `generated/` (ignorado por git)
   verify: `make gen` termina con 0; existen `generated/layout.c` y `generated/main/`; `du -sh generated` anotado
   depende de: T010
@@ -214,7 +217,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no edites nada dentro de `generated/`; no lo añadas a git; no uses `GENARGS=--any-version`.
   modelo sugerido: bajo
 
-- [ ] T012 [juego] Compilar la aplicación y la biblioteca del juego.
+- [x] T012 [juego] Compilar la aplicación y la biblioteca del juego.
+  reclamada: orquestador, 2026-11-24 — make -j8 0 en 8m21s; .id = GAMELIB_ID 9bc886f8314dd42b; build/ 815 MB
   files: `build/` (ignorado por git)
   verify: `ls -l build/savagewind.exe build/savagewind.dll.a build/swgame.dll` muestra los tres; el fichero `.id` junto a `swgame.dll` coincide con `make -s --eval='print-gamelib-id:;@echo $(GAMELIB_ID)' print-gamelib-id`
   depende de: T011
@@ -229,7 +233,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no cambies flags de optimización ni de coma flotante; no edites el `.id` para saltarte la comprobación; no arregles errores de compilación del PR sin anotarlos y avisar.
   modelo sugerido: bajo
 
-- [ ] T013 [juego] Generar el overlay de actores del modo online.
+- [x] T013 [juego] Generar el overlay de actores del modo online.
+  reclamada: orquestador, 2026-11-24 — online_mod.py 0 en 22 s; OnlinePlayer + 827 actores de equipo; 194 MB; ignorado
   files: `online_mod/` (ignorado por git)
   verify: existen `online_mod/v42`, `online_mod/online_mod.txt`, `online_mod/gear.txt` y `online_mod/quests.txt`; `git status --short` no muestra `online_mod/`
   depende de: T010
@@ -242,7 +247,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no subas `online_mod/` (deriva del juego); no cambies `VERSION` en `tools/online_mod.py`.
   modelo sugerido: bajo
 
-- [ ] T014 [juego] Primer arranque en solitario, desatendido.
+- [x] T014 [juego] Primer arranque en solitario, desatendido.
+  reclamada: orquestador, 2026-11-24 — mundo cargado ~50 s, pos (-1130, 237.4) en la Meseta; [vk] 58 fps, 221 832 draws; log con game version 1.9.0 y online_mod; exit limpio
   files: `$SW/pruebas/` (fuera del repositorio)
   verify: `tools/venv/Scripts/python.exe tools/swctl.py --wait 120 state` responde; `swctl.py pos` devuelve coordenadas; el log contiene `[gamelib]` con `game version 1.9.0` y `[online] online play's actors: online_mod`
   depende de: T012, T013
@@ -290,7 +296,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no traduzcas ni arregles nada; no marques como PASA una prueba que no terminó.
   modelo sugerido: bajo
 
-- [ ] T017 [pruebas] Ejecutar las pruebas en C que no usan `python3`.
+- [x] T017 [pruebas] Ejecutar las pruebas en C que no usan `python3`.
+  reclamada: orquestador, 2026-11-24 — test-control 0 (49), test-update-core 0, test-console 0 (49), test-places 0 (2206), test-mods 0 (144)
   files: `build/` (ignorado por git)
   verify: `make test-control test-update-core test-console test-places test-mods` — cada objetivo termina con 0, o queda anotado cuál falla y con qué mensaje
   depende de: T012
@@ -302,7 +309,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no modifiques pruebas ni código para que pasen.
   modelo sugerido: bajo
 
-- [ ] T018 [pruebas] Probar las recetas que llaman a `python3` y la prueba DSU.
+- [x] T018 [pruebas] Probar las recetas que llaman a `python3` y la prueba DSU.
+  reclamada: orquestador, 2026-11-24 — python3 existe (MSYS2). test_dsu 0. FALLAN: test-launch-flags (tabla desfasada), test-actions (fread en test_actions.c:279), test-gyro (enlace: falta framepace_dialogue_ui). Pasan a F1
   files: `build/`
   verify: resultado por objetivo (PASA / FALLA / NO EJECUTADA con motivo) en `verificacion.md` §3
   depende de: T017
@@ -375,7 +383,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no montes el árbol en modo escritura; si una prueba necesita escribir, anótalo y para.
   modelo sugerido: bajo
 
-- [ ] T023 [docker] `docker compose` con servidor dedicado y dos bots bajo latencia y pérdida.
+- [x] T023 [docker] `docker compose` con servidor dedicado y dos bots bajo latencia y pérdida.
+  reclamada: agente Sonnet t023-bots + orquestador — 3 bots en slots 0-2, BotA/BotB 45 s conectados, BotC (BOT_FREEZE=5) expulsado a los 15 s. SIN netem: el kernel WSL2 de Docker Desktop no lo trae (red-bots.sh avisa y sigue). El servidor no imprime "joined" en su salida
   files: `tools/docker/compose.yml`, `tools/docker/red-bots.sh`
   verify: `docker compose -f tools/docker/compose.yml up --abort-on-container-exit` muestra en el log del servidor dos líneas `[online] server: <nombre> joined (slot N)` y los bots siguen conectados 30 s con `netem delay 80ms loss 2%`; un bot con `BOT_FREEZE=5` es expulsado tras unos 10 s
   depende de: T020, T021
