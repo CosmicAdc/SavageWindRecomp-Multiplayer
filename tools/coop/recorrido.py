@@ -32,6 +32,8 @@ CAMPAMENTO = (-1203.0, 198.0, 1641.0)  # campamento del acantilado ("Recipes tha
 # apunta a la CIMA de la torre (y 247,4) y en el guardado de prueba Link cae unos 52 m hasta el pie (y 195, o 178
 # dentro de la estructura, donde se queda atascado). Ver specs/bitacora/2026-11-25-goto-investigacion.md.
 ENCUENTRO = (-1041.6, 250.2, 1812.1)
+# Espera a que un juego recién lanzado responda: con los dos juegos y poca RAM libre, B tardó más de 180 s (2026-11-25).
+ESPERA_ARRANQUE = 420
 
 LOG_UNION = r"joined \(slot \d+\)"
 LOG_TRASPASO = r"slot \d+'s now \(was"
@@ -215,8 +217,8 @@ class Ctx:
 def paso1(c):
     """Arrancar A y B (CU-01): los dos responden y A registra la sesion y las dos entradas."""
     for x in ("A", "B"):
-        if c.sw(x, "state", espera=180, timeout=8)[0] != 0:
-            raise JuegoCaido(f"el juego {x} no responde a state en 180 s")
+        if c.sw(x, "state", espera=ESPERA_ARRANQUE, timeout=8)[0] != 0:
+            raise JuegoCaido(f"el juego {x} no responde a state en {ESPERA_ARRANQUE} s")
     t = time.monotonic()
     while time.monotonic() - t < 120 and c.cuenta("A", LOG_UNION) < 2:
         time.sleep(3)
@@ -365,7 +367,7 @@ def paso10(c):
     antes = c.cuenta("A", LOG_UNION)
     c.dos_juegos("relanzar", "B")
     c.vivo["B"] = True
-    if c.sw("B", "state", espera=180, timeout=8)[0] != 0:
+    if c.sw("B", "state", espera=ESPERA_ARRANQUE, timeout=8)[0] != 0:
         raise JuegoCaido("B no responde a state tras relanzarlo")
     _en_mundo(c, "B", 240)
     c.god("B", True)
