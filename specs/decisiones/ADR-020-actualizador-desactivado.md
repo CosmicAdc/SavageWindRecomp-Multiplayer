@@ -1,4 +1,4 @@
-# ADR-007 · El actualizador queda desactivado en el fork (opción A)
+# ADR-020 · El actualizador queda desactivado en el fork (opción A)
 
 - Estado: aceptada por el dueño (2026-11-24)
 - Tarea: T007 de `fases/F0-preparacion/tasks.md`; opciones en `fases/F0-preparacion/plan.md` §4
