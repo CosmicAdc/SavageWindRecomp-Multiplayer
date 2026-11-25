@@ -28,6 +28,72 @@
 #include "rt.h"
 #include "settings.h"
 
+// ---- Names from the network that would make an actor here (specs/contratos/validacion-red.md V-11). The enemies
+// are enemies.txt's (enemy_name_ok); what a host's enemy holds and what falls as loot, each kind on a list of its own
+// in online_mod (tools/online_mod.py, from the player's own ActorInfo), "name=its profile" a line: weapons.txt (the
+// Weapon_* an enemy holds or drops: not the sheaths nor the quivers), items.txt (Item_*), rupees.txt (PutRupee*).
+// A list is read once, at the first name of its kind; one that isn't there (an overlay older than tools/online_mod.py
+// VERSION 43) or is empty refuses every name of its kind, said once in the log. tools/test_online_names.c builds this
+// part alone (ONLINE_NAMES_ONLY), with lists of its own.
+#define NAME_LEN 48  // (a name with its 0: the game's actor names are shorter; a longer line is no name)
+typedef struct { const char *file, *kind; char (*name)[NAME_LEN]; int n; bool read; } NameList;
+static NameList g_weapon_names = {"weapons.txt", "weapon"}, g_item_names = {"items.txt", "item"},
+                g_rupee_names = {"rupees.txt", "rupee"};
+
+static int name_cmp(const void *a, const void *b) { return strcmp((const char *)a, (const char *)b); }
+
+static void names_read(NameList *l) {
+    l->read = true;
+    const char *ov = getenv("SAVAGEWIND_ROMFS_OVERLAY");
+    char p[1100], line[256];
+    snprintf(p, sizeof p, "%s/%s", ov ? ov : "", l->file);
+    FILE *f = ov && *ov ? fopen(p, "r") : NULL;
+    int cap = 0;
+    while (f && fgets(line, sizeof line, f)) {
+        if (!strchr(line, '\n') && !feof(f)) {  // (longer than the buffer: none of it is a name)
+            int ch;
+            while ((ch = fgetc(f)) != EOF && ch != '\n') {}
+            continue;
+        }
+        line[strcspn(line, "\r\n")] = 0;
+        char *eq = strchr(line, '=');
+        if (eq) *eq = 0;
+        size_t len = strlen(line);
+        if (!len || len >= NAME_LEN) continue;
+        if (l->n == cap) {
+            void *m = realloc(l->name, sizeof *l->name * (cap ? cap * 2 : 256));
+            if (!m) break;
+            l->name = m, cap = cap ? cap * 2 : 256;
+        }
+        memcpy(l->name[l->n++], line, len + 1);
+    }
+    if (f) fclose(f);
+    if (l->n > 1) qsort(l->name, (size_t)l->n, NAME_LEN, name_cmp);
+    if (l->n) LOG("[online] %d %s names allowed from the network\n", l->n, l->kind);
+    else LOG("[online] no %s names (online_mod/%s): every %s name from the network refused\n", l->kind, l->file, l->kind);
+}
+
+// a name in a field of cap bytes as it came: on the list when it ends within them and the list has it
+static bool name_listed(NameList *l, const char *name, size_t cap) {
+    if (!l->read) names_read(l);
+    const char *end = memchr(name, 0, cap);
+    if (!end || end == name || end - name >= NAME_LEN || !l->n) return false;
+    return bsearch(name, l->name, (size_t)l->n, NAME_LEN, name_cmp) != NULL;
+}
+
+// what a host's enemy holds (its EquipItem1 / EquipItem2: a weapon, a shield), on weapons.txt
+static bool weapon_name_listed(const char *name, size_t cap) { return name_listed(&g_weapon_names, name, cap); }
+
+// loot: an item, a weapon or a rupee, each on its kind's list (anything else is on none)
+static bool loot_name_listed(const char *name, size_t cap) {
+    return !strncmp(name, "Item_", 5)      ? name_listed(&g_item_names, name, cap)
+         : !strncmp(name, "Weapon_", 7)    ? name_listed(&g_weapon_names, name, cap)
+         : !strncmp(name, "PutRupee", 8)   ? name_listed(&g_rupee_names, name, cap)
+                                           : false;
+}
+
+#ifndef ONLINE_NAMES_ONLY  // (the rest: the game's)
+
 #define FN_CREATE 0x7001535900ull
 #define ACTOR_HASH_ID 0x640  // (an actor's map object HashId: u32)
 #define FN_SET_MTX 0x700152261cull
@@ -2255,10 +2321,12 @@ static bool own_ready(Cpu *c, Own *o, const OnlineEnemy *e) {
     }
     if (!o->made.pending && !o->made.actor && !o->made.name[0]) {  // (asked for with the weapon it holds)
         memset(&o->params, 0, sizeof o->params);
-        // (what it holds only if a Weapon_*: a shield is one too)
-        if (e->weapon[0] && strncmp(e->weapon, "Weapon_", 7)) name_refused(&g_refused_weapon, "enemy weapon", e->weapon);
+        // (what it holds only if weapons.txt has it: a shield is on it too)
+        if (e->weapon[0] && !weapon_name_listed(e->weapon, sizeof e->weapon))
+            name_refused(&g_refused_weapon, "enemy weapon", e->weapon);
         else if (e->weapon[0]) inst_params_string(&o->params, "EquipItem1", e->weapon);
-        if (e->shield[0] && strncmp(e->shield, "Weapon_", 7)) name_refused(&g_refused_weapon, "enemy shield", e->shield);
+        if (e->shield[0] && !weapon_name_listed(e->shield, sizeof e->shield))
+            name_refused(&g_refused_weapon, "enemy shield", e->shield);
         else if (e->shield[0]) inst_params_string(&o->params, "EquipItem2", e->shield);
         o->made.handle = new_handle();
         if (request_p(c, e->name, o->made.handle, o->params.n ? (uint64_t)(uintptr_t)&o->params : 0)) {
@@ -3290,6 +3358,8 @@ static bool players_own_item(const char *n) {
 static bool is_loot(const char *n) {
     return (!strncmp(n, "Item_", 5) || !strncmp(n, "Weapon_", 7) || !strncmp(n, "PutRupee", 8)) && !players_own_item(n);
 }
+// loot named by another game (a field of cap bytes as it came): on its kind's list, and not the player's own
+static bool loot_name_ok(const char *n, size_t cap) { return loot_name_listed(n, cap) && !players_own_item(n); }
 
 #define DEATHS 8
 static struct { float pos[3]; int frames; uint32_t before[48]; int nbefore; } g_death[DEATHS];  // (frames: watched)
@@ -3398,7 +3468,7 @@ static void loot_host_take(uint32_t gid) {
 }
 
 static void loot_host_add(const OnlineLoot *l) {
-    if (!is_loot(l->name)) {  // (on no one's list: an item, a weapon or a rupee only)
+    if (!loot_name_ok(l->name, sizeof l->name)) {  // (on no one's list: an item, a weapon or a rupee of the lists only)
         name_refused(&g_refused_loot, "loot", l->name);
         return;
     }
@@ -3647,7 +3717,7 @@ static void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bo
         }
         if (!had) {
             if (!pc->pending && !pc->name[0]) {  // (asked for; one the game didn't make is asked for again, 5 times)
-                if (!is_loot(list[j].name)) {  // (the host's list, as it came: one not loot is never made here)
+                if (!loot_name_ok(list[j].name, sizeof list[j].name)) {  // (as it came: one on no list is never made)
                     name_refused(&g_refused_loot, "loot", list[j].name);
                     g_theirs[t].gone = true;
                     continue;
@@ -6529,3 +6599,5 @@ void rt_online_frame(Cpu *c) {
         }
     }
 }
+
+#endif  // ONLINE_NAMES_ONLY
