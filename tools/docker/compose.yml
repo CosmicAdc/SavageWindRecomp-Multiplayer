@@ -1,0 +1,66 @@
+# Dedicated server and bots under latency and loss (T023). Image: tools/docker/Dockerfile.pruebas
+#   docker build -f tools/docker/Dockerfile.pruebas -t swcoop-pruebas .
+#   docker compose -f tools/docker/compose.yml up --abort-on-container-exit
+#   docker compose -f tools/docker/compose.yml down -v     (afterwards; -v drops the volumes below)
+# From Git Bash on Windows prefix MSYS_NO_PATHCONV=1. Nothing is published to the host: the services talk over the
+# compose network (the bots reach the server as "servidor:52530"). The tree is mounted read-only; no game files.
+name: swcoop-red
+
+x-prueba: &prueba
+  image: swcoop-pruebas
+  working_dir: /src
+  volumes:
+    - ../..:/src:ro
+    - compartido:/compartido
+  cap_add: [NET_ADMIN]  # tc qdisc ... netem (red-bots.sh bot)
+
+services:
+  # Builds the app and the bot once (swcoop-obj keeps the objects for the next run), then serves.
+  servidor:
+    <<: *prueba
+    command: ["bash", "/src/tools/docker/red-bots.sh", "servidor"]
+    environment:
+      JOBS: "4"  # (Docker Desktop: 6.2 GB)
+      PUERTO: "52530"
+    volumes:
+      - ../..:/src:ro
+      - compartido:/compartido
+      - objetos:/tmp/b
+    healthcheck:  # (the bots start when the binaries are published)
+      test: ["CMD", "test", "-f", "/compartido/listo"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 40m
+
+  bot-a:
+    <<: *prueba
+    command: ["bash", "/src/tools/docker/red-bots.sh", "bot", "BotA"]
+    depends_on:
+      servidor: {condition: service_healthy}
+    environment:
+      PUERTO: "52530"
+      DURACION: "45"  # (this one leaving ends the run: abort-on-container-exit)
+
+  bot-b:
+    <<: *prueba
+    command: ["bash", "/src/tools/docker/red-bots.sh", "bot", "BotB"]
+    depends_on:
+      servidor: {condition: service_healthy}
+    environment:
+      PUERTO: "52530"
+      DURACION: "45"
+
+  # Goes silent after 5 s with its connection open; the server drops it after ~10 s (TIMEOUT_NS).
+  bot-congelado:
+    <<: *prueba
+    command: ["bash", "/src/tools/docker/red-bots.sh", "bot", "BotC"]
+    depends_on:
+      servidor: {condition: service_healthy}
+    environment:
+      PUERTO: "52530"
+      BOT_FREEZE: "5"
+
+volumes:
+  compartido:  # savagewind and online_bot, built by servidor
+  objetos:     # make objects (/tmp/b), for incremental builds
