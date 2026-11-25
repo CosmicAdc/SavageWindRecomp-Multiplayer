@@ -222,15 +222,15 @@ oa_control.c:g_eventq                        partida   petición de `event` a me
 oa_control.c:online_actors_control_init:cmds permitir  tabla constante de órdenes de control
 oa_control.c:oa_control_tests_frame:m        permitir  tabla cargada de enemies.txt (prueba ENEMY_TEST)
 oa_control.c:oa_control_tests_frame:n        permitir  número de líneas de enemies.txt (va con m; -1 sin cargar)
-oa_control.c:oa_control_tests_frame:next     partida   progreso de la prueba ENEMY_TEST
-oa_control.c:oa_control_tests_frame:tick     partida   contador de la prueba ENEMY_TEST
-oa_control.c:oa_control_tests_frame:p        puntero   Piece (actor del juego) de la prueba ENEMY_TEST
-oa_control.c:oa_control_tests_frame:seen_a   puntero   direcciones de actores vistos (prueba LOOK_LOG)
-oa_control.c:oa_control_tests_frame:seen_v   partida   valores leídos de esos actores (va con seen_a)
-oa_control.c:oa_control_tests_frame:tick#2   partida   contador de la prueba LOOK_LOG
-oa_control.c:oa_control_tests_frame:t        partida   contador de la prueba DIE_TEST
-oa_control.c:oa_control_tests_frame:last     partida   última vida registrada (LIFE_LOG; -12345 al empezar)
-oa_control.c:oa_control_tests_frame:t#2      partida   contador de la prueba KNOCK_TEST
+oa_control.c:next                            partida   progreso de la prueba ENEMY_TEST
+oa_control.c:oa_control_tests_frame_tick     partida   contador de la prueba ENEMY_TEST
+oa_control.c:p                               puntero   Piece (actor del juego) de la prueba ENEMY_TEST
+oa_control.c:seen_a                          puntero   direcciones de actores vistos (prueba LOOK_LOG)
+oa_control.c:seen_v                          partida   valores leídos de esos actores (va con seen_a)
+oa_control.c:oa_control_tests_frame_tick_2   partida   contador de la prueba LOOK_LOG
+oa_control.c:oa_control_tests_frame_t        partida   contador de la prueba DIE_TEST
+oa_control.c:last                            partida   última vida registrada (LIFE_LOG; -12345 al empezar)
+oa_control.c:oa_control_tests_frame_t_2      partida   contador de la prueba KNOCK_TEST
 # oa_core.c
 oa_core.c:g_handles                          puntero   anillo de handles de petición de actores del juego
 oa_core.c:g_next_handle                      partida   índice del anillo de handles (va con g_handles)
