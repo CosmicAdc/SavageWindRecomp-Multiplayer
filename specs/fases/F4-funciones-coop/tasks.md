@@ -1021,3 +1021,17 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     1. Aplazar la hora del anfitrión mientras el invitado está en un evento que no es dormir; aplicarla al acabar.
   hecho cuando: `verify` cumplido.
   modelo sugerido: medio
+
+- [ ] T465 [coop] Invitación a santuario (ADR-025 n.º 11-13).
+  files: los que proponga T540 (previsiblemente `runtime/coop_*.c` nuevo para la lógica pura, `runtime/oa_*.c`, mensajes de aviso en `runtime/ui/`, textos en `runtime/ui/i18n/*.inc`)
+  verify: prueba pura del estado de la invitación (entra → aviso → aceptar/rechazar/30 s); en juego: A entra a un santuario, a B le sale el aviso, B acepta, aparece en la puerta exterior, entra andando y los dos se ven dentro; con el aviso apagado en ajustes no sale; `i18n_check.py` en 0
+  depende de: T540 (investigación), HE-02 (filtro de mapa en el cliente)
+  quién: agente + orquestador prueba en el juego
+  contexto: Decisión del dueño: cada vez que uno entra a un santuario, al otro le sale "X entró al santuario Y. ¿Unirte?" (aceptar/rechazar, ≈ 30 s; se puede apagar en ajustes). Al aceptar se teletransporta a la entrada exterior y entra andando. Si no había descubierto el santuario, al entrar queda descubierto.
+  pasos:
+    1. Detectar la entrada a un santuario (cambio de mapa a `CDungeon/…`) y su nombre/puerta (de T540).
+    2. Mensaje de aviso al compañero (si hace falta un mensaje nuevo, por T409).
+    3. Al aceptar: teletransporte a la puerta exterior (coordenadas de la lista de santuarios de `places shrine`).
+  hecho cuando: `verify` cumplido.
+  no hagas: no cargues el mapa del santuario a mano (el dueño eligió entrar andando); no fuerces la entrada.
+  modelo sugerido: alto
