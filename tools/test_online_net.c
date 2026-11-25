@@ -346,7 +346,7 @@ static void test_lists_not_finite_dropped(void) {
 // Every type cl_message handles: with a payload one byte shorter than its minimum nothing changes, whatever the
 // session holds; at the minimum something does (so the short one proves something). "Nothing changes" is the whole
 // of g, byte for byte (the clock is fixed, so nothing in it moves by itself).
-static uint8_t cbuf[32768];
+static uint8_t cbuf[1 << 17];  // (room for 255 enemies of 311 bytes: beyond any real frame, on purpose)
 static unsigned char snap[sizeof g];
 
 static void take_snap(void) {
