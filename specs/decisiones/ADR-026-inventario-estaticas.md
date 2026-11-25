@@ -66,7 +66,7 @@ guardan iban como "puntero?" (dudosa 1); tras la resolución 1 son "puntero" (se
     $PY tools/coop/oa_statics.py --autoprueba
     $PY tools/coop/oa_statics.py --listar
     $PY tools/coop/oa_statics.py --clasificacion specs/decisiones/ADR-026-inventario-estaticas.md
-    $PY tools/coop/oa_statics.py            # modo comprobación: 1 hasta que T212 limpie las 295
+    $PY tools/coop/oa_statics.py            # modo comprobación: 1 antes de T212 (295 pendientes); 0 desde T212
 
 El modo comprobación sale con 0 solo si cada variable está en la lista de permitidas o, siendo de fichero, aparece
 **asignada** (`=`, `op=`, o `memset`/`memcpy`/`memmove` de ella) **dentro del cuerpo** de una función
@@ -198,6 +198,10 @@ pasaría al hilo del juego y sus cuatro estáticas cambiarían de hilo.
 Al subirlas, la clave de cada una cambia de `fichero:función:nombre` a `fichero:nombre` (o `fichero:<función>_<nombre>`):
 T212 cambia esas claves en la tabla de abajo (misma clase y motivo) para que `--clasificacion` siga cuadrando. Una
 variable nueva desde T211 (`online.c:g_state_cleared_n`, de T222) se añade a la tabla como "partida".
+
+Resultado de T212 (bitácora `2026-11-25-F2-T212.md`): un `RT_ON_RESET(oa_<módulo>_reset)` en cada `oa_*.c` y
+`online_reset` en `online.c`; 377 variables, 296 limpiadas en su reset, 81 permitidas (la lista no cambia), modo
+comprobación en **0**. Las secciones "Recuento" y "Para T212" de arriba son las de T211 (antes de las resoluciones).
 
 ## Riesgos y lo que no se ha verificado
 
