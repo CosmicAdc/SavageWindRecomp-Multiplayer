@@ -117,6 +117,11 @@ cmd_arrancar() {
         [ "$t" -ge "$ESPERA_ANFITRION" ] && { echo "aviso: A no dijo 'hosting on port' en ${ESPERA_ANFITRION}s; se lanza B igualmente" >&2; break; }
         sleep 2; t=$((t + 2))
     done
+    # Y a que A pinte (primera línea "[vk] t="): con poca RAM, cargar los dos a la vez los dejó sin pintar (F1 T121).
+    until grep -q '^\[vk\] t=' "$LOGS/A.log" 2>/dev/null; do
+        [ "$t" -ge "$ESPERA_ANFITRION" ] && { echo "aviso: A no pintó en ${ESPERA_ANFITRION}s; se lanza B igualmente" >&2; break; }
+        sleep 2; t=$((t + 2))
+    done
     lanzar B "$ventana" ">"
 }
 
