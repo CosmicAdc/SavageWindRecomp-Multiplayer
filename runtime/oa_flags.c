@@ -310,3 +310,20 @@ void oa_quests_update(Cpu *c, uint64_t player, bool host) {
         LOG("[online] quest flag %s: set (another player did it)\n", names[k]);
     }
 }
+
+// rt_online_frame, step 7:
+// the time of day: the host's for everyone (his game sends it; the others follow when theirs is off by more than
+// 3 game minutes, a few seconds: the two clocks run at the same speed)
+void oa_flags_hour_frame(void) {
+    float mine = test_warp_hour(NULL), host;
+    online_set_local_hour(mine);
+    if (mine >= 0 && online_host_hour(&host)) {
+        float d = host - mine;
+        if (d > 12) d -= 24;
+        if (d < -12) d += 24;
+        if (d > 0.05f || d < -0.05f) {
+            test_warp_set_hour(host);
+            LOG("[online] the host's time: %.2f (was %.2f)\n", host, mine);
+        }
+    }
+}

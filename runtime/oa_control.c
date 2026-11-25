@@ -164,3 +164,79 @@ void online_actors_control_init(void) {
     };
     control_register(cmds, (int)(sizeof cmds / sizeof *cmds));
 }
+
+// rt_online_frame, step 1: the control commands' answers (`actors`, `flag`, `event`), on the game's thread
+void oa_control_frame(Cpu *c, uint64_t pinfo) {
+    oa_find_actors(pinfo);
+    oa_flag_query(c);
+    oa_event_query(c, pinfo);
+}
+
+// rt_online_frame, step 10: the tests by environment variable (their own state kept in each)
+void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]) {
+    if (getenv("SAVAGEWIND_ONLINE_ENEMY_TEST")) {  // (test: each enemy's online actor made in turn, next to Link)
+        static MapLine *m;
+        static int n = -1, next, tick;
+        static Piece p;
+        if (n < 0) n = oa_map_load("enemies.txt", &m);
+        if (tick++ % 20 == 0 && next < n) {
+            if (p.actor || p.pending) oa_delete_piece(c, &p);
+            LOG("[online] enemy test %d: %s\n", next, m[next].val);
+            oa_piece_update(c, 0, &p, m[next].val, "test");
+            next++;
+        } else oa_piece_update(c, 0, &p, p.name, "test");
+        if (p.actor) {
+            float mm[12] = {1, 0, 0, link[0] + 4, 0, 1, 0, link[1], 0, 0, 1, link[2]};
+            oa_call(c, FN_SET_MTX, p.actor, (uint64_t)(uintptr_t)mm, 0, 0, 0, 0);
+        }
+    }
+    if (getenv("SAVAGEWIND_ONLINE_LOOK_LOG")) {  // (test: the actors near whose +0x710 / +0x518 change)
+        static uint64_t seen_a[64];
+        static uint32_t seen_v[64];
+        static int tick;
+        uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
+        if (VALID(pl0) && tick++ % 3 == 0) {
+            int na = oa_all_actors(*(uint64_t *)(uintptr_t)(pl0 + 0x68), oa_g_actors, MAX_ACTORS);
+            const float *pm = (const float *)(uintptr_t)(pl0 + 0x398);
+            for (int k = 0; k < na; k++) {
+                uint64_t a = oa_g_actors[k];
+                const float *m = (const float *)(uintptr_t)(a + 0x398);
+                if ((m[3] - pm[3]) * (m[3] - pm[3]) + (m[11] - pm[11]) * (m[11] - pm[11]) > 30 * 30) continue;
+                uint32_t v = *(uint32_t *)(uintptr_t)(a + 0x710);
+                int q = 0;
+                while (q < 64 && seen_a[q] != a) q++;
+                if (q == 64) { for (q = 0; q < 64 && seen_a[q]; q++) ; if (q == 64) continue; seen_a[q] = a, seen_v[q] = v; continue; }
+                if (v != seen_v[q]) {
+                    char n[48];
+                    oa_actor_name_of(a, n);
+                    LOG("[online] look %s: +0x710 %x -> %x\n", n, seen_v[q], v);
+                    seen_v[q] = v;
+                }
+            }
+        }
+    }
+    {   // (test: SAVAGEWIND_ONLINE_DIE_TEST=<s>: the local Link dies that many seconds in)
+        static int t;
+        const char *dt = getenv("SAVAGEWIND_ONLINE_DIE_TEST");
+        uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
+        if (dt && VALID(pl0) && ++t == atoi(dt) * 30) *(int32_t *)(uintptr_t)(pl0 + ENEMY_LIFE) = 0, LOG("[online] die test\n");
+    }
+    if (getenv("SAVAGEWIND_ONLINE_LIFE_LOG")) {  // (test: the local Link's life, as it changes)
+        static int32_t last = -12345;
+        uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
+        int32_t v = VALID(pl0) ? *(int32_t *)(uintptr_t)(pl0 + ENEMY_LIFE) : -1;
+        if (v != last) LOG("[online] our life %d\n", v), last = v;
+    }
+    {   // (test: SAVAGEWIND_ONLINE_KNOCK_TEST=<s>: a heavy blow's knock on the local Link every that many seconds)
+        static int t;
+        const char *kt = getenv("SAVAGEWIND_ONLINE_KNOCK_TEST");
+        uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
+        if (kt && VALID(pl0) && ++t % (atoi(kt) * 30) == 0) {
+            const float *pm = (const float *)(uintptr_t)(pl0 + 0x398);
+            float at[3] = {pm[3] + 1, pm[7] + 0.3f, pm[11]};
+            const char *kn = getenv("SAVAGEWIND_ONLINE_KNOCK");
+            oa_boom_start(c, kn ? kn : "OnlineShock", at);
+            LOG("[online] knock test\n");
+        }
+    }
+}

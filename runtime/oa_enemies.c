@@ -1137,3 +1137,15 @@ void oa_boss_update(Cpu *c, const OnlinePlayer *pl, int me) {
         }
     }
 }
+
+static int tick;  // (oa_enemies_frame's)
+
+// rt_online_frame, step 17, the enemies: the host's for everyone
+void oa_enemies_frame(Cpu *c, uint64_t player, const float link[3], int me) {
+    OnlinePlayer epl[ONLINE_MAX];
+    online_players(epl);
+    if (VALID(player) && online_is_host()) {
+        if (tick++ % 3 == 0) oa_enemies_host(c, player, link, epl, me);
+        oa_enemies_show(c, player, oa_g_reg_out, oa_g_reg_n, true, link, me, false);  // (the others': shown here)
+    } else if (VALID(player)) oa_enemies_client(c, player, me);
+}
