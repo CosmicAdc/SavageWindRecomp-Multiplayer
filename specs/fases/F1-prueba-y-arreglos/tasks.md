@@ -82,7 +82,14 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
     2. `actors OnlinePlayer` en cada puerto; anotar nombre, posición y distancia.
     3. Mover A; volver a consultar en B; comparar con `pos` de A.
     4. `actors OnlineArmor` y `actors OnlineGear` en B; anotar cuántos hay.
-  hecho cuando: evidencia de presencia y de seguimiento anotada; diferencias de posición anotadas.
+    5. **Enemigos atacan a los dos** (ADR-012): con A a más de 60 m, llevar a B a un campamento de enemigos de la
+       Meseta. Anotar con `actors Enemy_` en los dos puertos qué enemigos hay, y en los logs las líneas de cambio de
+       dueño de cada enemigo (`docs/ONLINE.md`, "Owners"). Comprobar: (a) los enemigos pasan a ser de B y se acercan a
+       B (su distancia a `pos` de B baja); (b) con A junto a B y `god_mode` apagado en A unos segundos, A recibe al
+       menos un golpe (su vida baja) de un enemigo que es de B; (c) si B se aleja más de 40 m y A queda 10 m más
+       cerca, el enemigo pasa a A.
+  hecho cuando: evidencia de presencia y de seguimiento anotada; diferencias de posición anotadas; el paso 5 anotado
+    con (a), (b) y (c) como PASA/FALLA (un FALLA va a la lista priorizada de T108).
   no hagas: no interpretes "el actor existe" como "se ve bien": eso lo confirma el dueño en T107.
   modelo sugerido: bajo
 
