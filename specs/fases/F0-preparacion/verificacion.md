@@ -60,16 +60,16 @@ Rellenar: PASA / FALLA / NO EJECUTADA, y el motivo si no pasa.
 
 | # | Cumplido | Evidencia (comando → salida resumida) |
 |---|---|---|
-| S1 | | |
-| S2 | | |
-| S3 | | |
-| S4 | | |
-| S5 | | |
-| S6 | | |
-| S7 | | |
-| S8 | | |
-| S9 | | |
-| S10 | | |
+| S1 | ✅ | `sw_probe.py juego/exefs` → build `cd57b23fa4bbad65`, game version 1.9.0, 0 instrucciones no soportadas |
+| S2 | ✅ | `make gen` = 0 en 6m03s; `generated/layout.c` y `generated/main/`; 668 MB |
+| S3 | ✅ | `make -j8` = 0 en 8m21s; los 3 binarios; `swgame.dll.id` = `GAMELIB_ID` = `9bc886f8314dd42b` |
+| S4 | ✅ | `online_mod.py` = 0 en 22 s; `v42`, `online_mod.txt`, `gear.txt`, `quests.txt`; 194 MB |
+| S5 | ✅ | desatendido: `pos` (-1130, 237.4) en la Meseta, `[vk]` 58 fps y 221 832 draws; con ventana (dueño): 59,6 fps de media |
+| S6 | ✅ | T016 (4 pruebas Python, `i18n_check` 1 esperado), T017 (5 en 0), T018 (DSU 0; `launch-flags`, `actions`, `gyro` FALLAN → F1), T022 (Docker igual) |
+| S7 | ✅ | `git diff --stat upstream/test -- .github` sin borrados (T006) |
+| S8 | ✅ | solo `windows_update.c:46`, `update_appimage.c:26`, `recomplauncher.json:5`, enumerados en ADR-020; `update_check_start` vuelve con `SW_FORK_NO_UPDATE` |
+| S9 | ✅ con matiz | pruebas Docker 0 (T022); `distro_build.sh debian:13` 0 en 64 s (tras el `stddef.h` de F1); compose con 3 bots 0 (T023) **sin netem** (el kernel WSL2 de Docker Desktop no lo trae) |
+| S10 | ✅ | `bitacora/2026-11-24-F0-arranque.md` (tiempos y disco) y esta tabla; RAM: 3,6 GB libres durante `make -j8` con dos agentes abiertos |
 
 ## 7. Plantilla de bitácora
 
