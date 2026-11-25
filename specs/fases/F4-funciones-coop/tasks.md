@@ -978,7 +978,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   modelo sugerido: alto
 
 - [~] T454 [efectos] El compañero no ve la animación del hada que revive (N2).
-  paso 1 hecho: agente Sonnet ag-t454 (integrado) — `specs/bitacora/F4-T454-hada.md`; FALTA PE-T454-1 en el juego (nombre del actor o efecto del hada) y después T454-b
+  paso 1 hecho: agente Sonnet ag-t454 (integrado) — `specs/bitacora/F4-T454-hada.md`; PE-T454-1 hecho con el dueño: H-B (actor aparte; `Appear`, `ResurrectionFairy`, `Fairy_Light`, `FairyTail`), sin cambio de formato; FALTA T454-b
   files: `specs/bitacora/F4-T454-hada.md` (investigación), después lo que proponga
   verify: en juego, A muere con un hada en el inventario y B ve la animación de la revivida (no solo la caída)
   depende de: —

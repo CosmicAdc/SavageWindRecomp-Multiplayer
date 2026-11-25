@@ -201,3 +201,21 @@ Objetivo: descubrir **qué emite el hada y quién**. Se hace en la máquina de B
 - Que `oa_puppet.c` siga reproduciendo efectos sobre una marioneta mientras B está caído (el paso 18 corre, pero
   no se comprobó que la marioneta de un jugador "Dead" siga `oa_running`).
 - Los números de línea son de `coop/T454` al 2026-11-25 (commit base `ef9a958`).
+
+## Resultado de PE-T454-1 (2026-11-25, orquestador + dueño, build `dc16647`, 1.9.0, 60 fps)
+
+B arrancado con `SAVAGEWIND_ONLINE_FX_ALL/FX_LOG/ACTOR_LOG/LIFE_LOG=1` y `SAVAGEWIND_ONLINE_DIE_TEST=180`, junto a A.
+Log de B (`[online] our life 0` → `Link died: revived by a fairy (online play)` → `our life 12`), justo después:
+
+| Emisor (instancia en B) | Nombres |
+|---|---|
+| `…6518` | `Appear`, `ResurrectionFairy` |
+| `…63a8` | `Fairy_Light`, `FairyTail` |
+| UI | `mc_HeartUp` |
+
+Ninguno es `fx Link`: son **otros emisores** → **H-B confirmada** (el hada es un actor aparte). El dueño lo vio en B y
+**no en A**. Nombres ≤ 17 caracteres: caben en `fxev.name` (21), **sin cambio de formato**. Falta el nombre del actor
+(no se pidió `actors` a tiempo): se obtiene en la implementación con `actors Fairy` durante la revivida, o desde el
+emisor en `oa_sample.c` (la instancia `ui` que emite `ResurrectionFairy`).
+Siguiente: T454-b (who 5 = hada; vigilar los dos emisores mientras Link revive; reproducir en la marioneta con el
+molde de `ReactionField`).
