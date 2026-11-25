@@ -2,10 +2,14 @@
 // tests/test_coop_palette.c.
 #include "coop_palette.h"
 
-// Okabe-Ito, black swapped for a light grey: orange, sky blue, bluish green, yellow, blue, vermillion, reddish
-// purple, grey
+// Okabe-Ito, black swapped for a light grey, and its blue made deeper: orange, sky blue, bluish green, yellow, deep
+// blue, vermillion, reddish purple, grey. The stock blue (0,114,178) and bluish green (0,158,115) both turn the same
+// teal under tritanopia (0.117 apart); the deep blue (0,85,170) goes darker there. Expected, worked by hand with the
+// matrices of colour_vision.c (sRGB 0..1 as seen, severity 1), deep blue and bluish green:
+//   tritanopia   (0.00,0.42,0.47) and (0.00,0.62,0.57): 0.22 apart (the closest other pair is about 0.18)
+//   protanopia   about 0.4 or more from every other colour; deuteranopia and normal vision, the same or more
 static const CoopRgb k_colors[COOP_PALETTE_COUNT] = {
-    {230, 159, 0}, {86, 180, 233}, {0, 158, 115}, {240, 228, 66}, {0, 114, 178}, {213, 94, 0}, {204, 121, 167}, {230, 230, 230},
+    {230, 159, 0}, {86, 180, 233}, {0, 158, 115}, {240, 228, 66}, {0, 85, 170}, {213, 94, 0}, {204, 121, 167}, {230, 230, 230},
 };
 
 bool coop_palette_index_ok(int i) { return i >= 0 && i < COOP_PALETTE_COUNT; }

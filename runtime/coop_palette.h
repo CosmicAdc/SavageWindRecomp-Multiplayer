@@ -5,7 +5,8 @@
 // (the players' choices come as arguments), so that the test can test it alone.
 //
 // The colours are the Okabe-Ito set (a palette made for colour blindness) with its black swapped for a light grey,
-// which an overlay on a dark picture can show; the order puts the first two players, the usual pair, furthest apart.
+// which an overlay on a dark picture can show, and its blue made deeper so it stays apart from the bluish green under
+// tritanopia (coop_palette.c has the numbers); the order puts the first two players, the usual pair, furthest apart.
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
