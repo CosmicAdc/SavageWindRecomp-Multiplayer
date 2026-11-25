@@ -267,8 +267,8 @@ oa_core.c:miss                               partida   contador de reintentos de
 oa_core.c:oa_g_actors                        puntero   lista de actores del juego (oa_all_actors)
 oa_core.c:oa_g_theirs                        puntero   botín de los otros hecho aquí (Piece)
 # oa_gamedata.c
-oa_gamedata.c:oa_start_event:meta            puntero   memoria donde el juego monta los datos del evento (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
-oa_gamedata.c:oa_start_event:req             puntero   petición de evento con el actor (req.actor); búfer de trabajo, pero se limpia (resolución 1)
+oa_gamedata.c:meta                           puntero   memoria donde el juego monta los datos del evento (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
+oa_gamedata.c:req                            puntero   petición de evento con el actor (req.actor); búfer de trabajo, pero se limpia (resolución 1)
 oa_gamedata.c:oa_give_heart:name             permitir  cadena constante
 # oa_enemies.c
 oa_enemies.c:enemy_actor:m                   permitir  tabla cargada de enemies.txt
