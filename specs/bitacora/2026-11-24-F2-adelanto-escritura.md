@@ -45,6 +45,7 @@ tras la verificación del orquestador, y todo lo que exige juego o firma de refe
 - `sesion-t204` (T204): escrita (`fde83e8`), sin integrar hasta correrla en Docker (es solo POSIX).
 - `oa-t206` (T206, solo puede ejecutar `oa_check.py`; base `7b53d18`).
 - `valida-t213` (T213, Opus).
+- Módulos puros sin dependencias, adelantados a petición del dueño ("¿hay como lanzar alguna otra tarea?"): `amenaza-t443` (T443, F4, Opus) y `modulos-f3` (T320, T322, T327 de F3, Sonnet). Solo ficheros nuevos; no tocan `online.c` ni el `Makefile`.
 
 ## Respuesta al dueño: cierre al recargar desde el título
 

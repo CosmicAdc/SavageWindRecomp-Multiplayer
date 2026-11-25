@@ -808,7 +808,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 ## Bloque 9 — Amenaza de los enemigos (CU-15, ADR-012)
 
-- [ ] T443 [P] [lógica] Amenaza de los enemigos: lógica pura
+- [~] T443 [P] [lógica] Amenaza de los enemigos: lógica pura
+  reclamada: agente Opus amenaza-t443 (coop/T443, en curso; adelantada)
   files: runtime/coop_threat.c, runtime/coop_threat.h, tests/test_coop_threat.c
   verify: `clang -Wall -Iruntime tests/test_coop_threat.c runtime/coop_threat.c -lm -o build/test_coop_threat && build/test_coop_threat` sale con 0
   depende de: ninguna
