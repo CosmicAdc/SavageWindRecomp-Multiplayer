@@ -1,4 +1,4 @@
-# Casos de uso del modo cooperativo (CU-01 … CU-14)
+# Casos de uso del modo cooperativo (CU-01 … CU-15)
 
 Un archivo por caso de uso. Cada uno describe qué quiere hacer el jugador, qué hace hoy el PR #294, qué falta
 construir y cómo se comprueba. La lista y las fases salen de `../PLAN-APROBADO.md`.
@@ -21,6 +21,7 @@ construir y cómo se comprueba. La lista y las fases salen de `../PLAN-APROBADO.
 | [CU-12](CU-12-pvp-activable.md) | PvP activable por acuerdo, con daño validado | PARCIAL | F4 | media | CU-03, CU-10, CU-11 |
 | [CU-13](CU-13-color-en-modelo-3d.md) | Color en el modelo 3D del segundo Link | FALTA | F5 | alta | CU-02, CU-10 |
 | [CU-14](CU-14-historia-santuarios-teletransporte-entre-mapas.md) | Historia con los dos presentes, santuarios juntos, teletransporte entre mapas | FALTA (hay piezas) | F5 | alta | CU-03, CU-05, CU-06, CU-07, CU-08, CU-10 |
+| [CU-15](CU-15-amenaza-de-los-enemigos.md) | Amenaza: el enemigo se vuelve hacia quien más daño le hace (ADR-012) | PARCIAL (hoy: hacia el último que golpea) | F4 | media-alta | CU-03, F2 (`oa_enemies`), F3 (autoridad) |
 
 "Dificultad" sale de las tablas de huecos de `../mapa/06-pr294-red-y-sesion.md` §9 y
 `../mapa/07-pr294-integracion-juego.md` §7.
