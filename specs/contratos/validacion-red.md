@@ -59,6 +59,10 @@ Cada regla es comprobable leyendo el código. "DEBE" y "NO DEBE" son obligatorio
   `runtime/online_actors.c` (sección 2) se conservan como segunda barrera; NO DEBES quitarlas.
 - **V-3.** Un mensaje que falla una comprobación DEBE **descartarse entero**. NO DEBES "arreglar" el valor y seguir
   (excepción permitida: terminar una cadena en cero y recortar un contador a su máximo, como ya se hace).
+  **Excepción para los mensajes con lista** (ENEMIES, LOOTS, ESTATE) **y para STATE** (ADR-025 n.º 1, T222): se
+  descarta la **entrada** que falla, no el mensaje. En STATE el mensaje entero solo se descarta si falla su **núcleo**;
+  cualquier otra entrada que falla se **anula** en la copia local, poniéndola en la marca de "nada" que ya usa ese
+  campo, y se cuenta (§3.9). Anular no es corregir: el valor recibido nunca se sustituye por otro valor "plausible".
 - **V-4.** Cada descarte DEBE contarse (un contador por tipo de mensaje) y registrarse en el log **como mucho una
   vez por segundo**, para que un emisor defectuoso no inunde el log.
 
@@ -99,7 +103,9 @@ Cada regla es comprobable leyendo el código. "DEBE" y "NO DEBE" son obligatorio
   - posición y traslación de matrices: valor absoluto `≤ 100000` (la cota que el emisor ya aplica a su propia
     posición, `online.c:832-834`);
   - hora: `0 ≤ h ≤ 24`;
-  - temporizador de Luna Carmesí: `-1` (desconocido) o `0..4000` (`OA:993`);
+  - temporizador de Luna Carmesí: en la capa, solo finito y `|x| ≤ 100000` (fuera: se anula a `-1`, desconocido); la
+    ventana `0..4000` la aplica el consumidor (`oa_flags.c`, `oa_bloody_moon_follow`). T222: antes la capa tiraba el
+    STATE entero por encima de 4000 aunque el juego puede pasar de ahí (hallazgo I-1);
   - clima: `0..8` o `255` (`runtime/online.h`, campo `weather`);
   - componentes de rotación/escala de una matriz: cota **por fijar en F2** (hasta entonces, al menos finitas).
 - **V-15.** Todo entero con signo cuyo sentido sea "una cantidad" DEBE ser `> 0` y tener un tope: daño de HIT, daño
@@ -140,6 +146,54 @@ Cada regla es comprobable leyendo el código. "DEBE" y "NO DEBE" son obligatorio
   pasa y, por cada comprobación, uno inválido que se descarta.
 - **V-26.** Los datos de prueba DEBEN ser sintéticos, escritos a mano. NO DEBES usar capturas de una partida real.
 
+### 3.9 STATE: núcleo y entradas (ADR-025 n.º 1, T222)
+
+`online_validate_state` (`runtime/online_validate.h`) separa el STATE en dos partes. Se aplica sobre la copia local
+que hace `cl_message`, después de terminar las cadenas (`online_terminate_state`).
+
+- **V-27.** **Núcleo** → si falla un campo, el STATE se descarta entero (`dropped a STATE` en el log, contador
+  `D_STATE`). Son: `pos[3]` y `yaw` (finitos, `|x| ≤ 100000`), `flags` (solo `PAUSED | LOADING`), `anim`
+  (`< ONLINE_A_COUNT`), `as[4]` (terminadas) y las reglas de sesión `collide`, `revive`, `nopause` (0 o 1).
+- **V-28.** **Entrada** → si falla, se anula esa entrada y el resto del STATE se aplica (`cleared an entry of a
+  STATE` en el log la primera vez; contador aparte, `g_state_cleared_n`). La tabla dice qué forma cada entrada, qué la
+  hace fallar y a qué "nada" se anula:
+
+| Entrada | Falla si | Se anula a |
+|---|---|---|
+| `gear_bone[k]` + `gear_rel[k]` (k < 6) | hueso `> 8` y `≠ 0xff`; matriz no finita o `> 100000` | hueso 0 (no se ve), matriz a cero |
+| `shots.n` | `> 8` | lista vacía: `n = 0`, los 8 disparos a cero |
+| `shots.shot[k]` (id, kind, m) | `kind ≥ ONLINE_K_COUNT`; matriz mala | k `< n`: sale de la lista, los siguientes suben y `n` baja (el consumidor los busca por id); k `≥ n`: a cero |
+| `shots.boom[k]` (seq, kind, pos) | `kind` fuera; posición mala | a cero (`seq` 0: ninguna) |
+| `effects` | bits fuera de KAGO, KAGO_COUNT, GALE y DEMO | 0 |
+| `grab`, `stop` (nombre, from, m) | nombre con caracteres fuera de `[A-Za-z0-9_]`; números malos | a cero (nombre `""`) |
+| `ice_n` | `> 3` | 0, los 3 pilares a cero |
+| `ice[k]` | matriz mala | como `shots.shot[k]` (el consumidor los empareja por posición) |
+| `map` | sin terminar | `""` (desconocido) |
+| `boss[k]` (hash, nombre, vida) | nombre malo; vida `< 0` | a cero (hash 0, `""`) |
+| `fx` | sin terminar | `""` |
+| `fx_anim[k]` + `fx_frame[k]` (k < 3) | animación `< -1` o `> 4095`; fotograma malo | animación `-1`, fotograma 0 |
+| `fxev[k]` (seq, who, nombre) | `who > 4`; nombre sin terminar | a cero (`seq` 0) |
+| `weather` | `> 8` y `≠ 255` | 255 (desconocido) |
+| `dye[k]` (k < 3) | `< -1` | `-1` (ninguno) |
+| `pvp_target` + `pvp_damage` | ranura `≥ 8`; daño `< 0` | 0 y 0; `pvp_seq` se conserva, así el golpe que nombra se pierde y no se aplica cuando vuelva |
+| `horse` + `horse_m` + `horse_as` | nombre malo; matriz mala; AS sin terminar | a cero (`""`) |
+| `tack[k]` + `tack_m[k]` (k < 2) | nombre malo; matriz mala | a cero |
+| `bloody_moon` | no finito o `> 100000` | `-1` (desconocido) |
+| `objs[k]` (hash, m) | matriz mala | a cero (hash 0) y su bit de `objs_trunk` a 0 |
+| `movers[k]` (hash, m, as) | matriz mala; AS sin terminar | a cero (hash 0) |
+| `held[k]` (nombre, mode, m) | nombre malo; `mode > 2`; números malos | a cero (`mode` NONE) |
+
+- **V-29.** Admiten cualquier valor (no son núcleo ni entrada): `ping_ms`, `pvp_seq`, `aggro_id`, `aggro_seq`,
+  `broken`, `trunks_gone`, `objs_trunk`, los `hash`, `id` y `seq` de las entradas, `fx_props` y `ground_props`.
+- **V-30.** `fx_props` (24 palabras) y `ground_props` (16) **se escriben tal cual en la memoria del juego**: en las
+  propiedades del ELink del muñeco (`oa_puppet.c`) y del ReactionField local. Cada palabra es entera o `float` según la
+  definición del ELink del juego, que nuestro código no conoce; comprobar `isfinite` sobre una palabra entera tiraría
+  valores legítimos (`0xffffffff` = -1 tiene forma de NaN). Mientras no se sepa qué índices son `float` (medirlo en el
+  juego), no se acotan: es un riesgo aceptado y anotado (revisión de F2, C-2).
+- **V-31.** Cotas de T222 y de dónde salen: `fx_anim ≤ 4095` es una **hipótesis** conservadora (el emisor manda el
+  índice como `int16`, `oa_sample.c` `anim_slots`; el tamaño de la tabla de animaciones de un modelo no consta en el
+  código); `dye ≤ 127` es la cota del emisor (`oa_sample.c`: solo manda el valor de la ranura si está en `0..127`).
+
 ---
 
 ## 4. Qué comprobar en cada mensaje
@@ -153,7 +207,7 @@ Cada regla es comprobable leyendo el código. "DEBE" y "NO DEBE" son obligatorio
 | REJECT | 1 | Motivo desconocido → texto genérico (`online.c:975-983`) | Nada |
 | JOIN | 25 | Ranura `< 8`; termina el nombre (`online.c:985-991`) | Sanear el nombre también en el cliente (hoy confía en el servidor) |
 | LEAVE | 1 | Ranura `< 8` y en uso (`online.c:996`) | Limpiar el estado asociado a esa ranura (flags `quest_of[]`) |
-| STATE | 3375 (+1 de ranura al recibir) | Longitud `≥`; ranura en uso; termina cadenas; recorta `shots.n`, `ice_n`, `anim` (`online.c:1002-1006`, `907-964`) | Longitud exacta; **todos** los `float` finitos y acotados (V-13, V-14); índices (V-7); `pvp_target < 8`; `pvp_damage` con tope; `bloody_moon` en rango; `weather` en rango; terminar `shots`/`grab`/`held`/`horse`/`tack` (ya se hace) y comprobar nombres contra listas cuando crean actores (`horse`, `tack`, `held`) |
+| STATE | 3375 (+1 de ranura al recibir) | (T213/T222) Longitud `≥`; ranura en uso; termina todas las cadenas; núcleo malo → descarta; entrada mala → se anula (§3.9) | Longitud exacta; **todos** los `float` finitos y acotados (V-13, V-14); índices (V-7); `pvp_target < 8`; `pvp_damage` con tope; `bloody_moon` en rango; `weather` en rango; terminar `shots`/`grab`/`held`/`horse`/`tack` (ya se hace) y comprobar nombres contra listas cuando crean actores (`horse`, `tack`, `held`) |
 | SKEL | `2 + (n + nbow) × 12` | `n + nbow ≤ 160` y longitud `≥` (`online.c:1011-1012`) | Longitud exacta; `nbow ≤ 32`; que el decodificador no pueda producir valores no finitos `[sin verificar]` |
 | EQUIP | 432 (+1) | Longitud `≥`; termina las 9 cadenas (`online.c:1022-1028`) | Longitud exacta; cada nombre en `armor.txt` / `gear.txt` o vacío |
 | CHAT | 1..120 | Recorta a 119 + cero en servidor y cliente (`online.c:299-306`, `1034-1037`) | Sin bytes de control; UTF-8 válido; tope de frecuencia |

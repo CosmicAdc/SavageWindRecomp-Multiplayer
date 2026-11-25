@@ -776,7 +776,8 @@ void online_set_local_pose(const OnlinePose *p) {
     pthread_mutex_unlock(&g_pose_lock);
 }
 
-// Link right now: false while there is no Link (loading, the title screen)
+// Link right now: false while there is no Link (loading, the title screen), with pos and yaw 0 (the STATE then sent with
+// ONLINE_F_LOADING passes online_validate_state: what was read there, not finite or beyond any world, would drop it)
 static bool sample_local(WireState *w) {
     static float last[3], yaw;
     static bool have;
@@ -784,11 +785,11 @@ static bool sample_local(WireState *w) {
     w->anim = ONLINE_A_WAIT;
     if (g_site.pause_state && *(uint32_t *)(uintptr_t)g_site.pause_state) w->flags |= ONLINE_F_PAUSED;
     uint64_t pinfo = g_site.player_info ? *(uint64_t *)(uintptr_t)g_site.player_info : 0;
-    if (!pinfo) { have = false; return false; }
+    if (!pinfo) goto none;
     memcpy(w->pos, (const void *)(uintptr_t)(pinfo + 0x88), sizeof w->pos);
     for (int k = 0; k < 3; k++)
-        if (!isfinite(w->pos[k]) || fabsf(w->pos[k]) > 100000) { have = false; return false; }
-    if (w->pos[0] == 0 && w->pos[1] == 0 && w->pos[2] == 0) { have = false; return false; }  // (no Link placed yet)
+        if (!isfinite(w->pos[k]) || fabsf(w->pos[k]) > 100000) goto none;
+    if (w->pos[0] == 0 && w->pos[1] == 0 && w->pos[2] == 0) goto none;  // (no Link placed yet)
     static uint8_t anim;
     if (have) {  // heading: where he has been going (kept while he stands)
         float dx = w->pos[0] - last[0], dy = w->pos[1] - last[1], dz = w->pos[2] - last[2];
@@ -839,6 +840,10 @@ static bool sample_local(WireState *w) {
     }
     pthread_mutex_unlock(&g_pose_lock);
     return true;
+none:
+    have = false;
+    memset(w->pos, 0, sizeof w->pos), w->yaw = 0;
+    return false;
 }
 
 // What Link wears and carries (runtime/online_actors.c reads it from his actor links on the frame loop)
@@ -864,7 +869,8 @@ static bool sample_equip(WireEquip *e) {
 // What arrives is hostile until shown otherwise (specs/contratos/validacion-red.md): every structure cl_message keeps
 // goes first through runtime/online_validate.h (its strings cut at their field's end, then each field checked), and
 // one that fails never reaches a queue or a snapshot. A message (or, in a list, an entry) that fails is dropped whole,
-// never repaired; each kind is counted and logged the first time only.
+// never repaired - a STATE whole only for its core, an entry of its own lists cleared alone; each kind is counted and
+// logged the first time only.
 enum { D_STATE, D_TIME, D_HIT, D_ENEMIES, D_ESTATE, D_LOOT_ADD, D_LOOTS, D_PICK, D_SKEL, D_EQUIP, D_COUNT };
 static const char *const g_drop_name[D_COUNT] = {"STATE", "TIME", "HIT", "ENEMIES", "ESTATE", "LOOT_ADD", "LOOTS", "PICK",
                                                  "SKEL", "EQUIP"};
@@ -872,6 +878,15 @@ static unsigned g_drop_n[D_COUNT];
 
 static void drop_note(int kind) {
     if (g_drop_n[kind]++ == 0) LOG("[online] dropped a %s that failed validation (more are counted, not logged)\n", g_drop_name[kind]);
+}
+
+// A STATE whose core passed but some entries of its lists did not (online_validate_state): those entries were cleared
+// and the rest kept; counted apart from the STATEs dropped whole, and logged the first time only
+static unsigned g_state_cleared_n;
+
+static void state_cleared_note(int n) {
+    if (g_state_cleared_n == 0) LOG("[online] cleared an entry of a STATE that failed validation (more are counted, not logged)\n");
+    g_state_cleared_n += (unsigned)n;
 }
 
 static void remote_snap(int id, const WireState *w) {  // (lock held; w validated: online_validate_state)
@@ -962,10 +977,12 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             WireState w;
             memcpy(&w, p + 1, sizeof w);
             online_terminate_state(&w);
-            if (!online_validate_state(&w)) {
+            int cleared;
+            if (!online_validate_state(&w, &cleared)) {  // (its core: the whole message goes)
                 drop_note(D_STATE);
                 break;
             }
+            if (cleared) state_cleared_note(cleared);  // (entries of its lists: cleared alone, the rest kept)
             remote_snap(p[0], &w);
         }
         break;

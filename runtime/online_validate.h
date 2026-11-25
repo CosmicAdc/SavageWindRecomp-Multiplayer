@@ -1,7 +1,8 @@
 // What comes from the network, checked in one place (specs/contratos/validacion-red.md): runtime/online.c's client
 // (cl_message) gives every structure it keeps to one of these before it reaches a queue or a snapshot, and drops what
-// fails (the message, or in a list the entry), never repairing it - but for the one repair the contract allows: a
-// string that fills its field is cut there (online_terminate_*), as online.c always did.
+// fails (the message, or in a list the entry; in STATE, all of it only for its core, else the entry, cleared to its
+// "none": online_validate_state), never repairing it - but for the one repair the contract allows: a string that fills
+// its field is cut there (online_terminate_*), as online.c always did.
 //
 // Pure functions: no state, nothing of the game's; each reads its structure field by field, by name, as online_wire.h
 // and online.h define it (runtime/online_validate.c holds the sizes they were written for). They live here, inline,
@@ -25,7 +26,9 @@
 #define ONLINE_V_LIMIT 100000.0f      // every number: finite and |x| <= this (what online.c's sample_local holds its
                                       // own position to; rotation and scale too, until a tighter bound is set)
 #define ONLINE_V_DAMAGE_MAX 1000000   // HIT: the life an enemy lost, 0..this (above any enemy's life)
-#define ONLINE_V_BLOODY_MOON 4000.0f  // OnlinePose.bloody_moon: -1 (unknown) or 0..this (online_actors.c takes no more)
+#define ONLINE_V_FX_ANIM_MAX 4095     // OnlinePose.fx_anim: -1 none, or an index in his model's animation table up to
+                                      // this (a hypothesis: no model's table size is known here; a conservative bound,
+                                      // specs/bitacora/2026-11-25-F2-T222.md)
 #define ONLINE_V_GEAR_BONES 8         // OnlinePose.gear_bone: 0, a bone + 1 up to this (online_actors.c k_bones), or
                                       // ONLINE_GEAR_WORLD
 #define ONLINE_V_HAND_BONES 2         // OnlineEnemy.wbone / sbone: 0 the world, 1 Weapon_R, 2 Weapon_L
@@ -70,67 +73,114 @@ static inline bool online_validate_grab(const OnlineGrab *g) {
 
 // ------------------------------------------------------------------ the structures
 
-// STATE (a player's, WireState): every field, in the order online_wire.h has them
-static inline bool online_validate_state(const WireState *w) {
+// a counted list's entries (OnlineShots.shot, WireState.ice), each one's verdict in ok[]: of its first *count, one that
+// fails goes and those after it move up (the others' games know each by its id, or by where it is, not by its place);
+// past them (zeros from a sender), one that fails is cleared. A count past the list's room clears it all. How many went
+static inline int online_validate_list(void *list, size_t size, int cap, uint8_t *count, const bool *ok) {
+    unsigned char *e = (unsigned char *)list;
+    if (*count > cap) {
+        *count = 0;
+        memset(e, 0, size * cap);
+        return 1;
+    }
+    int n = 0, kept = 0;
+    for (int k = 0; k < cap; k++) {
+        if (!ok[k]) {
+            n++;
+            if (k >= *count) memset(e + size * k, 0, size);
+        } else if (k < *count) {
+            if (kept != k) memcpy(e + size * kept, e + size * k, size);
+            kept++;
+        }
+    }
+    memset(e + size * kept, 0, size * (size_t)(*count - kept));
+    *count = (uint8_t)kept;
+    return n;
+}
+
+// STATE (a player's, WireState), in two parts (specs/contratos/validacion-red.md section 3.9; ADR-025, decision 1). Its core - where
+// he is (pos, yaw), flags, anim, as and the session's rules (collide, revive, nopause) - is all or nothing: one of them
+// fails, false, and the message goes. Any other entry that fails (a piece of gear, a shot, a bomb gone off, a pillar, a
+// boss, a slot of his trail, an effect, a dye, the horse, an object, a mechanism, a material...) is cleared in w, the
+// caller's copy, to the "none" its field already has (a count made smaller; zeros: a name "", a hash 0, a mode none;
+// -1; 255), never set to another value, and counted in *cleared. What it lets through holds no number that isn't
+// finite or is out of its bounds, no string without its end, no count or enumeration out of range.
+static inline bool online_validate_state(WireState *w, int *cleared) {
+    *cleared = 0;
+    // the core, in the order online_wire.h has it
     if (!online_validate_floats(w->pos, 3, ONLINE_V_LIMIT) || !online_validate_floats(&w->yaw, 1, ONLINE_V_LIMIT)) return false;
     if (w->flags & ~ONLINE_V_FLAGS) return false;
     // (ping_ms: any)
     if (w->anim >= ONLINE_A_COUNT) return false;
     for (int k = 0; k < ONLINE_AS_CHANNELS; k++)
         if (!online_validate_str(w->as[k], sizeof w->as[k])) return false;
-    for (int k = 0; k < ONLINE_GEAR; k++)
-        if (w->gear_bone[k] > ONLINE_V_GEAR_BONES && w->gear_bone[k] != ONLINE_GEAR_WORLD) return false;
-    if (!online_validate_floats(w->gear_rel, ONLINE_GEAR * 12, ONLINE_V_LIMIT)) return false;
-    // shots: the count, every entry (those past it are zero from a sender, and copied all the same)
-    if (w->shots.n > ONLINE_SHOTS) return false;
-    for (int k = 0; k < ONLINE_SHOTS; k++)  // (id: any)
-        if (w->shots.shot[k].kind >= ONLINE_K_COUNT || !online_validate_floats(w->shots.shot[k].m, 12, ONLINE_V_LIMIT))
-            return false;
-    for (int k = 0; k < ONLINE_BOOMS; k++)  // (seq: any)
-        if (w->shots.boom[k].kind >= ONLINE_K_COUNT || !online_validate_floats(w->shots.boom[k].pos, 3, ONLINE_V_LIMIT))
-            return false;
-    if (w->effects & ~ONLINE_V_EFFECTS) return false;
-    if (!online_validate_grab(&w->grab) || !online_validate_grab(&w->stop)) return false;
-    if (w->ice_n > 3 || !online_validate_floats(w->ice, 3 * 12, ONLINE_V_LIMIT)) return false;
-    if (!online_validate_str(w->map, sizeof w->map)) return false;  // ("<type>/<name>": not an actor's name)
-    for (int k = 0; k < ONLINE_BOSSES; k++)  // (hash: any; life: the damage done to it there, never below 0)
-        if (!online_validate_name(w->boss[k].name, sizeof w->boss[k].name) || w->boss[k].life < 0) return false;
-    if (!online_validate_str(w->fx, sizeof w->fx)) return false;
-    for (int k = 0; k < 3; k++)  // (an animation's index, -1 none: its upper bound is the model's, not known here)
-        if (w->fx_anim[k] < -1) return false;
-    if (!online_validate_floats(w->fx_frame, 3, ONLINE_V_LIMIT)) return false;
-    for (int k = 0; k < ONLINE_FX_EVENTS; k++)  // (seq: any)
-        if (w->fxev[k].who > ONLINE_V_FXEV_WHO_MAX || !online_validate_str(w->fxev[k].name, sizeof w->fxev[k].name))
-            return false;
-    // (fx_props: any)
-    if (w->weather > 8 && w->weather != 255) return false;
-    for (int k = 0; k < 3; k++)
-        if (w->dye[k] < -1) return false;
-    // (pvp_seq: any)
-    if (w->pvp_target >= ONLINE_MAX || w->pvp_damage < 0) return false;
-    if (!online_validate_name(w->horse, sizeof w->horse) || !online_validate_floats(w->horse_m, 12, ONLINE_V_LIMIT) ||
-        !online_validate_str(w->horse_as, sizeof w->horse_as))
-        return false;
-    for (int k = 0; k < 2; k++)
-        if (!online_validate_name(w->tack[k], sizeof w->tack[k])) return false;
-    if (!online_validate_floats(w->tack_m, 2 * 12, ONLINE_V_LIMIT)) return false;
-    // (ground_props: any)
     if (w->collide > 1 || w->revive > 1 || w->nopause > 1) return false;
-    if (!online_validate_floats(&w->bloody_moon, 1, ONLINE_V_LIMIT)) return false;
-    if (w->bloody_moon != -1 && (w->bloody_moon < 0 || w->bloody_moon > ONLINE_V_BLOODY_MOON)) return false;
+
+    // the entries, each alone, in the same order
+    int n = 0;
+    bool ok[ONLINE_SHOTS];
+    for (int k = 0; k < ONLINE_GEAR; k++)  // (none: bone 0, not shown)
+        if ((w->gear_bone[k] > ONLINE_V_GEAR_BONES && w->gear_bone[k] != ONLINE_GEAR_WORLD) ||
+            !online_validate_floats(w->gear_rel[k], 12, ONLINE_V_LIMIT))
+            w->gear_bone[k] = 0, memset(w->gear_rel[k], 0, sizeof w->gear_rel[k]), n++;
+    for (int k = 0; k < ONLINE_SHOTS; k++)  // (id: any)
+        ok[k] = w->shots.shot[k].kind < ONLINE_K_COUNT && online_validate_floats(w->shots.shot[k].m, 12, ONLINE_V_LIMIT);
+    n += online_validate_list(w->shots.shot, sizeof w->shots.shot[0], ONLINE_SHOTS, &w->shots.n, ok);
+    for (int k = 0; k < ONLINE_BOOMS; k++)  // (none: seq 0)
+        if (w->shots.boom[k].kind >= ONLINE_K_COUNT || !online_validate_floats(w->shots.boom[k].pos, 3, ONLINE_V_LIMIT))
+            memset(&w->shots.boom[k], 0, sizeof w->shots.boom[k]), n++;
+    if (w->effects & ~ONLINE_V_EFFECTS) w->effects = 0, n++;
+    if (!online_validate_grab(&w->grab)) memset(&w->grab, 0, sizeof w->grab), n++;  // (none: "")
+    if (!online_validate_grab(&w->stop)) memset(&w->stop, 0, sizeof w->stop), n++;
+    for (int k = 0; k < 3; k++) ok[k] = online_validate_floats(w->ice[k], 12, ONLINE_V_LIMIT);
+    n += online_validate_list(w->ice, sizeof w->ice[0], 3, &w->ice_n, ok);
+    if (!online_validate_str(w->map, sizeof w->map)) memset(w->map, 0, sizeof w->map), n++;  // ("<type>/<name>", not an
+                                                                                             // actor's; none: "")
+    for (int k = 0; k < ONLINE_BOSSES; k++)  // (hash: any; life: the damage done to it there, never below 0; none: 0, "")
+        if (!online_validate_name(w->boss[k].name, sizeof w->boss[k].name) || w->boss[k].life < 0)
+            memset(&w->boss[k], 0, sizeof w->boss[k]), n++;
+    if (!online_validate_str(w->fx, sizeof w->fx)) memset(w->fx, 0, sizeof w->fx), n++;
+    for (int k = 0; k < 3; k++)  // (an animation's index in his model's table, -1 none; its frame)
+        if (w->fx_anim[k] < -1 || w->fx_anim[k] > ONLINE_V_FX_ANIM_MAX ||
+            !online_validate_floats(&w->fx_frame[k], 1, ONLINE_V_LIMIT))
+            w->fx_anim[k] = -1, w->fx_frame[k] = 0, n++;
+    for (int k = 0; k < ONLINE_FX_EVENTS; k++)  // (seq: any; none: seq 0)
+        if (w->fxev[k].who > ONLINE_V_FXEV_WHO_MAX || !online_validate_str(w->fxev[k].name, sizeof w->fxev[k].name))
+            memset(&w->fxev[k], 0, sizeof w->fxev[k]), n++;
+    // (fx_props: any. Each word is a number or a float as his Link's ELink defines it, which isn't known here; they are
+    // written as they come into his puppet's ELink: specs/contratos/validacion-red.md section 3.9)
+    if (w->weather > 8 && w->weather != 255) w->weather = 255, n++;  // (none: 255, unknown)
+    for (int k = 0; k < 3; k++)  // (-1 none, or 0..127: oa_sample.c sends a slot's value only from 0 to 127, int8_t's top)
+        if (w->dye[k] < -1) w->dye[k] = -1, n++;
+    // (pvp_seq: any) his last blow on a player: on a slot, how hard (none: 0 and 0; its number stays, so the blow it
+    // names goes for good: it is not taken when the next STATE brings it again)
+    if (w->pvp_target >= ONLINE_MAX || w->pvp_damage < 0) w->pvp_target = 0, w->pvp_damage = 0, n++;
+    if (!online_validate_name(w->horse, sizeof w->horse) || !online_validate_floats(w->horse_m, 12, ONLINE_V_LIMIT) ||
+        !online_validate_str(w->horse_as, sizeof w->horse_as)) {  // (none: "")
+        memset(w->horse, 0, sizeof w->horse), memset(w->horse_m, 0, sizeof w->horse_m);
+        memset(w->horse_as, 0, sizeof w->horse_as), n++;
+    }
+    for (int k = 0; k < 2; k++)
+        if (!online_validate_name(w->tack[k], sizeof w->tack[k]) || !online_validate_floats(w->tack_m[k], 12, ONLINE_V_LIMIT))
+            memset(w->tack[k], 0, sizeof w->tack[k]), memset(w->tack_m[k], 0, sizeof w->tack_m[k]), n++;
+    // (ground_props: any, as fx_props)
+    // his Blood Moon timer: a number (none: -1, unknown); the window it is taken in, 0..4000, is oa_flags.c's
+    if (!online_validate_floats(&w->bloody_moon, 1, ONLINE_V_LIMIT)) w->bloody_moon = -1, n++;
     // (aggro_id, aggro_seq: any)
-    for (int k = 0; k < ONLINE_OBJS; k++)  // (hash: any)
-        if (!online_validate_floats(w->objs[k].m, 12, ONLINE_V_LIMIT)) return false;
+    for (int k = 0; k < ONLINE_OBJS; k++)  // (hash: any; none: hash 0, and not a trunk)
+        if (!online_validate_floats(w->objs[k].m, 12, ONLINE_V_LIMIT))
+            memset(&w->objs[k], 0, sizeof w->objs[k]), w->objs_trunk &= (uint8_t)~(1u << k), n++;
     // (broken, trunks_gone: any)
-    for (int k = 0; k < ONLINE_MOVERS; k++)  // (hash: any)
+    for (int k = 0; k < ONLINE_MOVERS; k++)  // (hash: any; none: hash 0)
         if (!online_validate_floats(w->movers[k].m, 12, ONLINE_V_LIMIT) ||
             !online_validate_str(w->movers[k].as, sizeof w->movers[k].as))
-            return false;
+            memset(&w->movers[k], 0, sizeof w->movers[k]), n++;
     // (objs_trunk: a bit for each of the ONLINE_OBJS (8): any)
-    for (int k = 0; k < ONLINE_HELD; k++)
+    for (int k = 0; k < ONLINE_HELD; k++)  // (none: ONLINE_HELD_NONE, "")
         if (!online_validate_name(w->held[k].name, sizeof w->held[k].name) || w->held[k].mode > ONLINE_HELD_WORLD ||
             !online_validate_floats(w->held[k].m, 12, ONLINE_V_LIMIT))
-            return false;
+            memset(&w->held[k], 0, sizeof w->held[k]), n++;
+    *cleared = n;
     return true;
 }
 
