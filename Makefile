@@ -969,3 +969,15 @@ test-online-gate: $(B)/test_online_gate
 	$(B)/test_online_gate
 
 .PHONY: test-online-gate
+
+# Online play's lists of the names it accepts from the network for an actor made here (runtime/online_actors.c
+# NameList, built alone with ONLINE_NAMES_ONLY), with synthetic lists the test writes: what each accepts and refuses
+$(B)/test_online_names: tools/test_online_names.c runtime/online_actors.c $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -std=gnu11 -O1 -g -Wall -Wno-unused-function $(OSFLAGS) -Iruntime -o $@ tools/test_online_names.c
+
+test-online-names: $(B)/test_online_names
+	@mkdir -p $(B)/test_online_names.d
+	$(B)/test_online_names $(B)/test_online_names.d
+
+.PHONY: test-online-names

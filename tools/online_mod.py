@@ -63,16 +63,21 @@ KNOCK = 'OnlineKnock'
 SHOCK0 = 'OnlineShock'
 PLAYER_ELINK = 'Player_GameRom'  # (GameROMPlayer's ElinkUser)
 PLAYER_SLINK = 'GameROMPlayer'  # (and its SlinkUser: his sounds, played on his Link by the runtime)
-VERSION = 42  # (runtime/main.c ONLINE_MOD_VERSION: armour actors, traverseDist, the paraglider, the enemies' traverseDist,
+VERSION = 43  # (runtime/main.c ONLINE_MOD_VERSION: armour actors, traverseDist, the paraglider, the enemies' traverseDist,
 # their chemical, the round bomb's own explosion, the weapons' ELink, the player's AnimationInfo, the
 # player's and the weapons' SLink, the armour's defence, the chests' flags, the world's, the horses, their saddles and reins, the Master Cycle,
-# the slate and the runes' effects, the materials he holds)
+# the slate and the runes' effects, the materials he holds, the names allowed from the network)
 TRAVERSE = 1000.0  # (the online actors' traverseDist)
 # what he holds from his pouch over his head, or has just thrown: each material's model alone too (OnlineGear_<model>)
 HELD_KINDS = ('Item_', 'Animal_Insect_')
 HELD_NOT = ('Item_Conductor', 'Item_Magnetglove')  # (the slate and the magnet: their own actors)
 GEAR_KINDS = ('Weapon_Sword_', 'Weapon_Lsword_', 'Weapon_Spear_', 'Weapon_Shield_', 'Weapon_Bow_', 'Weapon_Sheath_',
               'Weapon_Lsheath_', 'Weapon_SpearSheath_', 'Weapon_Quiver_')
+# the names another game may send for an actor made here (runtime/online_actors.c NameList: what the host's enemies
+# hold, what falls as loot), each kind's from the game's ActorInfo: file, its names' prefixes, those not on it
+NAME_LISTS = (('weapons.txt', ('Weapon_',), ('Weapon_Sheath_', 'Weapon_Lsheath_', 'Weapon_SpearSheath_', 'Weapon_Quiver_')),
+              ('items.txt', ('Item_',), HELD_NOT),
+              ('rupees.txt', ('PutRupee',), ()))
 # the Remote Bomb rune's bombs (resident in TitleBG), as the others see them thrown and going off
 BOMBS = ['RemoteBomb', 'RemoteBombCube', 'RemoteBomb2', 'RemoteBombCube2']
 BOMB_PREFIX = 'OnlineProj_'
@@ -932,6 +937,15 @@ def main():
     open(os.path.join(out, 'quests.txt'), 'w').write(''.join(f2 + chr(10) for f2 in qflags[:32768]))
     # the enemies' online actors (enemy=actor)
     open(os.path.join(out, 'enemies.txt'), 'w').write(''.join('%s=%s\n' % kv for kv in sorted(enemies.items())))
+    # the names allowed from the network, each kind a file (name=its ActorInfo profile): the game's own actors only,
+    # none of ours (Online*)
+    for fname, kinds, not_kinds in NAME_LISTS:
+        names = {}
+        for a2 in actors:
+            n2 = str(a2['name'])
+            if n2.startswith(kinds) and not n2.startswith(not_kinds) and len(n2) < 48:
+                names[n2] = str(a2['profile']) if 'profile' in a2 else ''
+        open(os.path.join(out, fname), 'w').write(''.join('%s=%s\n' % kv for kv in sorted(names.items())))
     # the armour pieces' online actors (piece=actor), and each one's bone map (actor=unit|unit, each "i,i,...")
     open(os.path.join(out, 'armor.txt'), 'w').write(''.join('%s=%s\n' % kv for kv in sorted(armor.items())))
     open(os.path.join(out, 'bones.txt'), 'w').write(''.join(
