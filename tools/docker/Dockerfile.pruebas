@@ -1,0 +1,22 @@
+# Test image: Debian 13 with the build dependencies and a Python venv for the
+# tools/ tests. No source and no game files are copied in; mount the tree.
+#
+#   docker build -f tools/docker/Dockerfile.pruebas -t swcoop-pruebas .
+#   docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas \
+#       /opt/venv/bin/python tools/test_layout.py
+FROM debian:13
+
+# docs/linux.md ("Building from source") plus distro_build.sh deps_for, plus
+# git and iproute2 (tc/netem). glslc and vulkan-tools come from docs/linux.md.
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends \
+        ca-certificates make clang lld pkg-config python3 python3-venv \
+        iproute2 git libsdl3-dev libavformat-dev libavcodec-dev \
+        libavutil-dev libswscale-dev libvulkan-dev libshaderc-dev \
+        zlib1g-dev glslc vulkan-tools \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/venv \
+ && /opt/venv/bin/pip install --no-cache-dir lz4 capstone unicorn
+
+WORKDIR /src
