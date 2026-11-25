@@ -143,7 +143,7 @@ bool oa_play_as(Cpu *c, uint64_t actor, const char *name, int slot, int bank, fl
     return !strcmp(now, name);
 }
 
-Piece oa_g_pool[ONLINE_MAX][POOL];
+Piece oa_g_pool[ONLINE_MAX + 1][POOL];  // (row OA_POOL_WORLD: the world's)
 
 // requests still under way when all was forgotten: what they make is deleted once made (else it would stay in the
 // world, a piece nobody moves)
@@ -236,9 +236,9 @@ static bool from_pool(Cpu *c, int i, Piece *p, const char *want) {
     return false;
 }
 
-// the pool's pieces still being made, as they come: taken, out of sight
+// the pool's pieces still being made, as they come: taken, out of sight (the world's row too)
 void oa_pool_update(Cpu *c) {
-    for (int i = 0; i < ONLINE_MAX; i++)
+    for (int i = 0; i <= OA_POOL_WORLD; i++)
         for (int k = 0; k < POOL; k++) {
             Piece *q = &oa_g_pool[i][k];
             int *unit = q->pending ? (int *)(uintptr_t)q->handle->unit : NULL;
@@ -647,7 +647,7 @@ OaTheirs oa_g_theirs[THEIRS];
 RT_ON_RESET(oa_core_reset) {
     memset(g_handles, 0, sizeof g_handles);
     g_next_handle = 0;
-    memset(oa_g_pool, 0, sizeof oa_g_pool);
+    memset(oa_g_pool, 0, sizeof oa_g_pool);  // (the world's row with it)
     memset(g_orphan, 0, sizeof g_orphan);
     memset(oa_g_pool_at, 0, sizeof oa_g_pool_at);
     memset(oa_g_actors, 0, sizeof oa_g_actors);

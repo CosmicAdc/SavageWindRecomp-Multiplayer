@@ -18,6 +18,7 @@ static void forget_all(void) {
         oa_runes_pieces(NULL, i, orphan_piece);
         for (int k = 0; k < POOL; k++) oa_orphan(&oa_g_pool[i][k]);
     }
+    for (int k = 0; k < POOL; k++) oa_orphan(&oa_g_pool[OA_POOL_WORLD][k]);  // (the world's row: the enemies' pieces)
     oa_puppet_forget();  // (and each Link's anim and covered to -1: none yet; nothing below reads them)
     oa_runes_forget();
     oa_puppets_forget();
@@ -40,6 +41,9 @@ static bool frame_out_of_session(Cpu *c, uint64_t pinfo, const float link[3], bo
             for (int k = 0; k < POOL; k++) has |= oa_g_pool[i][k].actor || oa_g_pool[i][k].pending;
             if (has) any = true, oa_drop(c, i, true);
         }
+        for (int k = 0; k < POOL; k++)  // (the world's row: the enemies' pieces it kept, out of sight)
+            if (oa_g_pool[OA_POOL_WORLD][k].actor || oa_g_pool[OA_POOL_WORLD][k].pending)
+                any = true, oa_delete_piece(c, &oa_g_pool[OA_POOL_WORLD][k]);
         if (any) LOG("[online] out of the session: the players' actors deleted\n");
         if (pinfo && VALID(*(uint64_t *)(uintptr_t)(pinfo + 0x60)))  // (the host's enemies stay as they were)
             oa_enemies_client(c, *(uint64_t *)(uintptr_t)(pinfo + 0x60), -1);

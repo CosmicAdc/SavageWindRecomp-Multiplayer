@@ -192,9 +192,9 @@ void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]) {
         if (oa_control_tests_frame_tick++ % 20 == 0 && next < n) {
             if (p.actor || p.pending) oa_delete_piece(c, &p);
             LOG("[online] enemy test %d: %s\n", next, m[next].val);
-            oa_piece_update(c, 0, &p, m[next].val, "test");
+            oa_piece_update(c, OA_POOL_WORLD, &p, m[next].val, "test");
             next++;
-        } else oa_piece_update(c, 0, &p, p.name, "test");
+        } else oa_piece_update(c, OA_POOL_WORLD, &p, p.name, "test");
         if (p.actor) {
             float mm[12] = {1, 0, 0, link[0] + 4, 0, 1, 0, link[1], 0, 0, 1, link[2]};
             oa_call(c, FN_SET_MTX, p.actor, (uint64_t)(uintptr_t)mm, 0, 0, 0, 0);
