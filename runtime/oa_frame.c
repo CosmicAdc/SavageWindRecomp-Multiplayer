@@ -67,7 +67,7 @@ static bool frame_load(const float link[3], bool world) {
         }
     }
     memcpy(g_last_link, link, sizeof g_last_link);
-    for (int i = 0; i < ONLINE_MAX; i++) oa_g_online_actor[i] = world && oa_running(oa_pup(i)->link);
+    for (int i = 0; i < ONLINE_MAX; i++) oa_g_online_actor[i] = world && oa_running(oa_puppet_link(i));
     if (!world) return true;
     return false;
 }
