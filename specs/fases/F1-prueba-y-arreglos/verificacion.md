@@ -81,7 +81,7 @@ Defectos vistos (cada uno: qué, dónde, cuántas veces):
 | S4 | pendiente (`T120`) | Faltan re-ejecutar todas las pruebas de F0 juntas tras `fe68382` |
 | S5 | parcial (`fe68382`) | `make -j8` ok en Windows; falta repetir `distro_build.sh debian:13` tras `fe68382` |
 | S6 | parcial | Pasada automática de `recorrido.py` ejecutada con fallos de guion arreglados en `e805e02` (falta repetir); sesión en ventana de `T107` tuvo crash `0xc0000409` al recargar desde el título (`F2 T212`) |
-| S7 | borrador (`T108`) | `bitacora/2026-11-24-F1-linea-base.md` pendiente de aprobación del dueño |
+| S7 | sí | `bitacora/2026-11-24-F1-linea-base.md`, aprobada por el dueño el 2026-11-24 |
 | S8 | sí (`064d68a`) | `PROTOCOL = 38`, `git diff f0-cerrada -- runtime/online.h` vacío |
 
 ## 7. Plantilla de bitácora (una entrada por pasada y una por arreglo)

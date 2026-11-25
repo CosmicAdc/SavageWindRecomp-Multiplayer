@@ -130,6 +130,7 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   modelo sugerido: bajo
 
 - [~] T107 [pruebas] Sesión con ventana, vista por el dueño.
+  dueño: confirma 2026-11-24 que las pruebas con ventana funcionaron; las casillas de `verificacion.md` §3 no se marcaron una a una (se repasan en la pasada con ventana de T120).
   nota: primera prueba con ventana hecha (`specs/bitacora/2026-11-24-F1-prueba-ventana-dueno.md`): conexión, presencia, equipo y golpes funcionaron; cierre inesperado `0xc0000409` en `Client` al volver a acercarse al Host tras salir a la pantalla de título sin guardar y recargar en el mismo proceso. Pendiente completar lista de `verificacion.md` §3.
   files: `specs/bitacora/<fecha>-F1-base-ventana.md`
   verify: entrada con FPS, ajustes y la lista de `verificacion.md` §3 marcada por el dueño
@@ -143,7 +144,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no uses el guardado real.
   modelo sugerido: bajo (tarea humana)
 
-- [~] T108 [bitácora] Cerrar la línea base: lista priorizada.
+- [x] T108 [bitácora] Cerrar la línea base: lista priorizada.
+  aprobada: el dueño, 2026-11-24 ("ya se hicieron las pruebas y funcionó"); queda como lista de entrada de T120.
   nota: borrador redactado en `specs/bitacora/2026-11-24-F1-linea-base.md` (incluye crash `0xc0000409` asignado a F2 `T212`, `PASO 2` intermitente y fallos de guion arreglados en `e805e02`); pendiente de aprobación del dueño.
   files: `specs/bitacora/<fecha>-F1-linea-base.md`
   verify: el fichero lista cada fallo con gravedad (cuelgue / incorrecto / cosmético), repro, frecuencia y fase destino; el dueño lo aprueba antes de empezar la parte B
@@ -261,7 +263,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## D. Carril NET — `runtime/online.c` (en serie, un solo dueño)
 
-- [ ] T115 [net] Rechazar números no finitos o fuera de rango al recibir.
+- [~] T115 [net] Rechazar números no finitos o fuera de rango al recibir.
+  reclamada: agente Opus carril-net (`81fc80b`, integrada en `e1a232f`) — `make test-online-net` 0 (162 checks con T116/T118); FALTA bot `BOT_NAN=1` contra el juego (T120)
   files: `runtime/online.c`, `tools/test_online_net.c`
   verify: `make test-online-net` termina con 0 con casos nuevos (STATE con posición `NAN` → el jugador no cambia; TIME 99 → `online_host_hour` no lo entrega; HIT con daño negativo → no llega a `online_take_hits`); con el bot `BOT_NAN=1`, el juego A sigue y registra el descarte una vez
   depende de: T110, T109
