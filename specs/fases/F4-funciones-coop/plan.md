@@ -4,7 +4,7 @@ Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`); `
 Tras F2 las funciones de `online_actors.c` viven en módulos `oa_*`: búscalas por nombre.
 
 Este plan ya incorpora las respuestas del dueño del 2026-11-24 (`../../decisiones/ADR-007-…`, `ADR-008-…` y
-`ADR-009-…`, citadas como "ADR-00x, decisión n"). Lo marcado `[DUEÑO]` no se discute en la implementación; si algo
+`ADR-009-…` y `ADR-011-…` (decisiones 29-47), citadas como "ADR-0xx, decisión n"). Lo marcado `[DUEÑO]` no se discute en la implementación; si algo
 de aquí contradice un ADR, vale el ADR.
 
 ## 0. Idea de construcción
@@ -89,7 +89,7 @@ está `SAVAGEWIND_SAVE_DIR` (`:57`). La pestaña Online solo existe dentro del j
    (pregunta 5). La vida y la resistencia con las que entra las pone el elemento D2.
 4. **Cambio de perfil.** Como la carpeta se fija por arranque, hay dos caminos; el spike T402 decide:
    - (a) reinicio del juego dentro del proceso al aceptar "Unirse" (existe el reinicio en caliente: `teardown`,
-     `runtime/main.c:148-168`, y los hilos de red sobreviven, mapa 06 §1.4);
+     `runtime/main.c:150-170`, y los hilos de red sobreviven, mapa 06 §1.4);
    - (b) unirse desde la pantalla de inicio (la pestaña de ajustes se comparte entre overlay y pantalla de inicio,
      `menu_tabs_draw`, mapa 05 §1.1), eligiendo el perfil antes de arrancar el juego.
 5. El anfitrión no cambia de perfil: su mundo es su partida.
@@ -128,7 +128,7 @@ Además, a un invitado recién llegado a un mundo avanzado le caen de golpe toda
 | Capacidad del mundo | Piedra, runas, paravela, mejoras de la piedra | A los dos | Sí (sin ellas no se puede seguir al anfitrión) | `[PROPUESTA]` (los ADR no la tocan; es lo que hace hoy el código) |
 | Habilidad de campeón | `IsGet_Obj_HeroSoul_*` | A los dos | **Sí**: las que el anfitrión ya ganó | `[DUEÑO]` ADR-007, decisión 2; ADR-008, decisión 13 |
 | Hito de vida y resistencia | Orbe de santuario, contenedor de corazón de Bestia | A los dos, una vez por hito | No se entregan uno a uno: los sustituye "ponerse al día" (elemento D2), que deja al invitado con el **mismo número de contenedores de corazón y de mejoras de resistencia** que el anfitrión | `[DUEÑO]` ADR-007, decisión 2; ADR-008, decisión 13 |
-| Coleccionable | Semilla Kolog | A los dos (como hoy) | No | `[PROPUESTA]` (los ADR no la tocan) |
+| Coleccionable | Semilla Kolog | Una para cada uno (como hoy) | No | `[DUEÑO]` ADR-011, decisión 30 |
 | Contenido de cofre | Lo que hubiera dentro | **No se copia**: es de quien lo abre, que puede soltarlo marcado para el compañero | No | `[DUEÑO]` ADR-008, decisión 14 (se revisa después de probarlo) |
 | Rupias | — | No se reparten: son de cada jugador | No | `[DUEÑO]` ADR-008, decisión 19 |
 
@@ -194,7 +194,7 @@ versión si el dueño cambia de idea.
 lo anuncia; el del compañero lo recibe por la política D.
 
 - Punto de observación disponible: el parche a la entrada de la función de recogida del juego, que ya existe para
-  el multiplicador de recogida (`runtime/items.c:404-415`, `tools/patches.py:1082-1086` según el mapa 03): ve el
+  el multiplicador de recogida (`runtime/items.c:404-415`, `_pouch_item_get` en `tools/patches.py:1194-1198`): ve el
   nombre y el valor de **toda** recogida.
 - Pregunta del spike T408: ¿cómo distinguir "esto salió de un cofre" de "lo recogí del suelo"? Candidatos sin
   ingeniería inversa: correlacionar en el tiempo la recogida con el paso a 1 de un flag `*_TBox_*` del juego local
@@ -234,8 +234,9 @@ propio Link.
    `control_tp_frame` mientras haya un viaje cooperativo en curso, sin activar el resto del modo desarrollador.
 6. Si `g_site.tp_gate` es 0 (grupo opcional ausente), se limita a distancias cortas (menos de 300 unidades en
    horizontal, umbral del propio teletransporte según el mapa 03) y se dice por qué.
-7. Bloqueos (solo los técnicos): evento en curso (`framepace_in_event`), muerto, cargando, en pausa, montado, mapa
-   distinto. **Estar en combate contra enemigos no bloquea.** Con un duelo de PvP activo se bloquea `[PROPUESTA]`
+7. Bloqueos (solo los técnicos), **separando viajero y destino**. Viajero: evento en curso (`framepace_in_event`),
+   muerto, cargando, en pausa, montado, en espera de 30 s. Destino: mapa distinto, muerto, cargando. `[DUEÑO]` (ADR-011,
+   decisión 37) un compañero en plena escena o conversación **no** bloquea: se viaja hacia él sin interrumpirle. **Estar en combate contra enemigos no bloquea.** Con un duelo de PvP activo se bloquea `[PROPUESTA]`
    (la decisión 16 habla de combate, no de duelos; confírmalo con el dueño antes de cerrar T418).
 
 ### G–I. Enviar objetos (CU-09)
@@ -394,13 +395,19 @@ juego (~15 min). **Se agrupan en una sola entrega.**
 |---|---|---|
 | **Protocolo** | `runtime/online.h`, `PROTOCOL`, cabecera compartida con el bot, tabla de autoridad de F3 | T409 |
 | **Lógica pura** (paralelo) | `runtime/coop_flags.*`, `coop_world.*`, `coop_rewards.*`, `coop_tp.*`, `coop_give.*`, `coop_palette.*`, `coop_revive.*`, `coop_pvp.*` + `tests/test_coop_*.c` | T410, T412, T415, T418, T424, T430, T433 (T420: segunda entrega) |
-| **Mundo** (serie) | módulo de flags de `online_actors` (`oa_flags` / `oa_gamedata`), guardados (`runtime/save_backup.c`, `runtime/services/save_profiles.*`), parte de `online.c` que guarda los QUEST | T411, T413, T414, T416, T442 (T417: aplazada) |
+| **Mundo** (serie, en la cadena única de §5) | módulo de flags de `online_actors` (`oa_flags` / `oa_gamedata`), guardados (`runtime/save_backup.c`, `runtime/services/save_profiles.*`), parte de `online.c` que guarda los QUEST | T411, T413, T414, T416, T442 (T417: aplazada) |
 | **Reglas** (serie) | módulo de reglas (`oa_rules`), `runtime/control_game.c`, `runtime/control_tp.c`, `runtime/items.c` | T419, T423, T431, T434 (segunda entrega y posteriores: T421, T422, T432) |
-| **UI** (serie) | `runtime/ui/online_ui.mm`, `runtime/ui/coop_hud.mm` (nuevo) | T425-T429, T435 |
+| **UI** (serie, en la cadena única de §5) | `runtime/ui/online_ui.mm`, `runtime/ui/coop_hud.mm` (nuevo) | T425-T429, T435 |
 | **Entrada** | `runtime/hle/input.c`, `runtime/hle/bindings.c` | T436 |
 | **i18n** | `runtime/ui/i18n/*.inc` | T437 |
 | **Parches** (una entrega) | `tools/patches.py`, `tools/game_sites.py`, `runtime/game_sites.h` | lo que salga de T404-T406 |
 | **Integrador** | orquestador de fotograma (`oa_frame`), `Makefile`, `runtime/launch_flags_table.c` (generado), `runtime/ui/menu.mm` y `runtime/settings.*` solo si hiciera falta | T439 |
+
+**Dueño único de los ficheros compartidos.** Los tres carriles (Mundo, Reglas y UI) editan los mismos ficheros:
+`runtime/online.c`, `runtime/ui/coop_hud.mm`, `runtime/ui/online_ui.mm` y `textos-nuevos.txt`. Por eso **no corren en
+paralelo entre sí**: las tareas que los tocan van en la cadena única de §5 (una a la vez, aunque su `depende de:` solo
+exija una parte). Solo la lógica pura (`coop_*.c` y sus pruebas) y las investigaciones corren en paralelo.
+`runtime/online.h` lo edita solo T409.
 
 Los ajustes nuevos van a `online.ini` (como en F3), no a `savagewind.ini`: así `runtime/settings.*` no se toca.
 
@@ -427,13 +434,16 @@ Los ajustes nuevos van a `online.ini` (como en F3), no a `savagewind.ini`: así 
 ## 5. Orden recomendado
 
 1. Decisiones e investigación en marcha desde el primer día: T401 (dueño; reducida a P4-2 y P4-8), T402, T403, T407
-   (agentes).
-2. T409 (protocolo).
+   (agentes). Pueden empezar durante F3 porque solo escriben bitácora; todo lo que edite `runtime/online.c` espera al
+   bloque 3 de F3 (T413) y T409 a F3 completa.
+2. T409 (protocolo), y **justo después** T438 (modos de bot y escenarios de F4).
 3. En paralelo, toda la lógica pura: T410, T412, T415, T418, T424, T430, T433. T415, T418 y T430 ya no esperan
    ninguna decisión del dueño.
-4. Carril Mundo: T413 → T411 → T414 → T416 → T442.
-5. Carril Reglas: T419 → T423 → T431 → T434.
-6. Carril UI: T425 → T426 → T427 → T428 → T429 → T435; T436 en paralelo.
-7. Cierre: T437 → T438 → T439 → T440 → T441.
-8. Después del cierre, por este orden de prioridad y solo si el dueño lo pide: envío directo (T404 → T420 → T421 →
+4. **Cadena única** (serie; los tres carriles comparten `online.c`, `coop_hud.mm` y `online_ui.mm`):
+   T413 → T411 → T414 → T416 → T436 → T425 → T426 → T427 → T428 → T429 → T442 → T419 → T423 → T431 → T434 → T435.
+   Dependencias que la justifican: T436 antes de T426 y T427 (sus acciones); T423 después de T426 (cola de MARK) y
+   T428; T419, T431 y T442 después de T428 (avisos por identificador).
+5. Los carriles Mundo, Reglas y UI son agrupaciones de esa cadena, no hilos paralelos.
+6. Cierre: T437 → T439 → T440 → T441 (T438 ya se hizo tras T409).
+7. Después del cierre, por este orden de prioridad y solo si el dueño lo pide: envío directo (T404 → T420 → T421 →
    T422), revisión de cofres (T408 → T417), rescate manual (T406 → T432), armas (T405 y su ventana de protocolo).

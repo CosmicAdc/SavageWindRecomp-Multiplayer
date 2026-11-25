@@ -6,7 +6,7 @@ Se recorre entera al cerrar la fase (tarea T441). Cada casilla necesita evidenci
 copias de guardado. Guarda además una copia aparte de tu partida real antes de empezar.
 
 Los resultados esperados ya recogen las respuestas del dueño del 2026-11-24 (`specs/decisiones/ADR-007-…`,
-`ADR-008-…` y `ADR-009-…`). Las filas de funciones que quedan para después de la primera entrega (envío directo,
+`ADR-008-…`, `ADR-009-…` y `ADR-011-…`). Las filas de funciones que quedan para después de la primera entrega (envío directo,
 copia de cofres, rescate manual) están marcadas "(después)" y **no** cuentan para cerrar F4.
 
 ## 0. Preparación
@@ -101,7 +101,7 @@ Elige 10 flags de muestra que la copia B tenga y la copia A no (santuarios compl
 | 7.6 | Al unirse a un mundo avanzado | B0 se une a `A+` | Recibe las capacidades del mundo y las habilidades de campeón ya ganadas; **no** recibe orbes ni contenedores uno a uno (los sustituye la puesta al día de abajo) | ☐ |
 | 7.7 | Santuario durante la sesión (ADR-007, decisión 2) | Uno completa un santuario, con el otro lejos | El otro recibe el orbe, una sola vez | ☐ |
 | 7.8 | Sin duplicados | Repite 7.7 y corta la red del invitado justo después; reconecta | Sigue teniendo 1 orbe de ese santuario | ☐ |
-| 7.9 | Kolog | Uno encuentra un Kolog con el otro lejos | Una semilla para cada uno, como hoy (`[PROPUESTA]` de `plan.md` §D) | ☐ |
+| 7.9 | Kolog | Uno encuentra un Kolog con el otro lejos | Una semilla para cada uno, como hoy (`[DUEÑO]` ADR-011, decisión 30) | ☐ |
 | 7.10 | Estatua de la Diosa | Cada uno canjea sus orbes | Cada uno elige lo suyo (corazón o resistencia), sin afectar al otro | ☐ |
 | 7.11 | Bestia durante la sesión (ADR-007, decisión 2) | Uno libera una Bestia Divina (o `setflag` del flag correspondiente en una copia) | El otro recibe el contenedor de corazón y la habilidad de campeón, una sola vez | ☐ |
 | 7.12 | Rupias de cada uno (ADR-008, decisión 19) | A recoge 50 rupias | El contador de B no cambia | ☐ |
@@ -154,7 +154,8 @@ como FALLO parcial con su tarea abierta.
 | 8.3 | Sin respuesta | El juego de A no contesta en 15 s (bot que no responde a TP_REQ) | "No answer"; B no se mueve | ☐ |
 | 8.4 | 10 viajes | 10 viajes a puntos distintos, respetando la espera de 30 s entre uno y otro | 10 llegadas a < 3 m; 0 con daño | ☐ |
 | 8.5 | Compañero en el aire / agua / pared | A planeando, nadando y escalando | Se usa su último punto en el suelo; B no cae al vacío ni al agua | ☐ |
-| 8.6 | Bloqueos | Probar con: evento en curso, uno muerto, uno en menú, uno a caballo | Rechazo con su motivo en cada caso | ☐ |
+| 8.6 | Bloqueos del viajero y del destino | Viajero: evento en curso, muerto, en menú, a caballo. Destino: muerto, en otro mapa | Rechazo con su motivo en cada caso | ☐ |
+| 8.6e | Compañero en plena escena (ADR-011, decisión 37) | A está en una escena o conversación; B pulsa "Go to" | B viaja y aparece cerca; la escena de A no se interrumpe | ☐ |
 | 8.6b | En combate (ADR-008, decisión 16) | B con enemigos atacándole pulsa "Go to" | El viaje se hace; no hay rechazo "en combate" | ☐ |
 | 8.6c | Espera de 30 s (ADR-008, decisión 16) | Tras un viaje, B pulsa otra vez a los 10 s y a los 31 s; además `sh tools/nettest/run.sh tp_cooldown` | A los 10 s: rechazo con los segundos que faltan. A los 31 s: viaja. El anfitrión no reenvía peticiones dentro de la espera | ☐ |
 | 8.6d | Invocar, aceptando (ADR-008, decisión 16) | A pulsa "Bring here" sobre B; B acepta | B aparece a < 3 m de A | ☐ |
@@ -209,6 +210,7 @@ Envío directo (después; solo si se hacen T420-T422):
 | 10.10 | Daltonismo | Repetir 10.2 y 10.4 con `SAVAGEWIND_CVD_SIMULATE=protan`, `deutan`, `tritan` | Todo distinguible por forma y texto | ☐ |
 | 10.11 | Tamaño de texto | Ajuste al 80 % y al 160 % | Legible, sin solapes graves | ☐ |
 | 10.12 | Solo mando | Ping, chat rápido, aceptar/rechazar con mando | Todo alcanzable, con la combinación de botones que el dueño eligió a partir de la propuesta de T436 (Q-10-5). Si aún no la ha elegido, queda como única casilla abierta de CU-10 | ☐ |
+| 10.14 | Nombre del mapa y distancia (ADR-011, decisión 41) | B en otro rincón del mapa de A; mira la flecha | La flecha muestra la distancia y el nombre del mapa de A; no hay marcador en el mapa del propio juego | ☐ |
 | 10.13 | Las marcas no tiemblan | Mover la cámara rápido con una marca en pantalla, a 30 y a 60 fps, con y sin generación de fotogramas | Sin temblor visible; anótalo si lo hay | ☐ |
 
 ## 6. CU-11 — Revivir al compañero
@@ -229,7 +231,7 @@ Rescate manual (después, prioridad baja; solo si se hacen T406 y T432):
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
 | 11.8 | Estado caído | B cae; A mantiene el botón a < 2 m | Cuenta atrás visible; B se levanta a los 3 s | ☐ |
-| 11.9 | Nadie ayuda | 30 s sin ayuda | Fin de partida | ☐ |
+| 11.9 | Nadie ayuda (después; ADR-011, decisión 34) | 30 s sin ayuda | B revive en el sitio con 3 corazones; no hay fin de partida por tiempo | ☐ |
 | 11.10 | Los dos caídos | Ambos a 0 | Fin de partida normal para los dos (ADR-008, decisión 15) | ☐ |
 
 ## 7. CU-12 — PvP por acuerdo, daño validado
@@ -248,6 +250,8 @@ Rescate manual (después, prioridad baja; solo si se hacen T406 y T432):
 | 12.8 | Tramposo contra el juego | Juego A anfitrión, juego B, bot con `BOT_PVP_CHEAT=1` y PvP activo | La vida de B no baja por el bot | ☐ |
 | 12.9 | Indicador | Con PvP activo | Icono junto al nombre de cada jugador | ☐ |
 | 12.10 | Bomba | Bomba de A a < 4 m de B con PvP activo y apagado | Daño solo con PvP activo | ☐ |
+| 12.12 | Morir en un duelo (ADR-011, decisión 39) | Con PvP activo, A mata a B | El duelo se apaga; B revive con la reanimación normal; B no pierde ningún objeto | ☐ |
+| 12.13 | Sin duelo en santuarios ni escenas (ADR-011, decisión 40) | Intentar proponer con uno en un santuario y con uno en una escena | Botones deshabilitados con "zona sin duelo"; no se abre | ☐ |
 | 12.11 | Golpe del invitado con red mala | Bot o segundo PC con perfil `wifi` | El golpe llega con el retraso esperado; no se pierden golpes válidos por el margen de distancia | ☐ |
 
 ## 8. Regresión y cierre
@@ -256,7 +260,7 @@ Rescate manual (después, prioridad baja; solo si se hacen T406 y T432):
 |---|---|---|---|---|
 | R.1 | Recorrido de F1 (30 min) | CU-01 a CU-03 con dos juegos | Sin crash | ☐ |
 | R.2 | Suite de red de F3 | `sh tools/nettest/run.sh all` | Pasa | ☐ |
-| R.3 | Idiomas | `tools/venv/Scripts/python.exe tools/i18n_check.py` | `0 missing` | ☐ |
+| R.3 | Idiomas | `tools/venv/Scripts/python.exe tools/i18n_check.py` | `0 missing`, y los avisos de `online_notice_push` (literales en `coop_hud.mm` dentro de `tr()`) aparecen entre los textos traducidos | ☐ |
 | R.4 | Segunda sesión limpia | Salir y entrar en otra sesión con otro anfitrión | Sin marcas, avisos, transacciones ni PvP de la anterior | ☐ |
 | R.5 | Reinicio en caliente | "Quit to start screen" con sesión abierta y volver | Sin crash; estado cooperativo coherente | ☐ |
 | R.6 | Identificador del juego | Si F4 tocó `tools/game_sites.py` o `tools/patches.py`: un solo cambio de `GAMELIB_ID` en toda la fase | Anotado en bitácora el antes y el después | ☐ |

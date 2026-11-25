@@ -22,6 +22,20 @@ adivinar, para y pregunta: no inventes.
 
 ## Reglas que valen para todas las tareas (léelas una vez)
 
+- **ADR-006 manda sobre los pasos de cada tarea.** El subagente solo escribe código y documentos, hace commit y marca
+  todo como "NO verificado". **No compila, no ejecuta pruebas, no lanza el juego ni Docker, no descarga dependencias y
+  no hace push.** Todo paso que diga "prueba", "mide", "ejecuta", "compila" o "regenera" (incluidos los `verify`, las
+  pruebas con dos juegos y las capturas) lo hace **el orquestador** o el dueño, de uno en uno, y anota la salida en
+  `specs/bitacora/`. El subagente solo puede usar `grep` y `git diff`.
+- **Un fichero, un dueño a la vez.** Las tareas que declaran `runtime/online.c`, `runtime/ui/coop_hud.mm`,
+  `runtime/ui/online_ui.mm` o `specs/fases/F4-funciones-coop/textos-nuevos.txt` se ejecutan **en serie**, en el orden de
+  la cadena de `plan.md` §5 (aunque su `depende de:` no lo diga), y nunca dos a la vez. Los carriles Mundo, Reglas y UI
+  solo se solapan en ficheros distintos. `runtime/online.h` solo lo toca T409 (ahí se declaran todos los prototipos y
+  los identificadores de aviso de F4).
+- **Avisos en pantalla por identificador (regla 18).** Un módulo `.c` no crea textos: llama a
+  `online_notice_push(id, nombre)` con un identificador del enum que declara T409; el literal inglés de cada aviso vive
+  en `runtime/ui/coop_hud.mm` (T428), dentro de `tr("...")`, que es lo único que ve `tools/i18n_check.py`. Ninguna
+  tarea añade avisos con literales en `online.c` ni en los módulos de `online_actors`.
 - Repositorio: el fork, rama creada desde `coop/main`. Rutas siempre **relativas a la raíz del repo**. Nunca rutas
   absolutas ni nombres de usuario en código, pruebas o documentos.
 - Las líneas `fichero:línea` son del PR #294 original (HEAD `350c5f8`). `runtime/online_actors.c` se partió en F2 en
@@ -50,7 +64,7 @@ adivinar, para y pregunta: no inventes.
 ## Decisiones del dueño que ya están tomadas (2026-11-24)
 
 Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-respuestas-del-dueno-ronda-2.md` y
-`ADR-009-respuestas-del-dueno-ronda-3.md`. En las tareas se citan como "ADR-00x, decisión n" y van marcadas
+`ADR-009-respuestas-del-dueno-ronda-3.md` y `ADR-011-respuestas-del-dueno-ronda-4.md` (decisiones 29-47). En las tareas se citan como "ADR-00x, decisión n" y van marcadas
 `[DUEÑO]`. Si una tarea dice otra cosa que un ADR, **vale el ADR**: para y avisa. No las reabras.
 
 - Perfil cooperativo del invitado: nace vacío, vive solo en su PC, y nada se copia de su partida individual ni se
@@ -71,6 +85,13 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - PvP: cuerpo a cuerpo y bombas; el anfitrión puede prohibirlo; el daño lo valida el anfitrión (ADR-008,
   decisión 17).
 - Jugadores: 2 por ahora; se diseña para N y se prueba con 2 (ADR-007, decisión 12).
+- Ronda 4 (**ADR-011**): el anfitrión es siempre la misma persona y otro anfitrión es otro mundo (29); semilla Kolog,
+  una para cada uno (30); revivir sin límite de usos con la vida que da el hada del juego, sin coste para nadie (33,
+  35); teletransporte sin coste aparte de la espera (36) y **permitido hacia un compañero en plena escena o
+  conversación, sin interrumpirle** (37); un objeto marcado entra sin confirmación y, si no cabe, se queda en el suelo
+  (38); morir en un duelo lo apaga y se aplica la reanimación normal (39); no se abre duelo en santuarios ni durante
+  escenas (40); sin marcador en el mapa del juego en F4: flecha, distancia y nombre del mapa (41); menús que no pausan
+  y colisión activada (44, 45).
 
 **Primera entrega de F4** (lo que hace falta para cerrar la fase): todas las tareas salvo las de la lista siguiente.
 
@@ -91,7 +112,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   files: specs/decisiones/ADR-recompensas-y-flags.md
   verify: el fichero existe, contiene la lista de prefijos de flag excluidos, respuestas a P4-2 y P4-8 de `spec.md` y la línea `Decidido por: <nombre>, <fecha>`
   depende de: ninguna
-  quién: dueño (un agente redacta el borrador)
+  quién: dueño (un agente redacta el borrador). Si el dueño aún no ha contestado P4-2 y P4-8, T401 se cierra anotando su valor por defecto de `spec.md` §7 y T409 y T410 no esperan la firma
   contexto: Hoy, al recibir ciertos flags de otro jugador, el juego regala objetos a todos: piedra Sheikah, runas, paravela, semilla Kolog, orbe de santuario, habilidad de campeón y contenedor de corazón (`runtime/online_actors.c:3987-3997`). La política de **recompensas** ya la fijó el dueño (P4-1 resuelta: ADR-007, decisiones 2 y 5; ADR-008, decisiones 13, 14 y 19) y está escrita en `plan.md` §D: esta tarea ya no la decide ni bloquea a T415. Queda por fijar la política de **flags**: qué categorías de flag puede hacer avanzar un invitado y cada cuánto hace copia de seguridad el anfitrión.
   pasos:
     1. Enlaza la tabla de recompensas de `plan.md` §D citando los ADR; no la reescribas ni la cambies.
@@ -105,12 +126,12 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 - [ ] T402 [P] [investigación] Spike: cambiar al perfil de guardado cooperativo sin cerrar el programa
   files: specs/bitacora/F4-T402-cambio-de-perfil.md, specs/decisiones/ADR-perfil-coop.md
-  verify: la bitácora responde a las 5 preguntas de `pasos` con la orden usada y lo que se vio; el ADR elige camino (a) o (b)
+  verify: `grep -c '^| [1-5] |' specs/bitacora/F4-T402-cambio-de-perfil.md` da 5 (una fila de tabla por pregunta, con la orden y lo visto) y `grep -c 'Decidido por' specs/decisiones/ADR-perfil-coop.md` da 1 (el ADR elige camino (a) o (b))
   depende de: F1
-  quién: agente + dueño (prueba en el juego)
-  contexto: La carpeta de guardado se decide una vez por arranque del juego (`sp_session_begin`, `runtime/main.c:589`; se usa en `runtime/services/fs.c:2096`). La pestaña Online solo aparece dentro del juego (`runtime/ui/menu.mm:2245`, `:2357`), así que hoy uno se une con la partida ya cargada. Queremos que el invitado juegue en un perfil aparte por cada mundo de anfitrión. `[DUEÑO]` (ADR-007, decisiones 1 y 5): ese perfil **nace vacío** y vive solo en el PC del invitado; no se copia nada de su partida individual ni se escribe nada en ella. Por eso esta tarea es más simple que antes: no hay que estudiar ningún traspaso de inventario entre partidas, solo el cambio de perfil y el arranque con un perfil vacío.
+  quién: agente redacta; orquestador y dueño ejecutan las pruebas en el juego
+  contexto: La carpeta de guardado se decide una vez por arranque del juego (`sp_session_begin`, `runtime/main.c:589`; se usa en `runtime/services/fs.c:2096`). La pestaña Online solo aparece dentro del juego (`runtime/ui/menu.mm:2246-2247`, `:2357`), así que hoy uno se une con la partida ya cargada. Queremos que el invitado juegue en un perfil aparte por cada mundo de anfitrión. `[DUEÑO]` (ADR-007, decisiones 1 y 5): ese perfil **nace vacío** y vive solo en el PC del invitado; no se copia nada de su partida individual ni se escribe nada en ella. Por eso esta tarea es más simple que antes: no hay que estudiar ningún traspaso de inventario entre partidas, solo el cambio de perfil y el arranque con un perfil vacío.
   pasos:
-    1. Pregunta 1: ¿el reinicio en caliente ("Quit to start screen"; `teardown` en `runtime/main.c:148-168`) vuelve a llamar a `sp_session_begin` y por tanto admite cambiar de perfil con `sp_set_active` (`runtime/services/save_profiles.c:389`) justo antes? Compruébalo leyendo `main.c` y probando con `SAVAGEWIND_REBOOT_AT`.
+    1. Pregunta 1: ¿el reinicio en caliente ("Quit to start screen"; `teardown` en `runtime/main.c:150-170`) vuelve a llamar a `sp_session_begin` y por tanto admite cambiar de perfil con `sp_set_active` (`runtime/services/save_profiles.c:389`) justo antes? Léelo en `main.c`; la prueba con `SAVAGEWIND_REBOOT_AT` la hace el orquestador.
     2. Pregunta 2: ¿la conexión de red sobrevive a ese reinicio? (El mapa 06 dice que los hilos de red sobreviven; confírmalo con dos juegos.)
     3. Pregunta 3: ¿se puede abrir la pestaña Online desde la pantalla de inicio (la pestaña 13 se filtra a "solo en juego")? ¿Qué habría que cambiar?
     4. Pregunta 4: ¿qué ocurre con el cerrojo de la carpeta (`sc_lock_take`, `runtime/main.c:590`) al cambiar?
@@ -122,14 +143,14 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 - [ ] T403 [P] [investigación] Spike: fijar y borrar flags compartidos al cargar el guardado
   files: specs/bitacora/F4-T403-flags-al-cargar.md
-  verify: la bitácora contiene el resultado de fijar 3 flags y borrar 3 flags de prueba al cargar, leídos después con `swctl flag <nombre>`
+  verify: `grep -c '^| [1-3] |' specs/bitacora/F4-T403-flags-al-cargar.md` da 3 (una fila por pregunta, con el resultado de fijar 3 flags y borrar 3 flags de prueba al cargar, leídos con `swctl flag <nombre>`)
   depende de: F1
-  quién: agente + dueño
+  quién: agente lee y redacta; orquestador y dueño ejecutan las pruebas y las medidas
   contexto: El runtime ya reescribe valores del `game_data.sav` en memoria cuando el juego lo lee, buscando por CRC32 del nombre (`runtime/services/test_warp.c:57-79`, enganchado en `runtime/services/fs.c:2058-2068`); hoy solo con variables de prueba como `SAVAGEWIND_TEST_FLAGS`. Si sirve para la lista de flags compartidos, el invitado podría cargar un mundo idéntico al del anfitrión.
   pasos:
     1. Lee `test_warp.c` entero y anota qué tipos de flag sabe cambiar y cómo se le indican.
-    2. Pregunta 1: ¿puede poner a 0 un flag booleano que el guardado tiene a 1?
-    3. Pregunta 2: ¿cuánto tarda en aplicar 25 000 cambios (medir)?
+    2. Pregunta 1 (la prueba la hace el orquestador): ¿puede poner a 0 un flag booleano que el guardado tiene a 1?
+    3. Pregunta 2: ¿cuánto tarda en aplicar 25 000 cambios? (la medida la hace el orquestador)
     4. Pregunta 3: tras cargar con un flag de cofre borrado, ¿el cofre aparece cerrado en el mundo?
     5. Usa `SAVAGEWIND_TEST_FLAGS` con flags de `online_mod/quests.txt` sobre una copia de guardado.
     6. Forma de la respuesta: tabla (pregunta, respuesta, evidencia) y recomendación sí/no para el requisito R4-07.
@@ -184,9 +205,9 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 - [ ] T407 [P] [investigación] Spike: teletransporte fuera del modo desarrollador y punto de llegada seguro
   files: specs/bitacora/F4-T407-teleport.md
-  verify: la bitácora responde a las 4 preguntas con medidas de 10 teletransportes de prueba
+  verify: `grep -c '^| [1-4] |' specs/bitacora/F4-T407-teleport.md` da 4 (una fila por pregunta, con medidas de 10 teletransportes de prueba)
   depende de: F1
-  quién: agente + dueño
+  quién: agente redacta; orquestador y dueño ejecutan los 10 teletransportes
   contexto: `control_tp_request(x, y, z)` (`runtime/control_tp.c:298`) deja una petición que atiende `control_tp_frame`, pero esa función solo se llama con el modo desarrollador activo (`runtime/control_game.c:36-40`). Los saltos largos dependen del sitio opcional `tp_gate` (`tools/game_sites.py:565`).
   pasos:
     1. Pregunta 1: ¿qué más hace `control_tp_frame` que dependa del modo desarrollador? (Lee `runtime/control_tp.c` entero.)
@@ -200,7 +221,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 
 - [ ] T408 [P] [investigación] (APLAZADA: ADR-008, decisión 14) Spike: saber qué objeto sale de un cofre
   files: specs/bitacora/F4-T408-contenido-de-cofre.md
-  verify: la bitácora muestra, para 5 cofres abiertos en el juego, el nombre del objeto registrado y el flag del cofre, emparejados correctamente
+  verify: `grep -c '^| [1-5] |' specs/bitacora/F4-T408-contenido-de-cofre.md` da 5 (una fila por cofre abierto en el juego, con el nombre del objeto registrado y el flag del cofre, emparejados)
   depende de: F1, y que el dueño pida la copia de cofres tras revisar la decisión 14
   quién: agente + dueño
   contexto: `[DUEÑO]` (ADR-008, decisión 14): el contenido de un cofre es para quien lo abre, que puede soltarlo marcado para el compañero (T423); la decisión se revisa después de probarlo. Mientras siga así, **esta tarea no se ejecuta**. Se conserva por si el dueño cambia de idea. El flag de un cofre abierto se comparte (`<mapa>_TBox_<tipo>_<HashId>`, DOC:704-706) pero el contenido es solo de quien lo abre. El runtime ya tiene un parche a la entrada de la función de recogida del juego (multiplicador de recogida: `rt_item_get_scale(safe_str, value)`, `runtime/items.c:404`) que ve nombre y valor de toda recogida.
@@ -219,7 +240,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T409 [protocolo] Definir el cambio de cable de F4 en un solo salto de versión
   files: runtime/online.h, runtime/online.c (solo `PROTOCOL`, enumeración de mensajes, estructuras de cable y reenvío dirigido), runtime/online_authority.c, la cabecera compartida con el bot, tools/online_bot.c, tests/test_online_wire.c, tests/test_online_authority.c, specs/contratos/protocolo.md
   verify: `make test-online` sale con 0 **y** `sh tools/nettest/run.sh smoke` sale con 0
-  depende de: F3 completa, T401
+  depende de: F3 completa, T401 (o su valor por defecto anotado)
   quién: agente designado como **dueño del protocolo**
   contexto: F3 dejó el protocolo con saludo ampliado, autoridad en el servidor (`runtime/online_authority.c`) y `seq`/`t_ms` en STATE. F4 necesita doce mensajes y cinco campos nuevos; se definen todos de una vez para que los carriles no toquen el cable. Algunos mensajes (REWARD, GIVE, DOWN, REVIVE) son de funciones que no entran en la primera entrega (cofre para los dos, envío directo, rescate manual: ADR-008, decisión 14; ADR-007, decisiones 10 y 7): se definen igualmente, con manejador vacío, para no gastar otro salto de versión. La durabilidad y las bonificaciones de las armas **no** entran aquí: irán en un cambio de protocolo propio (ADR-009, decisión 24).
   pasos:
@@ -227,10 +248,11 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     2. Mensajes nuevos (estructuras empaquetadas, tamaño fijo): WORLD (identificador de mundo 16 bytes, contenedores de corazón del anfitrión u8, mejoras de resistencia del anfitrión u8: los usa T442), REWARD (hash de flag u32, nombre de objeto char[40], valor s32, clase u8), TP_REQ (destino u8, operación u8: 0 ir, 1 invocar), TP_REPLY (destino u8, resultado u8, posición float[3]), GIVE (destino u8, operación u8, identificador u32, nombre char[40], cantidad s32), MARK (posición float[3], tipo u8), QCHAT (frase u8), PVP_CTL (operación u8), PVP_HIT (objetivo u8, secuencia u16), PVP_DMG (objetivo u8, atacante u8, daño s16), DOWN (segundos u8), REVIVE (objetivo u8).
     3. STATE: añade `int16_t life` (cuartos de corazón), `int16_t life_max` (cuartos de corazón; 0 = no se conoce), `uint8_t colour`, `uint8_t shape`, `uint8_t coop_flags` (bit 0 caído, bit 1 PvP activo). Reglas de sesión del anfitrión: añade el bit "PvP permitido" junto a las reglas existentes (`collide`, `nopause`, `revive`).
     4. Reenvío dirigido en el servidor: los mensajes con campo destino se envían solo a esa ranura, con la ranura de origen delante.
-    5. Tabla de autoridad: WORLD, REWARD y PVP_DMG solo del anfitrión; PVP_HIT solo hacia el anfitrión; TP_REQ, GIVE pasan por la validación de longitud y se reenvían al destino; MARK, QCHAT, PVP_CTL, DOWN, REVIVE a todos.
+    5. Tabla de autoridad: WORLD, REWARD y PVP_DMG solo del anfitrión; PVP_HIT solo hacia el anfitrión; **TP_REQ de un no anfitrión, solo hacia el anfitrión** (modo "solo al anfitrión" que F3 ya tiene en `online_authority.c`, T312): el anfitrión valida mapa y espera de 30 s (T419) y lo reenvía al destino con un TP_REQ propio; TP_REQ del anfitrión, al destino; TP_REPLY y GIVE pasan por la validación de longitud y se reenvían al destino; MARK, QCHAT, PVP_CTL, DOWN, REVIVE a todos. Así el anfitrión siempre ve las peticiones (constitución, regla 11).
     6. Límites de tasa por tipo (añádelos a la tabla de F3): MARK 2/s, QCHAT 2/s, TP_REQ 1 cada 2 s, GIVE 5/s, PVP_HIT 4/s.
     7. `_Static_assert` de tamaños; pruebas de la tabla de autoridad para cada mensaje nuevo; actualiza el bot.
     8. Deja todos los manejadores vacíos.
+    9. Declara en `runtime/online.h` **todos** los prototipos y tipos que usarán las demás tareas de F4, para que ninguna edite la cabecera: envío y cola de marcas (`online_send_mark`, `online_marks`), chat rápido (`online_send_qchat`), peticiones de teletransporte, y `online_notice_push(int id, const char *nombre)` con el enum de identificadores de aviso (`NOTICE_A_HELD_BACK`, `NOTICE_TP_COMING`, `NOTICE_TP_SUMMON_ASK`, `NOTICE_TP_NO_ANSWER`, `NOTICE_FLAGS_REJECTED`, `NOTICE_REWARD_RECEIVED`, `NOTICE_REVIVED`, `NOTICE_BOTH_FELL`, `NOTICE_CATCHUP_DONE`, `NOTICE_ITEM_FOR_YOU`; T428 les da texto).
   hecho cuando: juego y bot compilan y se conectan con la versión nueva; `protocolo.md` lista cada mensaje con tamaño, sentido y quién puede enviarlo.
   no hagas: no implementes la lógica de ninguna función; no dejes cadenas sin terminador garantizado en el receptor; no cambies la versión más de una vez.
   modelo sugerido: alto
@@ -240,7 +262,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T410 [P] [lógica] Línea base por invitado y filtro de cambios de flags
   files: runtime/coop_flags.c, runtime/coop_flags.h, tests/test_coop_flags.c
   verify: `clang -Wall -Iruntime tests/test_coop_flags.c runtime/coop_flags.c -o build/test_coop_flags && build/test_coop_flags` sale con 0
-  depende de: T401
+  depende de: T401 (o su valor por defecto anotado)
   quién: agente
   contexto: Hoy el anfitrión hace el OR de los 4096 bytes de flags de cada jugador (`online_take_quests`, `runtime/online.c:664-670`) y reparte la unión: un invitado con la partida avanzada vuelca todo su progreso en el mundo del anfitrión. Los flags son bits; el bit k corresponde a la línea k de `online_mod/quests.txt`.
   pasos:
@@ -256,18 +278,18 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T411 [mundo] El anfitrión deja de aplicar la unión de flags
   files: el módulo de flags de `online_actors` (función `quests_update`), runtime/online.c (solo `online_take_quests`, `quest_of`, y la limpieza por ranura)
   verify: `sh tools/nettest/run.sh flags_all_ones` sale con 0 (bot invitado con todos los bits a 1: el arnés comprueba que QUESTS del anfitrión no cambia) **y** recorrido manual §CU-06 de `verificacion.md`
-  depende de: T409, T410, T413
-  quién: agente + dueño (prueba en el juego)
+  depende de: T409, T410, T413, T438 (modo de bot `BOT_FLAGS_ALL` y escenario `flags_all_ones`)
+  quién: agente escribe; orquestador y dueño prueban en el juego
   contexto: `quests_update` (`runtime/online_actors.c:3851`) en modo anfitrión llama a `online_take_quests(all)` (`:3929`), hace OR con los flags propios y publica el resultado con `online_set_quests` (`:3931`). En `online.c`, el QUEST de cada ranura se guarda en `g.quest_of[ranura]` (`:1065-1070`) y `online_take_quests` los une (`:664-670`). Además `quest_of` no se borra cuando otro jugador ocupa la ranura.
   pasos:
     1. En `online.c`: sustituye la unión por una función que entregue al hilo del juego, por ranura, el último QUEST recibido y un indicador "nuevo".
     2. En `quests_update` (anfitrión): mantén un `CoopGuestFlags` por ranura; para cada QUEST nuevo llama a `coop_flags_delta` con `max = 16`.
     3. Cada índice devuelto se activa en el juego del anfitrión con el mismo camino que ya usa la función para flags ajenos (`set_bool_flag`), y pasa por la política de recompensas (T416) cuando exista.
-    4. Si `coop_flags_delta` devuelve -1: registra una línea y muestra un aviso; no apliques nada.
+    4. Si `coop_flags_delta` devuelve -1: registra una línea y llama a `online_notice_push(NOTICE_FLAGS_REJECTED, NULL)`; no apliques nada.
     5. `QUESTS` pasa a ser exactamente los flags del anfitrión.
     6. Reinicia el `CoopGuestFlags` de una ranura cuando llega JOIN de un jugador nuevo; consérvalo si es una reanudación (F3) dentro del plazo de reserva de 10 minutos (`[DUEÑO]` ADR-008, decisión 18; el plazo lo gestiona F3, aquí no se programa ningún reloj).
     7. No toques la parte de Luna Carmesí (`held_off`, `revival`).
-    8. Añade al bot el modo `BOT_FLAGS_ALL=1` y el escenario `flags_all_ones`.
+    8. El modo de bot `BOT_FLAGS_ALL=1` y el escenario `flags_all_ones` los crea T438 (esta tarea no edita el bot ni `run.sh`).
   hecho cuando: el bot con todos los bits a 1 no cambia ningún flag del anfitrión, y un invitado real que activa un santuario sí lo cambia.
   no hagas: no cambies cómo el invitado aplica QUESTS; no llames al juego desde `online.c`; no quites el filtro `g.hosting`; no pruebes con un guardado real.
   modelo sugerido: alto
@@ -277,7 +299,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   verify: `clang -Wall -Iruntime tests/test_coop_world.c runtime/coop_world.c -o build/test_coop_world && build/test_coop_world` sale con 0
   depende de: ninguna
   quién: agente
-  contexto: No existe ningún identificador del mundo de un anfitrión. Hace falta para que el invitado guarde su personaje "ligado al mundo de ese anfitrión" y para no mezclar perfiles de anfitriones distintos.
+  contexto: No existe ningún identificador del mundo de un anfitrión. Hace falta para que el invitado guarde su personaje "ligado al mundo de ese anfitrión" y para no mezclar perfiles de anfitriones distintos. `[DUEÑO]` (ADR-011, decisión 29): el anfitrión es siempre la misma persona y **otro anfitrión es otro mundo**: no se construye ningún traspaso de partida, y el identificador de mundo solo identifica el mundo de quien lo creó.
   pasos:
     1. `bool coop_world_load(const char *dir, uint8_t id[16]);` lee `<dir>/coop-world.txt` (32 dígitos hexadecimales).
     2. `bool coop_world_create(const char *dir, const uint8_t rnd[16], uint8_t id[16]);` lo escribe (escritura a fichero temporal y renombrado). Los bytes aleatorios se reciben como argumento.
@@ -291,7 +313,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T413 [mundo] Copia de seguridad automática antes de hospedar o unirse
   files: runtime/save_backup.c, runtime/online.c (solo la llamada en `online_host` y `online_join`), tests/test_coop_backup.c
   verify: `clang ... tests/test_coop_backup.c` (orden exacta en la cabecera de la prueba) sale con 0 **y**, con el juego: tras "Create session" existe una carpeta nueva con fecha en la carpeta de copias
-  depende de: F1
+  depende de: F1, F3 (bloque 3, T309-T319: hasta entonces la cadena núcleo de F3 es dueña de `runtime/online.c`)
   quién: agente
   contexto: `save_backup_at_start` (`runtime/save_backup.c:55`) copia el guardado al arrancar, una vez por ejecución, pero **no** lo hace si está definida `SAVAGEWIND_SAVE_DIR` (`:57`) ni antes de entrar en una sesión. Los flags y recompensas del modo en línea se escriben en el guardado y no se pueden deshacer.
   pasos:
@@ -300,7 +322,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     3. Funciona también con `SAVAGEWIND_SAVE_DIR`.
     4. Se ejecuta en un hilo de trabajo (no en el hilo de UI ni en el del juego); `online_host`/`online_join` no continúan hasta que termine o falle, mostrando el estado "Backing up your save…".
     5. Si falla, la sesión no empieza y se dice por qué.
-    6. Prueba con carpetas falsas en un directorio temporal: crea, limita a 5, una por día.
+    6. Escribe la prueba con carpetas falsas en un directorio temporal: crea, limita a 5, una por día (la ejecuta el orquestador).
   hecho cuando: las dos comprobaciones pasan.
   no hagas: no copies mientras el juego está escribiendo sin tratar el error (reintenta como hace `fs.c` con `EACCES`); no borres copias que no tengan el prefijo `coop-`; no bloquees la UI.
   modelo sugerido: medio
@@ -309,11 +331,11 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   files: runtime/services/save_profiles.c, runtime/services/save_profiles.h, runtime/online.c (solo el manejador de WORLD y el arranque de la unión), runtime/main.c (solo si el ADR de T402 lo exige)
   verify: recorrido manual §CU-07 de `verificacion.md` (suma de comprobación del perfil normal igual antes y después; objetos recogidos persisten entre sesiones)
   depende de: T402, T409, T412, T413
-  quién: agente + dueño
-  contexto: El invitado juega hoy con su partida normal, que recibe flags y objetos de la sesión. La carpeta de guardado se fija una vez por arranque (`runtime/main.c:589`). Existe `sp_set_active` (`runtime/services/save_profiles.c:389`). El ADR de T402 dice cómo cambiar de perfil y qué ocurre al arrancar con un perfil vacío. `[DUEÑO]` (ADR-007, decisiones 1 y 5): el invitado **empieza de cero**; el perfil cooperativo nace vacío, vive solo en su PC y conserva lo que consiga en ese mundo. No se trae nada de su partida individual ni se lleva nada a ella.
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
+  contexto: El invitado juega hoy con su partida normal, que recibe flags y objetos de la sesión. La carpeta de guardado se fija una vez por arranque (`runtime/main.c:589`). `[DUEÑO]` (ADR-011, decisión 31): lo que el invitado hace en el mundo durante un corte de red **se pierde**; al volver recibe el mundo del anfitrión y conserva solo su inventario (el perfil cooperativo). Existe `sp_set_active` (`runtime/services/save_profiles.c:389`). El ADR de T402 dice cómo cambiar de perfil y qué ocurre al arrancar con un perfil vacío. `[DUEÑO]` (ADR-007, decisiones 1 y 5): el invitado **empieza de cero**; el perfil cooperativo nace vacío, vive solo en su PC y conserva lo que consiga en ese mundo. No se trae nada de su partida individual ni se lleva nada a ella.
   pasos:
     1. El anfitrión, al crear sesión, carga o crea su identificador de mundo (`coop_world_*`) y lo envía en WORLD a cada invitado que entra.
-    2. El invitado, al recibir WORLD: calcula el nombre del perfil; si no existe, lo crea **vacío** (sin copiar ningún guardado), por la vía de creación de perfiles que ya tenga `save_profiles.c`. Léelo antes; si no hay una función que cree un perfil sin copiar, para y pregunta.
+    2. El invitado, al recibir WORLD (otro anfitrión = otro identificador = otro perfil; no hay traspaso, ADR-011, decisión 29): calcula el nombre del perfil; si no existe, lo crea **vacío** (sin copiar ningún guardado), por la vía de creación de perfiles que ya tenga `save_profiles.c`. Léelo antes; si no hay una función que cree un perfil sin copiar, para y pregunta.
     3. Cambia al perfil cooperativo por el camino que eligió el ADR de T402.
     4. Al salir de la sesión, vuelve al perfil anterior por el mismo camino.
     5. Si el invitado ya está en el perfil correcto, no hagas nada.
@@ -331,7 +353,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   pasos:
     1. `typedef enum { RW_NONE, RW_WORLD_ABILITY, RW_CHAMPION, RW_MILESTONE, RW_COLLECTIBLE, RW_CHEST } RewardClass;`
     2. `RewardClass coop_reward_class(const char *flag);` por nombre: `IsGet_PortableUnit`, runas y mejoras de la piedra, `FindDungeon_Finish` → capacidad; `IsGet_Obj_HeroSoul_*` → habilidad de campeón; `Clear_Dungeon*`, `Get_HeartUtuwa_*` → hito de vida y resistencia; Kolog → coleccionable; `*_TBox_*` → cofre.
-    3. `typedef enum { RW_AT_SESSION, RW_AT_FIRST_JOIN, RW_AT_REJOIN } RewardMoment;` y `bool coop_reward_decide(RewardClass c, RewardMoment m);` según la tabla de `plan.md` §D, casilla a casilla: capacidad → dar siempre; habilidad de campeón → dar siempre; hito → dar durante la sesión y en una entrada posterior, **no** en la primera entrada (lo sustituye T442); coleccionable → dar solo durante la sesión; cofre → no dar nunca.
+    3. `typedef enum { RW_AT_SESSION, RW_AT_FIRST_JOIN, RW_AT_REJOIN } RewardMoment;` y `bool coop_reward_decide(RewardClass c, RewardMoment m);` según la tabla de `plan.md` §D, casilla a casilla: capacidad → dar siempre; habilidad de campeón → dar siempre; hito → dar durante la sesión y en una entrada posterior, **no** en la primera entrada (lo sustituye T442); coleccionable (semilla Kolog) → una para cada uno durante la sesión, como hoy (`[DUEÑO]` ADR-011, decisión 30); cofre → no dar nunca.
     4. Libro: `coop_ledger_load(path)`, `coop_ledger_has(hash)`, `coop_ledger_add(hash)` (añade una línea y hace `fflush`), con tope de 65 536 entradas. Añade una marca aparte "puesto al día" (`coop_ledger_caught_up()` / `coop_ledger_set_caught_up()`), que usa T442 y que distingue la primera entrada de las posteriores.
     5. Pruebas: una por casilla de la tabla y por momento; libro: añadir, recargar, duplicado, fichero corrupto, marca de puesta al día que sobrevive a recargar.
   hecho cuando: la prueba pasa y la tabla del código coincide casilla a casilla con `plan.md` §D.
@@ -342,7 +364,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   files: el módulo de flags de `online_actors` (función `quests_update`)
   verify: recorrido manual §CU-07 (tabla de política caso a caso con dos juegos) con entrada en bitácora
   depende de: T411, T414, T415
-  quién: agente + dueño
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: En `quests_update`, justo después de activar un flag recibido (`set_bool_flag`), hay siete entregas incondicionales con `give_item` y `give_heart` (`runtime/online_actors.c:3987-3997`).
   pasos:
     1. Carga el libro del perfil actual al entrar en sesión (ruta junto al perfil: `coop-ledger.txt`).
@@ -370,21 +392,21 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   modelo sugerido: alto
 
 - [ ] T442 [mundo] Ponerse al día al entrar en un mundo avanzado
-  files: el módulo de flags de `online_actors` (función `quests_update` y lo que lea o suba corazones y resistencia), runtime/online.c (solo rellenar y entregar los dos campos nuevos de WORLD), runtime/coop_rewards.c, runtime/coop_rewards.h, tests/test_coop_rewards.c, specs/bitacora/F4-T442-ponerse-al-dia.md, specs/fases/F4-funciones-coop/textos-nuevos.txt
+  files: el módulo de flags de `online_actors` (función `quests_update` y lo que lea o suba corazones y resistencia), runtime/online.c (solo rellenar y entregar los dos campos nuevos de WORLD), runtime/coop_rewards.c, runtime/coop_rewards.h, tests/test_coop_rewards.c, specs/bitacora/F4-T442-ponerse-al-dia.md
   verify: `clang -Wall -Iruntime tests/test_coop_rewards.c runtime/coop_rewards.c -o build/test_coop_rewards && build/test_coop_rewards` sale con 0 (con los casos nuevos de puesta al día) **y** recorrido manual §"Ponerse al día al entrar" de `verificacion.md`, con entrada en bitácora
   depende de: T409, T414, T416, T428 (solo para el aviso en pantalla del paso 9)
-  quién: agente + dueño (prueba en el juego)
+  quién: agente escribe; orquestador y dueño ejecutan las pruebas en el juego
   contexto: `[DUEÑO]` ADR-007, decisión 2: las recompensas son para los dos, siempre, y quien se une más tarde recibe lo que el anfitrión ya tenía. ADR-007, decisión 5: el invitado empieza de cero. ADR-008, decisión 13: al unirse a un mundo avanzado **iguala al anfitrión**: recibe el mismo número de contenedores de corazón y de mejoras de resistencia, más las habilidades de campeón ya ganadas. Resultado: entra sin objetos pero con la misma vida y resistencia. Hoy no existe nada de esto: al llegar los flags del anfitrión, `quests_update` entregaba un orbe por cada santuario y un contenedor por cada Bestia (`runtime/online_actors.c:3987-3997`), y eso no es lo decidido (el dueño eligió igualar, no repartir orbes sin canjear). Lo que hay en el código y **puede** servir, sin comprobar para este uso: `give_heart` (`runtime/online_actors.c:3763`) entrega un contenedor de corazón llamando a una función del propio juego; hay una sonda de prueba que busca el valor `MaxHeartValue` de los datos de partida (`:3890-3893`, solo con `SAVAGEWIND_ONLINE_GDT_PROBE`); el control lee la resistencia **actual** (`runtime/control_game.c:182`). No hay nada que lea o suba la resistencia máxima. T409 dejó en WORLD dos bytes (contenedores y mejoras del anfitrión) y T415 dejó en el libro la marca "puesto al día". Esta tarea escribe en el estado del invitado: por eso es de modelo alto.
   pasos:
-    1. **Antes de escribir código de producción**, responde en la bitácora, con prueba en el juego sobre copias de guardado: (a) ¿cómo se lee cuántos contenedores de corazón tiene el Link local?; (b) ¿cómo se sube ese número: sirve llamar a `give_heart` varias veces, una por fotograma, o abre una ventana o una escena cada vez?; (c) ¿cómo se lee y cómo se sube el número de mejoras de resistencia? Usa solo lo que ya esté en el código o en la respuesta escrita de una investigación.
+    1. **Antes de escribir código de producción**, el dueño y el orquestador responden en la bitácora, con prueba en el juego sobre copias de guardado (el agente solo prepara las preguntas y anota): (a) ¿cómo se lee cuántos contenedores de corazón tiene el Link local?; (b) ¿cómo se sube ese número: sirve llamar a `give_heart` varias veces, una por fotograma, o abre una ventana o una escena cada vez?; (c) ¿cómo se lee y cómo se sube el número de mejoras de resistencia? Usa solo lo que ya esté en el código o en la respuesta escrita de una investigación.
     2. Si (a), (b) o (c) no tienen respuesta con lo que existe: **para**. Escribe "no resuelto" en la bitácora, con lo que probaste, y pide al dueño una investigación (como T404-T406: respuesta en forma de sitio por patrón en `tools/game_sites.py`, nunca una dirección suelta). Se puede entregar la parte de corazones sola si la de resistencia queda sin resolver; dilo claramente.
     3. Lógica pura en `coop_rewards.c`: `int coop_catchup_missing(int mine, int host, int max);` devuelve cuántos faltan para llegar al número del anfitrión; 0 si el invitado ya tiene tantos o más; 0 si `host` es negativo o mayor que `max` (el máximo del juego, que fijas en el paso 1 con su evidencia). Pruebas: igual, menos, más, fuera de rango.
-    4. Anfitrión: cuando entra un invitado, lee en el hilo del juego sus dos números y los publica (dato con mutex) para que `online.c` rellene los dos campos de WORLD.
+    4. Anfitrión: cuando entra un invitado, lee en el hilo del juego sus dos números y los publica (dato con mutex) para que `online.c` rellene los dos campos de WORLD. El receptor valida el rango de los dos números **al recibirlos** (regla 9), no al usarlos.
     5. Invitado: al recibir WORLD (el servidor solo lo acepta del anfitrión, tabla de autoridad de T409), guarda los dos números. En el hilo del juego, cuando el Link local existe y no está cargando, en un evento ni muerto: si el libro **no** tiene la marca "puesto al día", sube corazones y resistencia lo que diga `coop_catchup_missing`, por la vía del paso 1.
     6. Comprueba que los hitos de vida y resistencia que trae el primer QUESTS no se entregan además como orbes o contenedores (T416 los apunta como vistos), y que las habilidades de campeón ya ganadas sí llegan (política de T415, primera entrada).
     7. Al terminar, escribe la marca "puesto al día" en el libro. Si la sesión se corta a mitad, al volver se repite el paso 5: como solo sube "hasta" el número del anfitrión, repetirlo no da nada de más.
     8. Entrada posterior (el libro ya tiene la marca): no vuelvas a igualar. Los hitos que el mundo ganó sin el invitado le llegan por la política de T415 (`RW_AT_REJOIN`). Es el valor por defecto de la pregunta P4-11 de `spec.md`: anótalo en la bitácora como propuesta por confirmar.
-    9. Aviso en pantalla con `online_notice_push` (T428), texto fijo en inglés añadido a `textos-nuevos.txt`. Los orbes que el anfitrión tenga sin canjear no se entregan (valor por defecto de P4-10).
+    9. Aviso en pantalla con `online_notice_push(NOTICE_CATCHUP_DONE, NULL)` (T409 declara el identificador, T428 le da el texto; esta tarea no escribe literales). Los orbes que el anfitrión tenga sin canjear no se entregan (valor por defecto de P4-10).
   hecho cuando: un invitado con perfil cooperativo recién creado entra en un mundo avanzado y termina con los mismos contenedores de corazón y mejoras de resistencia que el anfitrión, las habilidades de campeón ya ganadas y el inventario vacío; salir y volver a entrar no le da nada por segunda vez; su partida individual no cambia.
   no hagas: no inventes direcciones, desplazamientos de estructura, nombres de objeto ni firmas (si falta algo, paso 2); no bajes nunca corazones ni resistencia; no apliques números que no vengan del anfitrión ni fuera del rango del juego; no escribas en el fichero de guardado en disco ni en el perfil individual del invitado; no llames al juego fuera del hilo del juego; no entregues orbes para compensar; no pruebes con un guardado real.
   modelo sugerido: alto
@@ -400,10 +422,10 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   pasos:
     1. Estados: `IDLE, ASKED, ACCEPTED, TRAVELLING, DONE, REFUSED, EXPIRED`. Dos operaciones: `COOP_TP_GO` (ir: el otro juego contesta solo, sin preguntar al jugador) y `COOP_TP_SUMMON` (invocar: el invocado debe aceptar; si acepta, viaja él).
     2. `coop_tp_ask(tp, operación, ahora_ns)`, `coop_tp_on_reply(tp, aceptado, pos)`, `coop_tp_tick(tp, ahora_ns)` (caduca a los 15 s sin respuesta; espera de 30 s entre viajes de un mismo jugador, como constante con nombre, sin ajuste del anfitrión).
-    3. `int coop_tp_can(const CoopTpWho *yo, const CoopTpWho *el)` devuelve 0 o un motivo: mapa distinto, evento, muerto, cargando, en pausa, montado, en espera. **No hay motivo "en combate"**: no lo añadas. Duelo de PvP activo: motivo aparte, `[PROPUESTA]` (confírmalo con el dueño; la decisión 16 no lo menciona). `CoopTpWho` son solo datos (booleanos, nombre de mapa, posición).
+    3. `int coop_tp_can(const CoopTpWho *yo, const CoopTpWho *el)` devuelve 0 o un motivo, **separando viajero y destino**. Motivos del **viajero** (`yo`): evento en curso, muerto, cargando, en pausa, montado, en espera de 30 s. Motivos del **destino** (`el`): mapa distinto, muerto, cargando (no hay punto de llegada que dar). **Un compañero en plena escena o conversación NO es motivo de rechazo** (`[DUEÑO]` ADR-011, decisión 37): el viajero aparece cerca y no se interrumpe a nadie. **No hay motivo "en combate"**: no lo añadas. El teletransporte no tiene coste aparte de la espera (ADR-011, decisión 36). Duelo de PvP activo: motivo aparte, `[PROPUESTA]` (confírmalo con el dueño; la decisión 16 no lo menciona). `CoopTpWho` son solo datos (booleanos, nombre de mapa, posición).
     4. `bool coop_tp_landing(const float pos_suelo[3], float yaw, float out[3])`: 1,5 m detrás y 0,5 m arriba; rechaza no finitos y coordenadas fuera de ±20 000.
     5. `coop_tp_ground_track(track, pos, en_suelo, ahora_ns)` y `coop_tp_ground_get(track, ahora_ns, out)`: última posición en el suelo de los últimos 10 s.
-    6. Pruebas: cada transición, cada motivo, caducidad, espera de 30 s (un segundo viaje a los 29 s se rechaza, a los 30 s se admite), invocación rechazada y sin respuesta (el invocado no viaja), posiciones no finitas.
+    6. Pruebas: cada transición, cada motivo (del viajero y del destino por separado), destino en escena (se permite), caducidad, espera de 30 s (un segundo viaje a los 29 s se rechaza, a los 30 s se admite), invocación rechazada y sin respuesta (el invocado no viaja), posiciones no finitas.
   hecho cuando: la prueba pasa; sin cabeceras del juego.
   no hagas: no llames a `control_tp_request` aquí; no leas el reloj dentro del módulo; no bloquees por estar en combate; no hagas que una invocación mueva a nadie sin su aceptación.
   modelo sugerido: medio
@@ -411,16 +433,16 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T419 [reglas] Integrar el teletransporte
   files: runtime/control_game.c, runtime/control_tp.c, runtime/control.h, el módulo de reglas de `online_actors`, runtime/online.c (colas de TP_REQ / TP_REPLY)
   verify: recorrido manual §CU-08 de `verificacion.md` (10 teletransportes: 10 llegadas a menos de 3 m, 0 con daño)
-  depende de: T409, T418
-  quién: agente + dueño
+  depende de: T409, T418, T428 (avisos)
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: `control_game_frame` solo avanza `control_tp_frame` si `control_enabled()` (modo desarrollador), `runtime/control_game.c:36-40`. `control_tp_request` (`runtime/control_tp.c:298`) es seguro desde otro hilo (petición atómica). `sample_pose` ya lee el AS del cuerpo del Link local.
   pasos:
     1. Añade en `control_tp.c` un indicador atómico `coop_tp_active` y `void control_tp_allow_coop(bool);`. En `control_game_frame`: llama a `control_tp_frame` si `control_enabled() || coop_tp_active`.
     2. En el hilo del juego, cada fotograma: actualiza `coop_tp_ground_track` con la posición del Link local y si su AS de cuerpo no contiene `Fall`, `Glide`, `Para`, `Swim`, `Climb` (ajusta la lista con el resultado de T407).
     3. Quien pide: comprueba `coop_tp_can`, envía TP_REQ con la operación (ir o invocar).
-    4. Anfitrión: valida mapa y la espera de 30 s del que va a viajar antes de reenviar.
-    5. Ir (`[DUEÑO]` ADR-008, decisión 16: siempre disponible, también en combate): el juego de quien recibe responde **solo**, sin preguntar al jugador, con TP_REPLY = `coop_tp_ground_get` + `coop_tp_landing`, y le muestra un aviso ("<nombre> is coming to you").
-    6. Invocar (`[DUEÑO]` ADR-008, decisión 16: requiere que acepte): el juego de quien recibe muestra la petición con aceptar/rechazar. Si acepta, es **su** juego el que inicia un viaje "ir" hacia quien le llamó (pasos 3 a 5 y 7); si rechaza o no responde en 15 s, responde con rechazo y no se mueve.
+    4. Anfitrión: recibe el TP_REQ (T409 solo se lo entrega a él), valida mapa y la espera de 30 s del que va a viajar y lo reenvía al destino; si no valida, responde con el rechazo y su motivo.
+    5. Ir (`[DUEÑO]` ADR-008, decisión 16: siempre disponible, también en combate; sin coste, ADR-011, decisión 36): el juego de quien recibe responde **solo**, sin preguntar al jugador, con TP_REPLY = `coop_tp_ground_get` + `coop_tp_landing`, y le muestra `online_notice_push(NOTICE_TP_COMING, nombre)` ("%s is coming to you"; no pide permiso). Si el compañero está en una escena o conversación, contesta igual y **no se le interrumpe** (`[DUEÑO]` ADR-011, decisión 37); solo no puede contestar si está muerto o cargando.
+    6. Invocar (`[DUEÑO]` ADR-008, decisión 16: requiere que acepte): el juego de quien recibe muestra la petición con aceptar/rechazar (`NOTICE_TP_SUMMON_ASK`, "%s asks you to come to them"). Si acepta, es **su** juego el que inicia un viaje "ir" hacia quien le llamó (pasos 3 a 5 y 7); si rechaza o no responde en 15 s (`NOTICE_TP_NO_ANSWER`), responde con rechazo y no se mueve.
     7. Quien viaja: valida el punto (finito, a menos de 400 m en horizontal de la posición conocida del compañero), activa `control_tp_allow_coop(true)` y llama a `control_tp_request`; al terminar (`control_tp_status`), lo desactiva.
     8. Si `g_site.tp_gate` es 0 y la distancia horizontal supera 300, rechaza con motivo.
   hecho cuando: el recorrido §CU-08 pasa (incluido un viaje en pleno combate y una invocación rechazada) y fuera de un viaje `control_tp_frame` sigue sin ejecutarse en modo normal.
@@ -450,14 +472,14 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T421 [reglas] (segunda entrega, prioridad baja: ADR-007, decisión 10) Recibir un objeto enviado
   files: runtime/items.c, runtime/items.h (si existe; si no, la cabecera donde se declara `items_request`), el módulo de reglas de `online_actors`, runtime/online.c (colas de GIVE)
   verify: `sh tools/nettest/run.sh give_recv` no aplica (necesita el juego): recorrido manual §CU-09 paso "recibir" con el bot en modo `BOT_GIVE=<objeto>,<n>` y captura del inventario
-  depende de: T420
+  depende de: T420, T438
   quién: agente + dueño
   contexto: `items_request(i, count)` (`runtime/items.c:367`) encola una entrega por índice en la lista de objetos del juego; `rt_item_tick` (`:420`) la ejecuta en el hilo del juego llamando a la función de recogida del propio juego. Solo corre "en juego" (no en menús ni eventos) y admite 32 peticiones. El resultado se deduce contando entradas de la bolsa (`:352-365`).
   pasos:
     1. Usa la búsqueda por nombre `items_find` que añadió T423 (si T423 no está hecha, añádela aquí igual: `int items_find(const char *name)`, -1 si el nombre no está).
     2. Al recibir OFFER: nombre no encontrado, categoría que no sea material o comida (`[DUEÑO]` ADR-009, decisiones 24 y 25: ni armas, ni arcos, ni escudos, ni rupias, ni objetos protegidos), cantidad fuera de 1..999, o juego no "en juego" → REFUSE con motivo.
     3. Al recibir TAKEN: `items_request`; espera el resultado y llama a `on_added(ok)`.
-    4. Añade al bot `BOT_GIVE=<objeto>,<n>` (hace de emisor que siempre "consigue quitar").
+    4. El modo de bot `BOT_GIVE=<objeto>,<n>` (emisor que siempre "consigue quitar") lo crea T438.
   hecho cuando: el bot envía 3 manzanas y aparecen en el inventario del juego; un nombre inventado se rechaza sin efectos.
   no hagas: no uses `give_item` de `online_actors` (direcciones fijas) si la vía de `items.c` está disponible; no llames a `guest_call` fuera de `rt_item_tick`; no aceptes objetos con la etiqueta `Important`; no aceptes armas, arcos ni escudos aunque estén en la lista de `items.c`.
   modelo sugerido: medio
@@ -480,17 +502,17 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   modelo sugerido: alto
 
 - [ ] T423 [reglas] "Soltar marcado para el compañero": solo materiales y comida (sin ingeniería inversa)
-  files: el módulo de botín de `online_actors`, runtime/items.c, runtime/items.h (solo la búsqueda por nombre `items_find`), runtime/online.c (cola de avisos), runtime/ui/coop_hud.mm, specs/bitacora/F4-T423-armas-por-el-suelo.md
+  files: el módulo de botín de `online_actors`, runtime/items.c, runtime/items.h (solo la búsqueda por nombre `items_find`), runtime/ui/coop_hud.mm, specs/bitacora/F4-T423-armas-por-el-suelo.md, specs/fases/F4-funciones-coop/textos-nuevos.txt
   verify: recorrido manual §CU-09 de `verificacion.md` (pasos "soltar", "clases excluidas" y "armas por el suelo"): el compañero ve una marca y un aviso con materiales y comida, y ninguno con armas, arcos, escudos ni rupias; la bitácora contiene el resultado de la comprobación del paso 5
-  depende de: T409, T425
-  quién: agente + dueño
+  depende de: T409, T425, T426 (la cola de MARK), T428 (avisos)
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: Lo que un jugador saca de la bolsa y deja caer se añade a la lista de botín compartida tras 0,4 s quieto, y el otro puede recogerlo (DOC:528-547; `loot_update` en `runtime/online_actors.c:3237-3649`). Funciona hoy, pero el compañero no sabe que hay algo para él. `[DUEÑO]`: es la forma de dar objetos de la primera entrega (ADR-007, decisión 10); cubre **solo materiales y comida** (ADR-009, decisión 24); armas, arcos y escudos quedan excluidos hasta que la durabilidad y las bonificaciones viajen por la red; nunca se envían rupias ni lo que el juego ya protege: objetos clave, Espada Maestra y lo que el juego impide soltar (ADR-009, decisión 25). Ojo: según `docs/ONLINE.md` (DOC:528-547) la lista de botín compartida admite también lo que cae con nombre `Weapon_*` y `PutRupee*`, y un arma soltada llega hoy al otro juego solo con su nombre, sin durabilidad ni modificadores (mapa 07 §7). `runtime/items.c` ya clasifica cada objeto de su lista por categoría (`ITEMCAT_*`, `runtime/items.h:12`).
   pasos:
     1. Añade en `items.c` una búsqueda por nombre en su lista de objetos: `int items_find(const char *name)`, que devuelve -1 si el nombre no está, y una forma de consultar la categoría del resultado. Lee antes cómo clasifica `items.c` los materiales y la comida; si con sus categorías no se puede distinguir "material o comida" de lo demás, para y pregunta.
     2. Cuando el juego local añade a la lista de botín un objeto que soltó su propio jugador **y** ese objeto es un material o una comida, envía un MARK de tipo "objeto" en esa posición.
-    3. El overlay del compañero dibuja la marca 20 s y un aviso "<nombre> dropped something for you".
+    3. El overlay del compañero dibuja la marca 20 s y llama a `online_notice_push(NOTICE_ITEM_FOR_YOU, nombre)` ("%s dropped something for you"). `[DUEÑO]` (ADR-011, decisión 38): recibir un objeto marcado no pide confirmación; si no cabe en la bolsa, se queda en el suelo.
     4. Para todo lo demás (arma, arco, escudo, flechas, armadura, rupias, o un nombre que `items_find` no conoce): **ni marca ni aviso**.
-    5. Comprobación obligatoria (ADR-009, consecuencia de la decisión 24), con dos juegos y copias de guardado: suelta una espada, un arco, un escudo y unas rupias. Anota en la bitácora, para cada uno, si aparece en el juego del compañero y si este puede recogerlo, y con qué durabilidad queda el arma.
+    5. Comprobación obligatoria (ADR-009, consecuencia de la decisión 24), que hace el orquestador o el dueño con dos juegos y copias de guardado (el agente deja preparada la tabla de la bitácora): suelta una espada, un arco, un escudo y unas rupias. Anota en la bitácora, para cada uno, si aparece en el juego del compañero y si este puede recogerlo, y con qué durabilidad queda el arma.
     6. Si el compañero puede recogerlos: **impídelo**, no añadiendo a la lista de botín compartida lo que el propio jugador suelta de esas clases (el botín de enemigos, cofres y objetos rotos no se toca). Si impedirlo rompe otro comportamiento que hoy funciona, no lo fuerces: déjalo como está, descríbelo en la bitácora como limitación conocida y pide el visto bueno del dueño antes de cerrar la tarea.
     7. Fuera de los pasos 4 a 6, no cambies nada de la lógica de botín.
   hecho cuando: soltar 3 setas y 3 manzanas produce una marca y un aviso en la otra pantalla y el otro las recoge; soltar un arma, un arco, un escudo o rupias no produce marca ni aviso; y la bitácora dice, con evidencia, si esas clases llegan o no al compañero y qué se hizo (impedido o documentado).
@@ -510,12 +532,12 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     2. Enumeración de 8 formas: círculo, cuadrado, triángulo, rombo, estrella, cruz, hexágono, anillo.
     3. `coop_palette_assign(preferidos[], n, out_color[], out_forma[])`: `[DUEÑO]` (ADR-009, decisión 26) quien no ha elegido nada recibe el color y la forma de su posición por **orden de entrada** (el índice: el primero, color 0 y forma 0; el segundo, color 1 y forma 1; …); quien ha cambiado el suyo en Opciones conserva su elección; si dos coinciden en color y forma, el de índice mayor recibe la siguiente forma libre.
     4. Prueba: para cada par de colores de la tabla, tras aplicar cada una de las 3 simulaciones de `colour_vision_simulation` a severidad 1, la diferencia de luminancia o de tono supera un umbral que fijes y documentes.
-  hecho cuando: la prueba pasa; si un par no supera el umbral, cambia el color, no el umbral.
+  hecho cuando: la prueba pasa (la ejecuta el orquestador); si un par no supera el umbral, cambia el color, no el umbral. El ajuste iterativo lo hace el agente con la salida que le pase el orquestador.
   no hagas: no incluyas ImGui ni nada de UI; no dependas de `g_settings`.
   modelo sugerido: bajo
 
 - [ ] T425 [ui] Color y forma por jugador en el overlay
-  files: runtime/ui/online_ui.mm, runtime/ui/coop_hud.mm (nuevo), runtime/ui/coop_hud.h (nuevo), runtime/online.c (solo publicar color y forma del jugador local en STATE)
+  files: runtime/ui/online_ui.mm, runtime/ui/coop_hud.mm (nuevo), runtime/ui/coop_hud.h (nuevo), runtime/online.c (solo publicar color y forma del jugador local en STATE), specs/fases/F4-funciones-coop/textos-nuevos.txt
   verify: `make runtime-objs` sin avisos; captura de ventana (`SAVAGEWIND_WINDOW_SHOT`) con dos jugadores mostrando nombre con color y forma elegidos
   depende de: T409, T424
   quién: agente
@@ -523,16 +545,16 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   pasos:
     1. Crea `coop_hud.mm` con `coop_shape_draw(ImDrawList*, centro, radio, forma, color)` para las 8 formas, cada una con borde oscuro.
     2. Sustituye `k_colors[i]` por el color y la forma que llegan en el STATE de cada jugador (validados: índice < 8, si no → por ranura).
-    3. Dibuja la forma junto al nombre en la lista, sobre el jugador y en la flecha del borde.
+    3. Dibuja la forma junto al nombre en la lista, sobre el jugador y en la flecha del borde. `[DUEÑO]` (ADR-011, decisión 41): junto a la flecha muestra la **distancia** y el **nombre del mapa** del compañero (no se dibuja ningún marcador en el mapa del propio juego en F4; se estudia después). El nombre del mapa se muestra tal como lo publica el jugador remoto, validado contra la lista de mapas conocidos; si no hay forma comprobada de obtenerlo, para y pregunta.
     4. `[DUEÑO]` (ADR-009, decisión 26) Sin configurar nada, cada jugador publica el color y la forma de su orden de entrada (su ranura). En Opciones (pestaña Online): selectores "Your colour" y "Your shape", con una opción "Automatic" que es el valor por defecto (guardados en `online.ini`).
   hecho cuando: sin tocar nada, dos jugadores salen con color y forma distintos según su orden de entrada; cambiar color o forma se ve en la otra pantalla en menos de 1 s.
   no hagas: no edites `runtime/ui/menu.mm`; no llames al juego ni a la red desde el dibujo; no uses fuentes ni iconos del juego.
   modelo sugerido: medio
 
 - [ ] T426 [ui] Pings (marcas en el mundo)
-  files: runtime/ui/coop_hud.mm, runtime/online.c (colas de MARK), runtime/online.h (solo las funciones `online_send_mark`/`online_marks`; avisa al dueño del protocolo)
+  files: runtime/ui/coop_hud.mm, runtime/online.c (colas de MARK; los prototipos ya los declaró T409), specs/fases/F4-funciones-coop/textos-nuevos.txt
   verify: `make runtime-objs` sin avisos; `sh tools/nettest/run.sh mark_rate` sale con 0 (bot que envía 50 MARK por segundo: el otro bot recibe ≤ 2 por segundo); captura con un ping visible en las dos pantallas
-  depende de: T425
+  depende de: T425, T436 (acciones del runtime), T438 (modo `BOT_FLOOD=mark` y escenario `mark_rate`)
   quién: agente
   contexto: No hay pings: PING/PONG del protocolo solo mide latencia. El overlay ya sabe proyectar un punto del mundo a la pantalla (`project`, `runtime/ui/online_ui.mm:135`) con la cámara que publica el hilo de render (`online_camera_get`, usada en `:256`).
   pasos:
@@ -540,7 +562,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     2. Al recibir MARK: valida posición finita y dentro de ±20 000, tipo < 4.
     3. Dibujo: forma según el tipo (aquí, peligro, objeto, ayuda), color del emisor, distancia en metros; si está fuera de pantalla, flecha en el borde como la de los jugadores.
     4. Colocación local: (a) en la posición del Link local; (b) si hay un jugador o enemigo conocido proyectado a menos de un 10 % del ancho de pantalla del centro, en su posición.
-    5. Escenario `mark_rate` con el modo de bot `BOT_FLOOD=mark,50`.
+    5. El escenario `mark_rate` y el modo de bot `BOT_FLOOD=mark,50` los crea T438.
   hecho cuando: los dos `verify` pasan.
   no hagas: no dibujes marcas con una cámara de más de 0,5 s (se descartan, como hace el código actual); no intentes trazar rayos contra el terreno.
   modelo sugerido: medio
@@ -548,7 +570,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T427 [ui] Chat rápido
   files: runtime/ui/coop_hud.mm, runtime/online.c (colas de QCHAT), specs/fases/F4-funciones-coop/textos-nuevos.txt
   verify: `make runtime-objs` sin avisos; captura: un juego en español y otro en inglés muestran la misma frase cada uno en su idioma
-  depende de: T426
+  depende de: T426, T436
   quién: agente
   contexto: El chat solo se escribe desde el menú (`runtime/ui/online_ui.mm`, campo "Chat") y viaja como texto libre (`M_CHAT`). Con mando es lento y no se traduce.
   pasos:
@@ -561,26 +583,26 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   modelo sugerido: bajo
 
 - [ ] T428 [ui] Avisos en pantalla y tamaño de texto
-  files: runtime/ui/coop_hud.mm, runtime/online.c (cola de avisos: `online_notice_push`), el módulo de reglas de `online_actors` (solo sustituir registros por avisos)
-  verify: `make runtime-objs` sin avisos; captura del aviso "A is held back" con el bot en modo `BOT_DEMO=1` a menos de 30 m
+  files: runtime/ui/coop_hud.mm, runtime/ui/online_ui.mm (solo el ajuste "Overlay text size"), runtime/online.c (cola de avisos: implementación de `online_notice_push`), el módulo de reglas de `online_actors` (solo sustituir registros por avisos), specs/fases/F4-funciones-coop/textos-nuevos.txt
+  verify: `make runtime-objs` sin avisos y `tools/venv/Scripts/python.exe tools/i18n_check.py --missing es` lista los literales de la tabla de avisos entre los de `textos-nuevos.txt`; captura del aviso "A is held back" con el bot en modo `BOT_DEMO=1` a menos de 30 m
   depende de: T427
   quién: agente
   contexto: Avisos importantes para el jugador solo van al registro: por ejemplo "another player is at a Sheikah pedestal near: A held back" (`runtime/online_actors.c:5999`). El jugador pulsa A, no pasa nada y no sabe por qué. El overlay ya tiene avisos de "se unió / se fue" durante 5 s.
   pasos:
-    1. `online_notice_push(const char *texto_en_ingles, int tipo)`: cola con mutex de 8 avisos, llamable desde el hilo del juego; el texto es un literal fijo.
-    2. El overlay los pinta 5 s con `tr()`, con icono por tipo (información, aviso, error).
-    3. Sustituye por avisos: botón A retenido; "<nombre> wants to come to you"; flags rechazados por exceso (T411); recompensa recibida.
+    1. Implementa `online_notice_push(int id, const char *nombre)` (prototipo y enum de T409): cola con mutex de 8 avisos, llamable desde el hilo del juego; solo guarda el identificador y el nombre del jugador (saneado, longitud acotada). **Nada de texto de la red como formato.**
+    2. En `coop_hud.mm` una tabla `id → literal inglés` con cada texto dentro de `tr("...")` (así `i18n_check.py` los ve), p. ej. `NOTICE_TP_COMING` → "%s is coming to you", `NOTICE_TP_SUMMON_ASK` → "%s asks you to come to them", `NOTICE_REVIVED` → "Revived: %s is still standing", `NOTICE_BOTH_FELL` → "Both players fell: game over", `NOTICE_ITEM_FOR_YOU` → "%s dropped something for you", y el resto de identificadores de T409. Cada literal se añade a `textos-nuevos.txt`. El overlay los pinta 5 s con icono por tipo (información, aviso, error).
+    3. Sustituye por avisos (por identificador): botón A retenido; flags rechazados por exceso (T411); recompensa recibida. El texto "wants to come to you" **ya no existe**: ir no pide permiso (ADR-008, decisión 16).
     4. Ajuste "Overlay text size" (80-160 %) en la pestaña, aplicado a todo el overlay cooperativo.
   hecho cuando: el aviso aparece en la captura y el tamaño cambia al mover el ajuste.
   no hagas: no pases texto de la red como aviso; no reserves memoria por fotograma; no bloquees el hilo del juego esperando el mutex más que una copia corta.
   modelo sugerido: medio
 
 - [ ] T429 [ui] Vida del compañero en pantalla
-  files: el módulo de muestreo de `online_actors` (función `sample_pose`), runtime/online.c (copiar el campo), runtime/ui/coop_hud.mm
+  files: el módulo de muestreo de `online_actors` (función `sample_pose`), runtime/online.c (copiar el campo), runtime/ui/coop_hud.mm, specs/fases/F4-funciones-coop/textos-nuevos.txt
   verify: `make runtime-objs` sin avisos; captura con dos juegos: tras dañar al invitado (`swctl` o un enemigo), sus corazones bajan en la pantalla del anfitrión
   depende de: T409, T425
   quién: agente
-  contexto: Ningún mensaje lleva la vida del jugador. El juego local ya lee la suya como un entero de cuartos de corazón en `player + 0x848` (constante `ENEMY_LIFE` usada en `pvp_update`, `runtime/online_actors.c:2906`; DOC:644). `[DUEÑO]` (ADR-009, decisión 27): la vida del compañero se ve **siempre**, en pequeño, y se destaca por debajo del 25 %. Para el 25 % hace falta la vida máxima; cómo leerla lo establece el paso 1 de T442 (hoy no hay una vía comprobada).
+  contexto: Ningún mensaje lleva la vida del jugador. El juego local ya lee la suya como un entero de cuartos de corazón en `player + 0x848` (constante `ENEMY_LIFE` usada en `pvp_update`, `runtime/online_actors.c:2907`; DOC:644). `[DUEÑO]` (ADR-009, decisión 27): la vida del compañero se ve **siempre**, en pequeño, y se destaca por debajo del 25 %. Para el 25 % hace falta la vida máxima; cómo leerla lo establece el paso 1 de T442 (hoy no hay una vía comprobada).
   pasos:
     1. En `sample_pose`, copia ese valor al campo `life` del STATE (definido en T409), acotado a 0..160. Rellena `life_max` con la vida máxima por la vía que haya dejado escrita T442 en su bitácora; si T442 aún no está hecha o no lo resolvió, deja `life_max` a 0.
     2. En el overlay, bajo el nombre del compañero, siempre visible y en pequeño: corazones (uno por cada 4 cuartos, con cuartos parciales) dibujados con formas propias, y el número.
@@ -599,10 +621,10 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   quién: agente
   contexto: Hoy `rt_online_has_fairy` responde "sí" siempre que hay sesión y la regla `revive` está activa (`runtime/online_actors.c:2825-2831`): reanimación automática sin que el compañero intervenga. `[DUEÑO]` (ADR-007, decisión 7): en la primera entrega revivir sigue siendo automático, como hace hoy el código; el rescate manual queda para después. `[DUEÑO]` (ADR-008, decisión 15): si caen los dos a la vez, fin de partida normal y los dos recargan su último guardado.
   pasos:
-    1. `bool coop_revive_allowed(const CoopReviveIn *in)`: regla activa y hay al menos un compañero en pie (vivo, no cargando, y que no haya caído en este mismo momento). **Sin límite de distancia ni de mapa**: el dueño no lo ha pedido.
+    1. `bool coop_revive_allowed(const CoopReviveIn *in)`: regla activa y hay al menos un compañero en pie (vivo, no cargando, y que no haya caído en este mismo momento). **Sin límite de distancia, de mapa ni de número de reanimaciones** (`[DUEÑO]` ADR-011, decisión 33: sin límite de usos mientras el compañero siga vivo; la vida es la que da el hada del juego) y sin coste ni penalización para nadie (decisión 35).
     2. Los dos caídos a la vez → no se permite revivir a ninguno (fin de partida normal para ambos). Define "a la vez" con una ventana corta inyectada como parámetro y documentada en la cabecera.
-    3. Para la entrega posterior (T432, prioridad baja), deja ya la máquina de estado caído: `UP → DOWN(t) → REVIVING(progreso) → UP | DEAD`, con cuenta atrás (por defecto 30 s) y progreso mientras un compañero mantiene el botón a menos de 2 m durante 3 s. Nada de la primera entrega la usa.
-    4. Pruebas: cada rama; compañero en pie lejos y en otro mapa (se permite); los dos caídos a la vez (no se permite); regla apagada; y, para la máquina de T432, tiempo agotado y compañero que se aleja a mitad.
+    3. Para la entrega posterior (T432, prioridad baja), deja ya la máquina de estado caído: `UP → DOWN(t) → REVIVING(progreso) → UP` (por rescate, o por contador agotado con 3 corazones), con cuenta atrás (por defecto 30 s) y progreso mientras un compañero mantiene el botón a menos de 2 m durante 3 s. `[DUEÑO]` (ADR-011, decisión 34): con el contador agotado el caído **revive en el sitio con 3 corazones** (la transición es `DOWN → UP`, no hay estado final de fin de partida por tiempo). Nada de la primera entrega la usa.
+    4. Pruebas: cada rama; compañero en pie lejos y en otro mapa (se permite); los dos caídos a la vez (no se permite); regla apagada; y, para la máquina de T432, tiempo agotado (revive con 3 corazones, no fin de partida) y compañero que se aleja a mitad.
   hecho cuando: la prueba pasa; sin cabeceras del juego.
   no hagas: no leas el reloj ni posiciones globales dentro del módulo; no añadas condiciones de distancia a la reanimación automática.
   modelo sugerido: bajo
@@ -610,14 +632,14 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T431 [reglas] Reanimación automática mientras el compañero siga en pie
   files: el módulo de reglas de `online_actors` (`rt_online_has_fairy`, `players_collide`)
   verify: recorrido manual §CU-11 de `verificacion.md` (compañero en pie → revive solo, esté donde esté; los dos caídos a la vez → fin de partida normal; 10 repeticiones sin crash)
-  depende de: T430
-  quién: agente + dueño
+  depende de: T430, T428 (avisos)
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: `rt_online_has_fairy` (`runtime/online_actors.c:2825-2831`) se llama desde código del juego en el momento de morir y devuelve 1 si hay sesión y la regla está activa. La regla se refresca dentro de `players_collide` **después** de un `return` temprano (`:2837-2839`): con las colisiones apagadas por variable de entorno o durante un evento, no se actualiza. `[DUEÑO]` (ADR-007, decisión 7; ADR-008, decisión 15): la primera entrega mantiene la reanimación automática de hoy; lo único que cambia es que, si caen los dos a la vez, hay fin de partida normal. Este es el comportamiento final de la primera entrega; el rescate manual (T432) queda para después.
   pasos:
     1. Mueve el refresco de `g_revive_rule` y `g_nopause_rule` a un punto del fotograma que se ejecute siempre (antes del `return` temprano de `players_collide`, o a una función propia llamada desde el orquestador).
     2. Cada fotograma, en el hilo del juego, calcula y guarda en una variable atómica el resultado de `coop_revive_allowed` con los datos de los jugadores.
     3. `rt_online_has_fairy` devuelve 1 solo si esa variable es verdadera (además de las condiciones actuales).
-    4. Aviso en pantalla al revivir ("Revived: <nombre> is still standing") o al no poder ("Both players fell: game over").
+    4. Aviso en pantalla por identificador: `online_notice_push(NOTICE_REVIVED, nombre)` al revivir o `online_notice_push(NOTICE_BOTH_FELL, NULL)` al no poder (T428 les da el texto; esta tarea no escribe literales).
   hecho cuando: el recorrido pasa.
   no hagas: no llames a `online_players()` dentro de `rt_online_has_fairy` (copia 8 jugadores en la pila desde un punto delicado del juego: usa el valor ya calculado); no crees ni borres actores mientras el Link local está muerto (cuelgue documentado, DOC:732-734).
   modelo sugerido: alto
@@ -631,7 +653,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   pasos:
     1. Lee la bitácora de T406. Si dice "no viable", **no hagas esta tarea** y deja T431 como comportamiento final.
     2. Añade los sitios y el parche que indique T406 en un grupo opcional nuevo; si el grupo falta, se usa T431.
-    3. Conecta la máquina de T430: al caer, indicador "caído" en STATE y mensaje DOWN; el compañero ve marca y cuenta atrás; mantener el botón de la acción "revive" (T436) cerca envía REVIVE; el anfitrión valida distancia; el caído revive por el camino que describa T406.
+    3. Conecta la máquina de T430 (con el contador agotado revive en el sitio con 3 corazones, ADR-011, decisión 34): al caer, indicador "caído" en STATE y mensaje DOWN; el compañero ve marca y cuenta atrás; mantener el botón de la acción "revive" (T436) cerca envía REVIVE; el anfitrión valida distancia; el caído revive por el camino que describa T406.
     4. Agrupa los cambios de `game_sites.py`/`patches.py` con los de T422 (una sola recompilación).
   hecho cuando: los `verify` pasan.
   no hagas: no implementes nada que T406 no describa; no escribas direcciones en un `.c`; no mantengas a Link vivo escribiendo su vida cada fotograma.
@@ -646,19 +668,19 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   quién: agente
   contexto: Hoy cada jugador activa "Damage between players" por su cuenta y el atacante escribe en su STATE a quién golpea y con cuánto daño; la víctima lo aplica (`runtime/online_actors.c:2874-2928`). Solo se descarta el daño ≤ 0: un valor enorme se acepta. `[DUEÑO]` (ADR-008, decisión 17): el PvP es de cuerpo a cuerpo y bombas (flechas y runas, fuera de la primera entrega); el anfitrión puede prohibirlo en su sesión; el daño lo valida el anfitrión. Quién puede proponerlo sigue abierto (P4-6): se construye con el valor por defecto, "cualquiera propone; hacen falta los dos".
   pasos:
-    1. Acuerdo: `OFF → PROPOSED(por X) → ON`; `coop_pvp_ctl(st, quien, operación)`; aceptar exige que sea otro jugador; apagar vale desde cualquiera y en cualquier estado; con más de 2 jugadores, hacen falta todos los presentes. El estado lleva además `bool allowed` (regla del anfitrión "PvP permitido"): con `allowed` falso, proponer y aceptar se rechazan, y pasar a falso con un duelo en `ON` lo lleva a `OFF`.
+    1. Acuerdo: `OFF → PROPOSED(por X) → ON`; `coop_pvp_ctl(st, quien, operación)`; aceptar exige que sea otro jugador; apagar vale desde cualquiera y en cualquier estado; con más de 2 jugadores, hacen falta todos los presentes. El estado lleva además `bool allowed` (regla del anfitrión "PvP permitido"): con `allowed` falso, proponer y aceptar se rechazan, y pasar a falso con un duelo en `ON` lo lleva a `OFF`. `[DUEÑO]` (ADR-011, decisión 39): `coop_pvp_on_death(st, quien)` lleva un duelo en `ON` a `OFF` cuando muere cualquiera de los dos; después se aplica la reanimación normal (T431) y **no se pierde ningún objeto**. `[DUEÑO]` (ADR-011, decisión 40): el estado lleva `bool no_duel_zone` (cualquiera de los dos en un santuario o en una escena); con él, proponer y aceptar se rechazan con el motivo "zona sin duelo".
     2. `int coop_pvp_validate(const CoopPvpHit *h)` devuelve el daño a aplicar o 0: exige PvP activo, ambos vivos, mismo mapa, ninguno cargando, distancia ≤ `alcance + 2 m` (margen por latencia), secuencia nueva, ritmo ≤ 4 golpes por segundo por atacante, y daño = `min(poder_del_arma, 120)`; nunca negativo.
     3. `CoopPvpHit` son solo datos: posiciones, alcance, poder del arma (lo busca la integración), horas.
-    4. Pruebas: cada rechazo, daño máximo, secuencia repetida, ráfaga de 10 golpes en 1 s, PvP prohibido por el anfitrión (no se puede proponer; un duelo activo se apaga; `coop_pvp_validate` devuelve 0).
+    4. Pruebas: cada rechazo, daño máximo, secuencia repetida, ráfaga de 10 golpes en 1 s, PvP prohibido por el anfitrión (no se puede proponer; un duelo activo se apaga; `coop_pvp_validate` devuelve 0), muerte en duelo (pasa a `OFF`, sin pérdida de objetos) y zona sin duelo (santuario o escena: no se puede proponer ni aceptar).
   hecho cuando: la prueba pasa; sin cabeceras del juego.
   no hagas: no confíes en ningún valor de daño que venga del atacante; no uses variables globales; no añadas flechas ni runas como fuente de daño.
   modelo sugerido: medio
 
 - [ ] T434 [reglas] PvP por acuerdo con daño validado por el anfitrión
-  files: el módulo de reglas de `online_actors` (`pvp_update`), runtime/online.c (colas de PVP_CTL, PVP_HIT, PVP_DMG), runtime/ui/online_ui.mm (sustituir el interruptor por proponer/aceptar/apagar)
+  files: el módulo de reglas de `online_actors` (`pvp_update`), runtime/online.c (colas de PVP_CTL, PVP_HIT, PVP_DMG), runtime/ui/online_ui.mm (sustituir el interruptor por proponer/aceptar/apagar), specs/fases/F4-funciones-coop/textos-nuevos.txt
   verify: `sh tools/nettest/run.sh pvp_cheat` sale con 0 (bot que envía PVP_DMG sin ser anfitrión y PVP_HIT a 500 m: el otro bot recibe 0 PVP_DMG) **y** recorrido manual §CU-12
-  depende de: T409, T433
-  quién: agente + dueño
+  depende de: T409, T433, T438 (modo `BOT_PVP_CHEAT` y escenario `pvp_cheat`)
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: `pvp_update` (`runtime/online_actors.c:2874`) hace dos cosas: publica el golpe propio en `g_pvp` (objetivo, daño = poder de ataque del arma según `power.txt`) y aplica los golpes de los demás leídos de su STATE (`pvp_seq`, `pvp_target`, `pvp_damage`), restando la defensa propia y respetando el bloqueo con escudo (`:2907-2928`).
   pasos:
     1. Acuerdo: la pestaña ofrece "Propose PvP" / "Accept" / "Turn off"; envían PVP_CTL. El juego del anfitrión mantiene el estado (`coop_pvp_ctl`) y lo publica en sus reglas de sesión; los demás lo adoptan. `[DUEÑO]` (ADR-008, decisión 17) El anfitrión tiene además el interruptor "Allow PvP in this session" (regla de sesión "PvP permitido" de T409, activada por defecto `[PROPUESTA]`): apagado, los botones de proponer y aceptar salen deshabilitados para todos y el anfitrión rechaza cualquier PVP_CTL de propuesta.
@@ -666,8 +688,9 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     3. Anfitrión: por cada PVP_HIT construye `CoopPvpHit` con las posiciones que conoce de ambos y el poder del arma del atacante según su EQUIP (`attack_power`), llama a `coop_pvp_validate` y, si el daño es mayor que 0, envía PVP_DMG.
     4. Víctima: aplica PVP_DMG con el código actual de defensa y bloqueo. Deja de leer `pvp_damage` del STATE.
     5. Bombas: el mismo camino, con el daño fijo actual calculado por el anfitrión.
-    6. Añade el modo de bot `BOT_PVP_CHEAT=1` y el escenario.
-    7. No cambies el alcance de las armas ni añadas daño de flechas o runas (`[DUEÑO]` ADR-008, decisión 17: solo cuerpo a cuerpo y bombas).
+    6. El modo de bot `BOT_PVP_CHEAT=1` y el escenario `pvp_cheat` los crea T438.
+    7. `[DUEÑO]` (ADR-011, decisión 39): si uno de los dos muere en un duelo, el acuerdo se apaga (`coop_pvp_on_death`) y actúa la reanimación normal de T431, sin quitar objetos. `[DUEÑO]` (decisión 40): no se abre duelo en santuarios ni durante escenas; los botones de proponer y aceptar salen deshabilitados con el motivo "zona sin duelo" y se alimenta `no_duel_zone` con el dato de escena que ya usa T418; si no hay una vía comprobada para reconocer un santuario, para y pregunta.
+    8. No cambies el alcance de las armas ni añadas daño de flechas o runas (`[DUEÑO]` ADR-008, decisión 17: solo cuerpo a cuerpo y bombas).
   hecho cuando: los dos `verify` pasan.
   no hagas: no apliques daño que no venga en un PVP_DMG marcado por el servidor como del anfitrión; no quites el bloqueo con escudo ni la defensa; no permitas PvP con el acuerdo apagado, ni con el PvP prohibido por el anfitrión, aunque llegue PVP_DMG.
   modelo sugerido: alto
@@ -683,8 +706,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   pasos:
     1. Junto a cada jugador de la lista: botones "Go to" (ir con él; sin pedirle permiso) y "Bring here" (invocarle; él debe aceptar). Mientras dure la espera de 30 s, "Go to" sale deshabilitado con los segundos que faltan.
     2. Texto de ayuda fijo: para dar objetos al compañero se sueltan de la bolsa y él los ve marcados; solo materiales y comida (ADR-009, decisión 24). El botón "Give item…" **no** se añade en la primera entrega: llega con el envío directo (T420-T422), y entonces lista solo materiales y comida.
-    3. Sección "Co-op": perfil de guardado en uso, color y forma (con "Automatic" por defecto), tamaño de texto. No hay ajuste de espera de teletransporte ni de distancia de revivir: los fijó el dueño (ADR-008, decisión 16; ADR-007, decisión 7).
-    4. Sección "Combat": los tres botones de PvP en lugar del interruptor, y para el anfitrión "Allow PvP in this session".
+    3. Sección "Co-op": ordena y comprueba los controles que ya crearon T425 (color y forma, con "Automatic" por defecto), T428 (tamaño de texto) y T414 (perfil en uso); no los dupliques. No hay ajuste de espera de teletransporte ni de distancia de revivir: los fijó el dueño (ADR-008, decisión 16; ADR-007, decisión 7).
+    4. Sección "Combat": comprueba los controles de PvP que creó T434 (tres botones y, para el anfitrión, "Allow PvP in this session"); aquí no se crean de nuevo.
     5. Los ajustes del anfitrión aparecen deshabilitados para el invitado, como ya hace el código con `collide`/`nopause`/`revive` (`:113-127`).
     6. Usa los widgets `opt_*`; todo alcanzable con mando.
   hecho cuando: cada función de F4 se puede usar sin teclado.
@@ -694,7 +717,7 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T436 [entrada] Atajos: ping, chat rápido, aceptar/rechazar, revivir
   files: runtime/hle/bindings.c, runtime/input_bind.h, runtime/hle/input.c (solo si es imprescindible), docs/ACTIONS.md, tests (la prueba existente de acciones), specs/bitacora/F4-T436-botones-libres.md
   verify: `make test-actions` sale con 0 y `make runtime-objs` sin avisos; la bitácora contiene la tabla de botones y teclas libres y la combinación propuesta al dueño
-  depende de: T426, T427
+  depende de: F1 (no depende de ninguna otra tarea de F4: T426 y T427 dependen de esta)
   quién: agente (el dueño elige la combinación del mando)
   contexto: El proyecto tiene un sistema de asignación de teclas y botones por acción (`runtime/hle/bindings.c`, tablas en `runtime/input_bind.h`, documentación en `docs/ACTIONS.md`, prueba `make test-actions`). El modo en línea solo añadió dos variables globales en `runtime/hle/input.c:1203-1208` (botones que ve el juego y bloqueo de A). Con qué botón se lanza el ping y se abre la rueda de chat rápido es **lo único de CU-10 que sigue abierto** (Q-10-5; ADR-009, "Lo único que sigue abierto"): no es una decisión de diseño sino una comprobación de qué está libre.
   pasos:
@@ -710,23 +733,23 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
 - [ ] T437 [i18n] Traducir los textos nuevos de F4 a los 13 idiomas
   files: runtime/ui/i18n/*.inc
   verify: `tools/venv/Scripts/python.exe tools/i18n_check.py` → `0 missing` en los 13 y sale con 0
-  depende de: T423, T425-T429, T431, T434, T435, T436, T442
+  depende de: T419, T423, T425-T429, T431, T434, T435, T436, T442
   quién: agente (dueño único de los `.inc`)
   contexto: Cada carril dejó sus textos en inglés en `specs/fases/F4-funciones-coop/textos-nuevos.txt`. La clave de traducción es el texto inglés: `T("English", "traducción")` en cada `runtime/ui/i18n/<idioma>.inc`.
   pasos:
-    1. `tools/i18n_check.py --missing <idioma>` para cada uno de los 13.
+    1. El orquestador ejecuta `tools/i18n_check.py --missing <idioma>` para cada uno de los 13 y te pasa la lista.
     2. Añade las líneas al bloque `// Online (co-op)` del final de cada fichero.
     3. Conserva `%s`/`%d` en el mismo orden; las 8 frases de chat rápido deben ser cortas y naturales en cada idioma. En español son, sin cambiar una letra, las que fijó el dueño (ADR-009, decisión 28): "Ven aquí", "Espera", "Necesito ayuda", "Gracias", "Sí", "No", "Vamos", "Mira esto".
-  hecho cuando: `0 missing` y capturas en español, japonés y hebreo.
+  hecho cuando: `0 missing` y capturas en español, japonés y hebreo (las hace el orquestador o el dueño).
   no hagas: no cambies la cadena inglesa; no reformatees líneas existentes.
   modelo sugerido: bajo
 
 - [ ] T438 [P] [pruebas] Modos de bot y escenarios de F4
-  files: tools/online_bot.c, tools/nettest/scenarios/*.sh
-  verify: `sh tools/nettest/run.sh all` sale con 0 con los escenarios nuevos incluidos
-  depende de: T409
+  files: tools/online_bot.c, tools/nettest/scenarios/bot_modes_f4.sh, tools/nettest/scenarios/flags_all_ones.sh, tools/nettest/scenarios/flags_one.sh, tools/nettest/scenarios/pvp_cheat.sh, tools/nettest/scenarios/mark_rate.sh, tools/nettest/scenarios/tp_cooldown.sh, tools/nettest/scenarios/world_fake.sh, tools/nettest/scenarios/give_states.sh
+  verify: `sh tools/nettest/run.sh bot_modes_f4` sale con 0 (lanza el bot una vez por modo nuevo y comprueba en el registro la línea `bot: mode <nombre> active`; los escenarios de comportamiento los verifican las tareas que los usan y `run.sh all` al cierre, R.2)
+  depende de: T409 (va **justo después** de T409: T411, T421, T426 y T434 dependen de esta tarea)
   quién: agente
-  contexto: El bot (ampliado en F3) no conoce los mensajes de F4. Las tareas T411, T421, T426 y T434 necesitan modos concretos.
+  contexto: El bot (ampliado en F3) no conoce los mensajes de F4. Las tareas T411, T421, T426 y T434 necesitan modos concretos; por eso se reúnen aquí, antes que ellas, y esas tareas no editan el bot ni `run.sh` (F3 dejó los escenarios como ficheros `tools/nettest/scenarios/<nombre>.sh`).
   pasos:
     1. `BOT_FLAGS_ALL=1` (QUEST con todos los bits a 1 desde el primer envío), `BOT_FLAGS_ONE=<índice>,<s>` (activa un bit a los s segundos).
     2. `BOT_GIVE=<objeto>,<n>` (emisor de la transacción), `BOT_GIVE_DROP=<paso>` (corta la conexión tras ese paso). Son del envío directo (segunda entrega): hazlos solo cuando se haga T420.
@@ -734,21 +757,21 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
     4. `BOT_TP=1` (pide ir con el otro cada 35 s, contesta a los "ir" que recibe y acepta las invocaciones), `BOT_TP_FAST=1` (pide ir cada 5 s, para comprobar que la espera de 30 s se hace cumplir en el anfitrión) y `BOT_WORLD_FAKE=1` (envía WORLD sin ser anfitrión, con números de corazones y resistencia desorbitados).
     5. `BOT_FLOOD=mark,<hz>`.
     6. Escenarios: `flags_all_ones`, `flags_one`, `pvp_cheat`, `mark_rate`, `tp_cooldown`, `world_fake`; y `give_states` solo con T420.
-  hecho cuando: `all` pasa.
+  hecho cuando: `bot_modes_f4` pasa y los escenarios existen.
   no hagas: no copies estructuras de cable a mano; no cambies el comportamiento por defecto del bot.
   modelo sugerido: medio
 
 - [ ] T439 [integración] Registrar los módulos en el fotograma, objetivos de prueba y variables
   files: el orquestador de fotograma de `online_actors` (`rt_online_frame`), Makefile (bloque de pruebas del final), runtime/launch_flags_table.c (regenerado)
   verify: `make test-online test-coop` sale con 0 y `make test-launch-flags` sale con 0
-  depende de: T411, T416, T419, T423, T431, T434, T442
+  depende de: T411, T416, T419, T423, T431, T434, T442 y de todo lo que edite `online.c` (cadena de `plan.md` §5)
   quién: agente integrador
   contexto: Tras F2, `rt_online_frame` es una lista de llamadas con el orden escrito. Cada función de F4 necesita su llamada por fotograma en un sitio concreto del orden, y su limpieza al salir de sesión y en `RT_ON_RESET`.
   pasos:
     1. Añade las llamadas por fotograma de: seguimiento de suelo y teletransporte, puesta al día al entrar (T442), política de revivir, PvP, avisos; y la transacción de objetos solo si T420-T422 se hicieron. Ninguna antes de comprobar que el Link local existe y no está cargando.
     2. Registra la limpieza de cada módulo en el mecanismo de F2 (`oa_register_forget` o equivalente) y en `RT_ON_RESET`.
     3. Makefile: objetivo `test-coop` con todas las pruebas `tests/test_coop_*.c`.
-    4. Regenera `runtime/launch_flags_table.c` con `tools/gen_launch_flags.py`.
+    4. Pide al orquestador que regenere `runtime/launch_flags_table.c` con `tools/gen_launch_flags.py` (el subagente no ejecuta el generador).
   hecho cuando: los `verify` pasan y una sesión de 10 minutos no deja estado tras "Leave" (segunda sesión limpia).
   no hagas: no cambies el orden de las llamadas existentes; no edites a mano la tabla generada; no añadas reglas en mitad del Makefile.
   modelo sugerido: alto

@@ -4,7 +4,7 @@ Estado: borrador para revisión del dueño. Depende de F2 (partición de `online
 (autoridad en el servidor, reconexión, versión estricta).
 
 Decisiones del dueño ya incorporadas (2026-11-24): `../../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
-`ADR-008-respuestas-del-dueno-ronda-2.md` y `ADR-009-respuestas-del-dueno-ronda-3.md`. Se citan como
+`ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md` y `ADR-011-respuestas-del-dueno-ronda-4.md` (decisiones 29-47). Se citan como
 "ADR-00x, decisión n" y van marcadas `[DUEÑO]`. Si este documento dice otra cosa que un ADR, **vale el ADR**.
 
 Convenciones:
@@ -136,8 +136,10 @@ con prioridad baja.
   no necesita que el compañero lo acepte (su juego contesta solo con el punto de llegada; sin respuesta en 15 s, se
   cancela). "Traer a mi compañero" (invocar) envía una petición que el invocado **debe aceptar**; si no acepta o no
   responde, no se le mueve. Puede invocar cualquiera de los dos.
-- **R4-12** Solo en el mismo mapa, fuera de eventos, ninguno muerto, cargando ni en pausa. `[DUEÑO]` (ADR-008,
-  decisión 16) Espera de **30 s** entre usos, fija.
+- **R4-12** Motivos de rechazo del **viajero**: evento en curso, muerto, cargando, en pausa, montado, en espera.
+  Motivos del **destino**: mapa distinto, muerto o cargando. `[DUEÑO]` (ADR-011, decisión 37) **Un compañero en plena
+  escena o conversación no impide viajar hacia él**: el viajero aparece cerca y no se interrumpe a nadie. `[DUEÑO]`
+  (ADR-008, decisión 16) Espera de **30 s** entre usos, fija; sin más coste (ADR-011, decisión 36).
 - **R4-13** El destino es un punto junto al compañero tomado cuando este está en el suelo; si no lo está (cayendo,
   planeando, nadando, escalando), se usa su última posición en el suelo de los últimos segundos.
 - **R4-14** El anfitrión valida la petición (mismo mapa, enfriamiento) antes de reenviarla.
@@ -170,6 +172,8 @@ con prioridad baja.
 - **R4-21** Los avisos de red importantes aparecen en pantalla, no solo en el registro (hoy "A held back" solo se
   registra, OA:5999).
 - **R4-22** Tamaño de texto del overlay ajustable; ningún estado depende solo del color.
+- **R4-35** `[DUEÑO]` (ADR-011, decisión 41) No hay marcador en el mapa del propio juego en F4: junto a la flecha en pantalla
+  se muestran la distancia y el **nombre del mapa** del compañero. Se estudia después.
 
 ### K–L. Revivir
 
@@ -189,6 +193,9 @@ con prioridad baja.
   atacante. Daño negativo, cero o desorbitado se descarta. Solo cuerpo a cuerpo y bombas; el alcance de las armas
   no cambia.
 - **R4-27** Se ve quién tiene el PvP activo.
+- **R4-33** `[DUEÑO]` (ADR-011, decisión 39) Si alguien muere en un duelo, el duelo se apaga y se aplica la reanimación
+  normal; no se pierde ningún objeto.
+- **R4-34** `[DUEÑO]` (ADR-011, decisión 40) No se puede abrir un duelo en santuarios ni durante escenas.
 
 ## 5. Criterios de salida (medibles)
 
@@ -207,7 +214,7 @@ con prioridad baja.
 | S11 | Accesibilidad | Revisión con la simulación de daltonismo (`SAVAGEWIND_CVD_SIMULATE`, `runtime/colour_vision.h`): todos los estados distinguibles |
 | S12 | Revivir | Compañero en pie: el caído se levanta solo. Los dos caídos a la vez: fin de partida normal para ambos. 10 repeticiones sin crash |
 | S13 | PvP por acuerdo | Con uno solo activado: 0 daño. Con los dos: daño aplicado. Con el PvP prohibido por el anfitrión: no se puede proponer y 0 daño. Bot tramposo (daño 9999, negativo, a 500 m): 0 daño aplicado |
-| S14 | Idiomas | `tools/i18n_check.py` → `0 missing` |
+| S14 | Idiomas | `tools/i18n_check.py` → `0 missing`; los avisos nacen en `.c` por identificador y su literal vive en `coop_hud.mm` dentro de `tr()` (si no, el comprobador no los ve) |
 | S15 | Regresión | Recorrido de 30 minutos de F1 sin crash |
 | S16 | Ponerse al día al entrar | Un invitado con perfil cooperativo recién creado entra en un mundo avanzado: mismos contenedores de corazón y mejoras de resistencia que el anfitrión, habilidades de campeón ya ganadas, inventario vacío; al volver a entrar no recibe nada por segunda vez |
 
@@ -233,7 +240,7 @@ con prioridad baja.
 
 ## 7. Preguntas para el dueño
 
-Resueltas en las tres rondas del 2026-11-24 (la respuesta manda sobre la propuesta que había aquí):
+Resueltas en las cuatro rondas del 2026-11-24 (la respuesta manda sobre la propuesta que había aquí):
 
 | # | Pregunta | Respuesta del dueño | Estado |
 |---|---|---|---|
