@@ -90,10 +90,12 @@ lanzar() {
         else
             export SAVAGEWIND_HIDDEN=1 SAVAGEWIND_INPUT="900:A:8,1400:A:8,1900:A:8"
         fi
+        # Sin nohup: el nohup de MSYS2 lanzado desde Git Bash pierde las variables SAVAGEWIND_* (el juego
+        # arrancaba con savagewind.ini, ventana y la carpeta save por defecto).
         if [ "$modo" = ">>" ]; then
-            nohup "$EXE" >> "$log" 2>&1 < /dev/null &
+            "$EXE" >> "$log" 2>&1 < /dev/null & disown
         else
-            nohup "$EXE" > "$log" 2>&1 < /dev/null &
+            "$EXE" > "$log" 2>&1 < /dev/null & disown
         fi
     )
     echo "lanzado $x ($online, control $ctl, log $log)"
