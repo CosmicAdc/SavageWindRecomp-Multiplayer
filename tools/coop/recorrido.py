@@ -197,7 +197,14 @@ class Ctx:
     def dos_juegos(self, *orden):
         # Ruta completa de bash: en Windows, CreateProcess busca en System32 antes que en PATH y "bash" sería el de
         # WSL, que no ve las rutas C:/... (pasos 9 y 10 fallaban con "No such file or directory").
-        bash = shutil.which("bash") or "bash"
+        # Desde PowerShell, shutil.which("bash") también da el de WSL (C:\Windows\system32\bash.exe): se prefiere el de
+        # MSYS2 o Git, y se descarta cualquiera de System32.
+        bash = next((b for b in ("C:/Program Files/Git/bin/bash.exe", "C:/msys64/usr/bin/bash.exe")
+                     if os.name == "nt" and os.path.exists(b)), None)
+        if bash is None:
+            bash = shutil.which("bash") or "bash"
+            if "system32" in bash.lower():
+                raise Falla(f"el bash encontrado es el de WSL ({bash}); instalar MSYS2 o Git for Windows")
         p = subprocess.run([bash, DOS_JUEGOS.as_posix(), *orden], capture_output=True, text=True)
         if p.returncode != 0:
             raise Falla(f"dos_juegos.sh {' '.join(orden)} fallo: {(p.stderr or p.stdout).strip()}")

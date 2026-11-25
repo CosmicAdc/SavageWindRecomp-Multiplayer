@@ -169,6 +169,8 @@ Lo que usan todas las tablas siguientes. Todo **[L]** salvo que se diga otra cos
 | Cámara de la pizarra y fotos | Sin detección [L]; la cámara no es pausa [H]. La cámara libre del runtime casi para el reloj (mapa 03 §1.5) | En las fotos sale la marioneta [H] | cosmético | — | — |
 | amiibo | `services/nfp.c` es un lector local con `nfp_reset` [L]; nada en el modo online [L] | Lo que suelta el amiibo puede entrar en el botín compartido si queda quieto sin HashId [H]. Link Lobo solo existe en su juego [H] | cosmético | — | Q-EST-8 |
 
+> **Respondidas en ADR-025 (2026-11-25).** Cambian respecto a la propuesta: Q-EST-2 (el invitado duerme y espera a que el anfitrión elija la hora), Q-EST-4 (los dos ven la escena de la Luna de Sangre), Q-EST-6 (entran los dos juntos al reto) y Q-EST-8 (amiibo bloqueados durante la sesión). Las demás, como la propuesta.
+
 ### 2.8 Pausa, menús, mapa grande, inventario y foco
 
 | Estado | Qué hace hoy | Riesgo con dos jugadores | Gravedad | Cubierto por | Falta |
