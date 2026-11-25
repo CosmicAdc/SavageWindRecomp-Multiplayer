@@ -38,7 +38,6 @@ tras la verificación del orquestador, y todo lo que exige juego o firma de refe
 |---|---|---|---|
 | T201 `tools/coop/firma_log.py` | `7b53d18` | `--autoprueba` 0 | etiqueta `f1-cerrada`, tres pasadas de referencia y cuarta con `--comparar` |
 | T202 `runtime/online_wire.h` | `2f38cc9` | `make -j8` 0 (aserciones de tamaño compiladas); bot `cc -O2 -Wall -Iruntime` sin avisos; `grep` de `typedef struct` y `version = 38` en el bot vacíos; `test-online-net` 162/0 | bot contra el juego; Linux en Docker |
-
 | T203 pruebas de trama | `baf62ff` | Windows: `test-online-wire` 16647/0 (error SKEL máx. 9,93e-5 rad; tolerancia 2e-4), `test-online-net` 309/0. El primer intento falló por la prueba: `cbuf` de 32 KB y un ENEMIES de 255 entradas pide 79 KB; se agrandó a 128 KB | Docker |
 
 ## F2 adelantada: en curso
