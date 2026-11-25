@@ -337,36 +337,36 @@ oa_enemies.c:last                            partida   prueba BOSS_HIT/BOSS_KILL
 oa_enemies.c:logt                            partida   contador de log (BOSS_LOG)
 oa_enemies.c:tick                            partida   contador de oa_enemies_frame
 # oa_flags.c
-oa_flags.c:oa_bloody_moon_follow:tested      partida   prueba BM_TEST hecha
-oa_flags.c:oa_bloody_moon_follow:wait        partida   prueba BM_TEST
-oa_flags.c:oa_bloody_moon_follow:logged      partida   contador de avisos en el log
-oa_flags.c:oa_weather_follow:logged          partida   contador de avisos en el log
-oa_flags.c:oa_slate_event:tries              partida   intentos del evento de la tableta
-oa_flags.c:oa_slate_event:wait               partida   espera entre intentos
+oa_flags.c:tested                            partida   prueba BM_TEST hecha
+oa_flags.c:oa_bloody_moon_follow_wait        partida   prueba BM_TEST
+oa_flags.c:oa_bloody_moon_follow_logged      partida   contador de avisos en el log
+oa_flags.c:oa_weather_follow_logged          partida   contador de avisos en el log
+oa_flags.c:tries                             partida   intentos del evento de la tableta
+oa_flags.c:oa_slate_event_wait               partida   espera entre intentos
 oa_flags.c:slate_rune:runes                  permitir  tabla constante
 oa_flags.c:korok_event:off                   permitir  desplazamiento del HashId dentro de un actor, descubierto una vez (el mismo en cada arranque de 1.9.0)
-oa_flags.c:korok_event:meta                  puntero   memoria donde el juego monta los datos del evento (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
+oa_flags.c:meta                              puntero   memoria donde el juego monta los datos del evento (direcciones del juego); búfer de trabajo, pero se limpia (resolución 1)
 oa_flags.c:oa_g_fake_blood_moon              partida   orden `bloodmoon` pendiente (hilo de control → fotograma)
 oa_flags.c:oa_quests_update:m                permitir  tabla de oa_map_load que no se usa (siempre 0)
 oa_flags.c:oa_quests_update:names            permitir  tabla cargada de quests.txt
 oa_flags.c:oa_quests_update:hash             permitir  tabla cargada de quests.txt (CRC de cada nombre)
 oa_flags.c:oa_quests_update:revival          permitir  tabla cargada de quests.txt (qué flags renacen con la Luna de Sangre: sale solo del nombre)
-oa_flags.c:oa_quests_update:held_off         partida   flags retenidos tras una Luna de Sangre
-oa_flags.c:oa_quests_update:had              partida   flags que tenía este juego en la última vuelta
+oa_flags.c:held_off                          partida   flags retenidos tras una Luna de Sangre
+oa_flags.c:had                               partida   flags que tenía este juego en la última vuelta
 oa_flags.c:oa_quests_update:n                permitir  número de líneas de quests.txt (-1 sin cargar)
-oa_flags.c:oa_quests_update:tick             partida   contador
+oa_flags.c:tick                              partida   contador
 oa_flags.c:oa_quests_update:kinds            permitir  tabla constante
-oa_flags.c:oa_quests_update:counted          partida   diagnóstico de flags hecho una vez por partida (mira los datos del juego)
-oa_flags.c:oa_quests_update:had_once         partida   va con had
-oa_flags.c:oa_quests_update:last             partida   últimos flags enviados (anfitrión)
-oa_flags.c:oa_quests_update:sent             partida   enviados al menos una vez (anfitrión)
-oa_flags.c:oa_quests_update:last#2           partida   últimos flags enviados (invitado)
-oa_flags.c:oa_quests_update:every            partida   contador de reenvío (invitado)
-oa_flags.c:oa_quests_update:slate_started    partida   evento de la tableta arrancado
-oa_flags.c:oa_quests_update:korok_played     partida   escenas de Korok ya lanzadas
-oa_flags.c:oa_quests_update:korok_np         partida   índice de korok_played
-oa_flags.c:oa_quests_update:wait_h           partida   Koroks esperando escena
-oa_flags.c:oa_quests_update:wait_n           partida   intentos de cada uno
+oa_flags.c:counted                           partida   diagnóstico de flags hecho una vez por partida (mira los datos del juego)
+oa_flags.c:had_once                          partida   va con had
+oa_flags.c:oa_quests_update_last             partida   últimos flags enviados (anfitrión)
+oa_flags.c:sent                              partida   enviados al menos una vez (anfitrión)
+oa_flags.c:oa_quests_update_last_2           partida   últimos flags enviados (invitado)
+oa_flags.c:every                             partida   contador de reenvío (invitado)
+oa_flags.c:slate_started                     partida   evento de la tableta arrancado
+oa_flags.c:korok_played                      partida   escenas de Korok ya lanzadas
+oa_flags.c:korok_np                          partida   índice de korok_played
+oa_flags.c:wait_h                            partida   Koroks esperando escena
+oa_flags.c:wait_n                            partida   intentos de cada uno
 # oa_frame.c
 oa_frame.c:g_last_link                       partida   última posición del Link local
 oa_frame.c:g_settle                          partida   fotogramas de espera tras una carga
