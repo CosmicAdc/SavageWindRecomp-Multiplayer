@@ -1,6 +1,7 @@
 // Online play's actors, oa_control: the control commands (flag, setflag, event, actors, ...). What the modules share:
 // runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 // `actors <text>` (control): the live actors whose name has text in it, with where each is and how far from Link.
 // The control thread asks, the frame loop answers (the actor list is the game's, read on its thread only).
@@ -172,14 +173,23 @@ void oa_control_frame(Cpu *c, uint64_t pinfo) {
     oa_event_query(c, pinfo);
 }
 
+// oa_control_tests_frame's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int next, oa_control_tests_frame_tick;
+static Piece p;
+static uint64_t seen_a[64];
+static uint32_t seen_v[64];
+static int oa_control_tests_frame_tick_2;
+static int oa_control_tests_frame_t;
+static int32_t last = -12345;
+static int oa_control_tests_frame_t_2;
+
 // rt_online_frame, step 10: the tests by environment variable (their own state kept in each)
 void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]) {
     if (getenv("SAVAGEWIND_ONLINE_ENEMY_TEST")) {  // (test: each enemy's online actor made in turn, next to Link)
         static MapLine *m;
-        static int n = -1, next, tick;
-        static Piece p;
+        static int n = -1;
         if (n < 0) n = oa_map_load("enemies.txt", &m);
-        if (tick++ % 20 == 0 && next < n) {
+        if (oa_control_tests_frame_tick++ % 20 == 0 && next < n) {
             if (p.actor || p.pending) oa_delete_piece(c, &p);
             LOG("[online] enemy test %d: %s\n", next, m[next].val);
             oa_piece_update(c, 0, &p, m[next].val, "test");
@@ -191,11 +201,8 @@ void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]) {
         }
     }
     if (getenv("SAVAGEWIND_ONLINE_LOOK_LOG")) {  // (test: the actors near whose +0x710 / +0x518 change)
-        static uint64_t seen_a[64];
-        static uint32_t seen_v[64];
-        static int tick;
         uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
-        if (VALID(pl0) && tick++ % 3 == 0) {
+        if (VALID(pl0) && oa_control_tests_frame_tick_2++ % 3 == 0) {
             int na = oa_all_actors(*(uint64_t *)(uintptr_t)(pl0 + 0x68), oa_g_actors, MAX_ACTORS);
             const float *pm = (const float *)(uintptr_t)(pl0 + 0x398);
             for (int k = 0; k < na; k++) {
@@ -216,22 +223,19 @@ void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]) {
         }
     }
     {   // (test: SAVAGEWIND_ONLINE_DIE_TEST=<s>: the local Link dies that many seconds in)
-        static int t;
         const char *dt = getenv("SAVAGEWIND_ONLINE_DIE_TEST");
         uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
-        if (dt && VALID(pl0) && ++t == atoi(dt) * 30) *(int32_t *)(uintptr_t)(pl0 + ENEMY_LIFE) = 0, LOG("[online] die test\n");
+        if (dt && VALID(pl0) && ++oa_control_tests_frame_t == atoi(dt) * 30) *(int32_t *)(uintptr_t)(pl0 + ENEMY_LIFE) = 0, LOG("[online] die test\n");
     }
     if (getenv("SAVAGEWIND_ONLINE_LIFE_LOG")) {  // (test: the local Link's life, as it changes)
-        static int32_t last = -12345;
         uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
         int32_t v = VALID(pl0) ? *(int32_t *)(uintptr_t)(pl0 + ENEMY_LIFE) : -1;
         if (v != last) LOG("[online] our life %d\n", v), last = v;
     }
     {   // (test: SAVAGEWIND_ONLINE_KNOCK_TEST=<s>: a heavy blow's knock on the local Link every that many seconds)
-        static int t;
         const char *kt = getenv("SAVAGEWIND_ONLINE_KNOCK_TEST");
         uint64_t pl0 = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
-        if (kt && VALID(pl0) && ++t % (atoi(kt) * 30) == 0) {
+        if (kt && VALID(pl0) && ++oa_control_tests_frame_t_2 % (atoi(kt) * 30) == 0) {
             const float *pm = (const float *)(uintptr_t)(pl0 + 0x398);
             float at[3] = {pm[3] + 1, pm[7] + 0.3f, pm[11]};
             const char *kn = getenv("SAVAGEWIND_ONLINE_KNOCK");
@@ -239,4 +243,21 @@ void oa_control_tests_frame(Cpu *c, uint64_t pinfo, const float link[3]) {
             LOG("[online] knock test\n");
         }
     }
+}
+
+// A reboot (runtime/main.c teardown): a request of the control thread still under way belongs to the last boot - not
+// answered in the next one (that thread, waiting, sees no answer and says so); the tests start again as in a fresh
+// process. Nothing here calls the game (the test's piece went with its memory)
+RT_ON_RESET(oa_control_reset) {
+    memset(&g_find, 0, sizeof g_find);
+    memset(&g_flagq, 0, sizeof g_flagq);
+    memset(&g_eventq, 0, sizeof g_eventq);
+    next = oa_control_tests_frame_tick = 0;
+    memset(&p, 0, sizeof p);
+    memset(seen_a, 0, sizeof seen_a);
+    memset(seen_v, 0, sizeof seen_v);
+    oa_control_tests_frame_tick_2 = 0;
+    oa_control_tests_frame_t = 0;
+    last = -12345;
+    oa_control_tests_frame_t_2 = 0;
 }

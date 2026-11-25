@@ -1,6 +1,7 @@
 // Online play's actors, oa_gamedata: the game's data: its flags (GameDataMgr), events started, items and hearts given.
 // What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 // ---- The quests (protocol 17): the flags of online_mod/quests.txt (the main, shrine and side quests' steps and the bool flags
 // they depend on) are everyone's: each game sends which it has (every 2 s), the host's game ORs them all with its own
@@ -41,12 +42,14 @@ uint32_t *oa_gdt_value(int off, uint32_t h) {
     return VALID(pr) && *(uint32_t *)(uintptr_t)(pr + 0xc) == h ? (uint32_t *)(uintptr_t)(f + 0x10) : NULL;
 }
 
+// oa_start_event's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint8_t meta[0x200] __attribute__((aligned(16)));
+static struct { float m[12]; uint32_t flags, pad; uint64_t meta, zero, actor; } req __attribute__((aligned(16)));
+
 bool oa_start_event(Cpu *c, uint64_t actor, const char *flow, const char *entry) {
     uint64_t mgr = *(uint64_t *)(uintptr_t)P_EVT_MGR;
     mgr = VALID(mgr) ? *(uint64_t *)(uintptr_t)mgr : 0;
     if (!VALID(mgr) || !VALID(actor)) return false;
-    static uint8_t meta[0x200] __attribute__((aligned(16)));
-    static struct { float m[12]; uint32_t flags, pad; uint64_t meta, zero, actor; } req __attribute__((aligned(16)));
     memset(meta, 0, sizeof meta);
     oa_call(c, FN_EVT_META_INIT, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
     oa_call(c, FN_EVT_META_NAME, (uint64_t)(uintptr_t)meta, (uint64_t)(uintptr_t)flow, (uint64_t)(uintptr_t)entry,
@@ -87,4 +90,10 @@ bool oa_set_bool_flag(Cpu *c, uint32_t h) {
     handle |= (uint32_t)*(int32_t *)(uintptr_t)(mgr + 0xc28) << 24;
     if (handle == 0xffffffffu) return false;
     return oa_call(c, FN_GDT_SET_BOOL, mgr, 1, handle, 0, 0, 0) & 1;
+}
+
+// A reboot (runtime/main.c teardown): the event's work memory held the last boot's addresses (ADR-026, resolution 1)
+RT_ON_RESET(oa_gamedata_reset) {
+    memset(meta, 0, sizeof meta);
+    memset(&req, 0, sizeof req);
 }

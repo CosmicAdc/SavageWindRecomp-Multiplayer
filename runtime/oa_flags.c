@@ -1,6 +1,7 @@
 // Online play's actors, oa_flags: the flags the players share: the quests, the slate, the Koroks, the Blood Moon, the
 // weather. What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 // The weather: the host's where the others are near him (WEATHER_NEAR: the game's weather is a region's, and each game
 // draws its own; far from him each one keeps his own). ksys::world::Manager's current weather (+0x7d1) is set as
@@ -34,12 +35,15 @@ static void bloody_moon_set(Cpu *c, float v) {
     *bm = v;
 }
 
+// oa_bloody_moon_follow's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static bool tested;
+static int oa_bloody_moon_follow_wait;
+static int oa_bloody_moon_follow_logged;
+
 void oa_bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me) {
     const char *test = getenv("SAVAGEWIND_ONLINE_BM_TEST");  // (test: the host's timer set to that once, in the world)
-    static bool tested;
     if (test && me == 0 && !tested && oa_bloody_moon_timer()) {
-        static int wait;
-        if (++wait > 300) bloody_moon_set(c, strtof(test, NULL)), tested = true, LOG("[online] Blood Moon test: %s\n", test);
+        if (++oa_bloody_moon_follow_wait > 300) bloody_moon_set(c, strtof(test, NULL)), tested = true, LOG("[online] Blood Moon test: %s\n", test);
     }
     const OnlinePlayer *h = &pl[0];  // (the host: slot 0)
     float *bm = oa_bloody_moon_timer();
@@ -48,10 +52,12 @@ void oa_bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me) {
         return;
     float d = h->pose.bloody_moon - *bm;
     if (d < 30 && d > -30) return;  // (two game hours: his comes a little before or after ours, the same night)
-    static int logged;
-    if (logged++ < 10) LOG("[online] the host's Blood Moon timer: %.1f (was %.1f)\n", h->pose.bloody_moon, *bm);
+    if (oa_bloody_moon_follow_logged++ < 10) LOG("[online] the host's Blood Moon timer: %.1f (was %.1f)\n", h->pose.bloody_moon, *bm);
     bloody_moon_set(c, h->pose.bloody_moon);
 }
+
+// oa_weather_follow's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_weather_follow_logged;
 
 void oa_weather_follow(const OnlinePlayer *pl, int me, const float at[3]) {
     if (g_settings.weather > 0) return;
@@ -69,18 +75,19 @@ void oa_weather_follow(const OnlinePlayer *pl, int me, const float at[3]) {
     if (!h) return;
     volatile uint8_t *now = (volatile uint8_t *)(uintptr_t)(wm + 0x7d1);
     if (*now == h->pose.weather) return;
-    static int logged;
-    if (logged++ < 20) LOG("[online] %s's weather: %d (was %d)\n", h->name, h->pose.weather, *now);
+    if (oa_weather_follow_logged++ < 20) LOG("[online] %s's weather: %d (was %d)\n", h->name, h->pose.weather, *now);
     *now = h->pose.weather;
     *(volatile int32_t *)(uintptr_t)(wm + 0x794) = 4;
 }
+
+// oa_slate_event's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int tries, oa_slate_event_wait;
 
 // the Sheikah Slate, another player having taken it: its pedestal's own event here (Obj_DRStone_A_01<Talk>: the
 // cutscene Demo700_0, which sets its flags, gives the slate, wakes the HUD and opens the first door), when this Link is
 // near its pedestal and in no event; true once started (its flags are then left to it)
 bool oa_slate_event(Cpu *c, uint64_t player) {
-    static int tries, wait;
-    if (wait > 0) { wait--; return false; }
+    if (oa_slate_event_wait > 0) { oa_slate_event_wait--; return false; }
     extern bool framepace_in_event(void);
     if (framepace_in_event() || tries > 5) return false;
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
@@ -93,7 +100,7 @@ bool oa_slate_event(Cpu *c, uint64_t player) {
         oa_actor_name_of(oa_g_actors[k], n);
         if (!strcmp(n, "Obj_DRStone_A_01")) stone = oa_g_actors[k];
     }
-    tries++, wait = 90;
+    tries++, oa_slate_event_wait = 90;
     return oa_start_event(c, stone ? stone : player, "Obj_DRStone_A_01", "Talk");
 }
 
@@ -119,6 +126,9 @@ static bool union_has(const uint8_t *all, char (*names)[48], int n, const char *
         if (!strcmp(names[k], want)) return all[k >> 3] >> (k & 7) & 1;
     return false;
 }
+
+// korok_event's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint8_t meta[0x200] __attribute__((aligned(16)));
 
 static int korok_event(Cpu *c, uint64_t player, const char *flag) {
     extern bool framepace_in_event(void);
@@ -147,7 +157,6 @@ static int korok_event(Cpu *c, uint64_t player, const char *flag) {
     LOG("[online] %s: its Korok is here, its cutscene\n", flag);
     uint64_t mgr = *(uint64_t *)(uintptr_t)P_KOROK_EVT_MGR;
     if (!VALID(mgr)) return 0;
-    static uint8_t meta[0x200] __attribute__((aligned(16)));
     memset(meta, 0, sizeof meta);
     oa_call(c, FN_EVT_META_INIT, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
     oa_call(c, FN_EVT_META_NAME, (uint64_t)(uintptr_t)meta, (uint64_t)(uintptr_t)"Demo017_0",
@@ -160,14 +169,29 @@ static int korok_event(Cpu *c, uint64_t player, const char *flag) {
 
 volatile int oa_g_fake_blood_moon;  // (`bloodmoon`, developer mode: the world's flags cleared here, as one does)
 
+// oa_quests_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint8_t held_off[ONLINE_QUEST_BYTES], had[ONLINE_QUEST_BYTES];
+static int tick;
+static bool counted;
+static bool had_once;
+static uint8_t oa_quests_update_last[ONLINE_QUEST_BYTES];
+static bool sent;
+static uint8_t oa_quests_update_last_2[ONLINE_QUEST_BYTES];
+static int every;
+static bool slate_started;
+static uint32_t korok_played[16];
+static int korok_np;
+static uint32_t wait_h[16];
+static int wait_n[16];
+
 void oa_quests_update(Cpu *c, uint64_t player, bool host) {
     static MapLine *m;
     static char names[ONLINE_QUEST_BYTES * 8][48];
     static uint32_t hash[ONLINE_QUEST_BYTES * 8];
     // (the world's items and chests, the flags a Blood Moon clears: after one here, those the others' union still has
     // from before it aren't set here again (until the union drops them, every game past its own); those taken after are)
-    static uint8_t revival[ONLINE_QUEST_BYTES], held_off[ONLINE_QUEST_BYTES], had[ONLINE_QUEST_BYTES];
-    static int n = -1, tick;
+    static uint8_t revival[ONLINE_QUEST_BYTES];
+    static int n = -1;
     if (n < 0) {  // (quests.txt: a name a line; map_load wants key=value)
         n = 0;
         const char *ov = getenv("SAVAGEWIND_ROMFS_OVERLAY");
@@ -190,7 +214,6 @@ void oa_quests_update(Cpu *c, uint64_t player, bool host) {
         (void)m;
     }
     if (!n || tick++ % 60) return;
-    static bool counted;
     if (!counted && test_warp_gdt_mgr()) {  // (how many aren't bool flags)
         int miss = 0;
         for (int k = 0; k < n; k++)
@@ -225,7 +248,6 @@ void oa_quests_update(Cpu *c, uint64_t player, bool host) {
     {   // a Blood Moon here: many of the revival flags this game had are clear at once
         int cleared = 0;
         for (int b = 0; b < ONLINE_QUEST_BYTES; b++) cleared += __builtin_popcount(had[b] & ~mine[b] & revival[b]);
-        static bool had_once;
         if (had_once && cleared >= 64) {
             uint8_t u[ONLINE_QUEST_BYTES];
             bool got = host ? (online_take_quests(u), true) : online_quests(u);
@@ -236,21 +258,16 @@ void oa_quests_update(Cpu *c, uint64_t player, bool host) {
     }
     bool have;
     if (host) {
-        static uint8_t last[ONLINE_QUEST_BYTES];
-        static bool sent;
         online_take_quests(all);
         for (int k = 0; k < ONLINE_QUEST_BYTES; k++) all[k] |= mine[k];
-        if (!sent || memcmp(all, last, sizeof all)) online_set_quests(all), memcpy(last, all, sizeof last), sent = true;
+        if (!sent || memcmp(all, oa_quests_update_last, sizeof all)) online_set_quests(all), memcpy(oa_quests_update_last, all, sizeof oa_quests_update_last), sent = true;
         have = true;
     } else {
-        static uint8_t last[ONLINE_QUEST_BYTES];
-        static int every;
-        if (memcmp(mine, last, sizeof mine) || every++ % 5 == 0) online_send_quests(mine), memcpy(last, mine, sizeof last);
+        if (memcmp(mine, oa_quests_update_last_2, sizeof mine) || every++ % 5 == 0) online_send_quests(mine), memcpy(oa_quests_update_last_2, mine, sizeof oa_quests_update_last_2);
         have = online_quests(all);
     }
     // (the slate: near its pedestal without it, by its own event once the other has it, whose flags come with it; none of
     // them set meanwhile (with some set, its pedestal is half done); elsewhere its flags alone)
-    static bool slate_started;
     bool by_event = slate_started;
     for (int k = 0; have && k < n && VALID(player); k++) {
         if (strcmp(names[k], "IsGet_PortableUnit") || (mine[k >> 3] >> (k & 7) & 1)) continue;
@@ -275,13 +292,9 @@ void oa_quests_update(Cpu *c, uint64_t player, bool host) {
         // (a Korok found near here: its own cutscene, which gives the seed and sets its flag; once started, the seed isn't
         // given again when its flag is set afterwards)
         bool korok = !strncmp(names[k], "MainField_Npc_HiddenKorok", 25), played = false;
-        static uint32_t korok_played[16];
-        static int korok_np;
         for (int q = 0; korok && q < 16; q++) played |= korok_played[q] == hash[k];
         if (korok && !played && !korok_started) {
             int r = korok_event(c, player, names[k]);
-            static uint32_t wait_h[16];
-            static int wait_n[16];
             if (r == 1) {
                 korok_played[korok_np++ % 16] = hash[k], korok_started = true;
                 continue;
@@ -326,4 +339,28 @@ void oa_flags_hour_frame(void) {
             LOG("[online] the host's time: %.2f (was %.2f)\n", host, mine);
         }
     }
+}
+
+// A reboot (runtime/main.c teardown): the quests' state (flags held off, had, sent; the slate's event, the Koroks'
+// scenes), the Blood Moon and weather logs, a `bloodmoon` asked for and the Korok event's work memory (addresses of the
+// last boot: ADR-026, resolution 1) start again as in a fresh process
+RT_ON_RESET(oa_flags_reset) {
+    tested = false;
+    oa_bloody_moon_follow_wait = oa_bloody_moon_follow_logged = 0;
+    oa_weather_follow_logged = 0;
+    tries = oa_slate_event_wait = 0;
+    memset(meta, 0, sizeof meta);
+    oa_g_fake_blood_moon = 0;
+    // oa_quests_update's
+    memset(held_off, 0, sizeof held_off);
+    memset(had, 0, sizeof had);
+    tick = 0;
+    counted = had_once = sent = slate_started = false;
+    memset(oa_quests_update_last, 0, sizeof oa_quests_update_last);
+    memset(oa_quests_update_last_2, 0, sizeof oa_quests_update_last_2);
+    every = 0;
+    memset(korok_played, 0, sizeof korok_played);
+    korok_np = 0;
+    memset(wait_h, 0, sizeof wait_h);
+    memset(wait_n, 0, sizeof wait_n);
 }

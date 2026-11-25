@@ -93,9 +93,6 @@ online.c:g_online                                ajustes del jugador (fichero de
 online.c:net_init:done                           inicio de la pila de red, una vez por proceso. Hilos: menú (y main.c por línea de órdenes)
 online.c:g_pose_lock                             mutex. Hilos: juego, red-c
 online.c:g_drop_name                             tabla constante. Hilo: red-c
-online.c:cl_thread:lb                            búfer de envío: se escribe antes de cada envío. Hilo: red-c
-online.c:cl_thread:sb                            búfer de envío. Hilo: red-c
-online.c:cl_thread:eb                            búfer de envío. Hilo: red-c
 # online_actors.c
 online_actors.c:g_weapon_names                   tabla cargada de weapons.txt (lista de nombres de red permitidos)
 online_actors.c:g_item_names                     tabla cargada de items.txt

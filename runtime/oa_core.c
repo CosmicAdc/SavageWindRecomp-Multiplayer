@@ -2,6 +2,7 @@
 // .txt maps, bones and matrices, the list of the world's actors. What the modules share:
 // runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 bool framepace_title_ui(void);
 bool framepace_paused(void);
@@ -89,30 +90,34 @@ bool online_actors_on(void) {
     return on;
 }
 
+// oa_call_f's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static Cpu oa_call_f_saved;  // (the main thread only)
+
 // a call into the game with the frame loop's registers kept as they were
 uint64_t oa_call_f(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                        uint64_t a6, float s0) {
-    static Cpu saved;  // (the main thread only)
-    memcpy(&saved, c, sizeof saved);
+    memcpy(&oa_call_f_saved, c, sizeof oa_call_f_saved);
     c->x[0] = a0, c->x[1] = a1, c->x[2] = a2, c->x[3] = a3, c->x[4] = a4, c->x[5] = a5, c->x[6] = a6;
     union { float f; uint32_t u; } v = {s0};
     c->v[0] = v.u;
     c->sp = (c->sp - 0x400) & ~0xFull;  // (room below the frame loop's own stack frame)
     guest_call(c, fn);
     uint64_t r = c->x[0];
-    memcpy(c, &saved, sizeof saved);
+    memcpy(c, &oa_call_f_saved, sizeof oa_call_f_saved);
     return r;
 }
 
+// oa_call_sret's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static Cpu oa_call_sret_saved;  // (the main thread only)
+
 // a call whose result the game returns in memory (x8: where)
 void oa_call_sret(Cpu *c, uint64_t fn, uint64_t out, uint64_t a0, uint64_t a1) {
-    static Cpu saved;  // (the main thread only)
-    memcpy(&saved, c, sizeof saved);
+    memcpy(&oa_call_sret_saved, c, sizeof oa_call_sret_saved);
     for (int k = 0; k < 8; k++) c->x[k] = 0;
     c->x[0] = a0, c->x[1] = a1, c->x[8] = out;
     c->sp = (c->sp - 0x400) & ~0xFull;
     guest_call(c, fn);
-    memcpy(c, &saved, sizeof saved);
+    memcpy(c, &oa_call_sret_saved, sizeof oa_call_sret_saved);
 }
 
 uint64_t oa_call(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5) {
@@ -486,10 +491,13 @@ uint64_t oa_linked(uint64_t at) {
     return VALID(a) && *(uint8_t *)(uintptr_t)(a + 0x64) != 3 ? a : 0;
 }
 
+// glider_of's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int miss;
+
 // his paraglider (PlayerStole2, or its _Vagrant look): an actor the player links (the link's
 // place in the player found once, by looking through him for one; again every second while none is)
 static uint64_t glider_of(uint64_t player) {
-    static int off = -1, miss;
+    static int off = -1;
     char n[48];
     if (off >= 0) {
         uint64_t a = oa_linked(player + off);
@@ -632,3 +640,31 @@ int oa_all_actors(uint64_t from, uint64_t *out, int max) {
     return n;
 }
 OaTheirs oa_g_theirs[THEIRS];
+
+// A reboot (runtime/main.c teardown: the game's threads stopped, its memory about to be wiped): every actor, handle
+// and request of the last boot is gone with that memory, so they are forgotten here, never deleted - nothing here
+// calls the game. The handles' ring, the pool and the orphans emptied; the next boot starts as in a fresh process
+RT_ON_RESET(oa_core_reset) {
+    memset(g_handles, 0, sizeof g_handles);
+    g_next_handle = 0;
+    memset(oa_g_pool, 0, sizeof oa_g_pool);
+    memset(g_orphan, 0, sizeof g_orphan);
+    memset(oa_g_pool_at, 0, sizeof oa_g_pool_at);
+    memset(oa_g_actors, 0, sizeof oa_g_actors);
+    memset(oa_g_theirs, 0, sizeof oa_g_theirs);
+    oa_g_piece_params = NULL;
+    memset(&oa_call_f_saved, 0, sizeof oa_call_f_saved);
+    memset(&oa_call_sret_saved, 0, sizeof oa_call_sret_saved);
+    oa_g_local_dead = false;
+    oa_g_aggro_id = 0;
+    oa_g_aggro_seq = 0;
+    memset(oa_g_objs_out, 0, sizeof oa_g_objs_out);
+    oa_g_objs_out_trunk = 0;
+    memset(oa_g_movers_out, 0, sizeof oa_g_movers_out);
+    memset(oa_g_broken, 0, sizeof oa_g_broken);
+    memset(oa_g_trunks_gone, 0, sizeof oa_g_trunks_gone);
+    for (int i = 0; i < ONLINE_MAX; i++) oa_g_online_actor[i] = false;  // (volatile: one by one)
+    oa_g_dist = 0;
+    memset(&oa_g_pvp, 0, sizeof oa_g_pvp);
+    miss = 0;
+}

@@ -1,6 +1,7 @@
 // Online play's actors, oa_world: the world's objects: moved, broken, trees cut and their trunks; the level's
 // mechanisms. What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 static uint64_t g_break_test_t;            // (when SAVAGEWIND_ONLINE_BREAK_TEST cut its tree)
 
@@ -40,6 +41,9 @@ static bool obj_kind(const char *n) {
     return true;
 }
 
+// obj_find's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint64_t last;
+
 // One the others move that we don't follow yet - farther than OBJ_NEAR from our Link, he 25 m off as he cut a tree and
 // pushed its trunk: its moves went unheard here, it lay as it fell here - found now: a trunk by its tree's HashId, else
 // the map object of that HashId (the actors looked through at most twice a second)
@@ -56,7 +60,6 @@ static void obj_find(uint64_t player, uint32_t hash, bool trunk) {
         for (int k = 0; k < n && !a; k++)
             if (th[k] == hash) a = ta[k];
     } else {
-        static uint64_t last;
         uint64_t now = plat_now_ns();
         if (now - last < 500000000ull) return;
         last = now;
@@ -79,10 +82,18 @@ static void obj_find(uint64_t player, uint32_t hash, bool trunk) {
         g_obj_seen[free_s].quiet = trunk_made_t(a) + TRUNK_QUIET_NS;
 }
 
+// oa_objs_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_objs_update_tick;
+static uint64_t oa_objs_update_t0;
+static int oa_objs_update_held = -1;
+static bool oa_objs_update_told;
+static float to[12];
+static int oa_objs_update_told_2;
+static int logged;
+
 void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
-    static int tick;
     // ours moving: looked for among the actors twice a second, followed each 3 frames
-    if (tick % 30 == 0) {
+    if (oa_objs_update_tick % 30 == 0) {
         int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         for (int k = 0; k < na; k++) {
             uint64_t a = oa_g_actors[k];
@@ -127,15 +138,13 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
     {   // (test: SAVAGEWIND_ONLINE_OBJ_TEST=<s>: that many seconds in - 1000 + <s>: after the break test's cut - the nearest
         // object we follow is lifted 3 m and held there for 3 s, as Magnesis would)
         static const char *ot;
-        static uint64_t t0;
-        static int held = -1;
         if (!ot) ot = getenv("SAVAGEWIND_ONLINE_OBJ_TEST") ? getenv("SAVAGEWIND_ONLINE_OBJ_TEST") : "";
         bool after_cut = atof(ot) >= 1000;
-        if (*ot && !t0 && !after_cut) t0 = plat_now_ns();
-        if (after_cut && !t0 && g_break_test_t) t0 = g_break_test_t;
-        double el = *ot && t0 ? (plat_now_ns() - t0) / 1e9 - (atof(ot) - (after_cut ? 1000 : 0)) : -1;
+        if (*ot && !oa_objs_update_t0 && !after_cut) oa_objs_update_t0 = plat_now_ns();
+        if (after_cut && !oa_objs_update_t0 && g_break_test_t) oa_objs_update_t0 = g_break_test_t;
+        double el = *ot && oa_objs_update_t0 ? (plat_now_ns() - oa_objs_update_t0) / 1e9 - (atof(ot) - (after_cut ? 1000 : 0)) : -1;
         if (el >= 0 && el < 3) {
-            if (held < 0) {
+            if (oa_objs_update_held < 0) {
                 float bd = 1e30f;
                 for (int s = 0; s < OBJ_SEEN; s++) {
                     if (!g_obj_seen[s].a || !oa_alive(g_obj_seen[s].a, g_obj_seen[s].w)) continue;
@@ -146,23 +155,21 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
                         continue;
                     const float *m = (const float *)(uintptr_t)(g_obj_seen[s].a + 0x398);
                     float dx = m[3] - link[0], dz = m[11] - link[2], d = dx * dx + dz * dz;
-                    if (d < bd) bd = d, held = s;
+                    if (d < bd) bd = d, oa_objs_update_held = s;
                 }
-                if (held >= 0) {
+                if (oa_objs_update_held >= 0) {
                     char n[48];
-                    oa_actor_name_of(g_obj_seen[held].a, n);
-                    LOG("[online] object test: lifting %s %u\n", n, g_obj_seen[held].hash);
+                    oa_actor_name_of(g_obj_seen[oa_objs_update_held].a, n);
+                    LOG("[online] object test: lifting %s %u\n", n, g_obj_seen[oa_objs_update_held].hash);
                 } else {
-                    static bool told;
-                    if (!told) told = true, LOG("[online] object test: nothing to lift near\n");
+                    if (!oa_objs_update_told) oa_objs_update_told = true, LOG("[online] object test: nothing to lift near\n");
                 }
             }
-            if (held >= 0 && oa_alive(g_obj_seen[held].a, g_obj_seen[held].w)) {
-                static float to[12];
-                if (to[0] == 0) memcpy(to, (const float *)(uintptr_t)(g_obj_seen[held].a + 0x398), sizeof to), to[7] += 3;
-                if (*(uint8_t *)(uintptr_t)(g_obj_seen[held].a + 0x64) != 1)  // (at rest a while: asleep)
-                    oa_call(c, FN_ACTOR_WAKE, g_obj_seen[held].a, 0, 0, 0, 0, 0);
-                uint64_t body = *(uint64_t *)(uintptr_t)(g_obj_seen[held].a + 0x190);
+            if (oa_objs_update_held >= 0 && oa_alive(g_obj_seen[oa_objs_update_held].a, g_obj_seen[oa_objs_update_held].w)) {
+                if (to[0] == 0) memcpy(to, (const float *)(uintptr_t)(g_obj_seen[oa_objs_update_held].a + 0x398), sizeof to), to[7] += 3;
+                if (*(uint8_t *)(uintptr_t)(g_obj_seen[oa_objs_update_held].a + 0x64) != 1)  // (at rest a while: asleep)
+                    oa_call(c, FN_ACTOR_WAKE, g_obj_seen[oa_objs_update_held].a, 0, 0, 0, 0, 0);
+                uint64_t body = *(uint64_t *)(uintptr_t)(g_obj_seen[oa_objs_update_held].a + 0x190);
                 if (VALID(body)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
             }
         }
@@ -228,15 +235,14 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
             float dx = am[3] - hm[3], dy = am[7] - hm[7], dz = am[11] - hm[11];
             if (dx * dx + dy * dy + dz * dz > 0.5f * 0.5f) {
                 oa_call(c, FN_SET_MTX, g_obj_seen[s].a, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
-                static int told;
-                if (told++ < 8) LOG("[online] an object of another's %.1f m off his at rest: put there\n", sqrtf(dx * dx + dy * dy + dz * dz));
+                if (oa_objs_update_told_2++ < 8) LOG("[online] an object of another's %.1f m off his at rest: put there\n", sqrtf(dx * dx + dy * dy + dz * dz));
             }
         }
         if (VALID(body)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
         g_obj_seen[s].last[0] = hm[3], g_obj_seen[s].last[1] = hm[7], g_obj_seen[s].last[2] = hm[11];
         g_obj_seen[s].still = 1000;  // (moved by him: not ours to send)
     }
-    if (tick++ % 3) return;
+    if (oa_objs_update_tick++ % 3) return;
     // ours: those that moved more than 2 cm since, the nearest first
     struct { int s; float d; } mv[OBJ_SEEN];
     int nm = 0;
@@ -273,7 +279,6 @@ void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePl
         if (g_obj_seen[mv[k].s].trunk) oa_g_objs_out_trunk |= (uint8_t)(1u << k);
         memcpy(oa_g_objs_out[k].m, (const float *)(uintptr_t)(g_obj_seen[mv[k].s].a + 0x398), sizeof oa_g_objs_out[k].m);
     }
-    static int logged;
     if (nm && logged++ < 20) {
         char n[48];
         oa_actor_name_of(g_obj_seen[mv[0].s].a, n);
@@ -323,14 +328,20 @@ static bool mtx_moved(const float *a, const float *b) {
     return false;
 }
 
+// oa_movers_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_movers_update_tick;
+static bool rescan;  // (one lost - the game made it again: woken, or moved asleep - or one of another's not ours yet)
+static uint64_t oa_movers_update_t0;
+static int oa_movers_update_held = -1;
+static float from[12];
+static uint32_t held_h;
+
 void oa_movers_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
-    static int tick;
     static int log_on = -1;
     if (log_on < 0) log_on = getenv("SAVAGEWIND_ONLINE_MOVER_LOG") != NULL;
     uint64_t now = plat_now_ns();
-    static bool rescan;  // (one lost - the game made it again: woken, or moved asleep - or one of another's not ours yet)
     // the mechanisms near us: looked for among the actors once a second, and at once after one was lost
-    if (tick % 60 == 0 || rescan) {
+    if (oa_movers_update_tick % 60 == 0 || rescan) {
         rescan = false;
         int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         for (int k = 0; k < na; k++) {
@@ -357,44 +368,40 @@ void oa_movers_update(Cpu *c, uint64_t player, const float link[3], const Online
             if (log_on) LOG("[online] mechanism near: %s %u (AS %s)\n", n, hash, g_mv[free_s].as);
         }
     }
-    tick++;
+    oa_movers_update_tick++;
     {   // (test: SAVAGEWIND_ONLINE_MOVER_TEST=<s>: that many seconds in, the nearest mechanism here goes down 2 m in 2 s,
         // set as the others' are; SAVAGEWIND_ONLINE_MOVER_TEST_AS=<name>: that AS played on it as it starts)
         static const char *mt;
-        static uint64_t t0;
-        static int held = -1;
-        static float from[12];
         if (!mt) mt = getenv("SAVAGEWIND_ONLINE_MOVER_TEST") ? getenv("SAVAGEWIND_ONLINE_MOVER_TEST") : "";
-        if (*mt && !t0) t0 = now;
-        double el = *mt ? (now - t0) / 1e9 - atof(mt) : -1;
+        if (*mt && !oa_movers_update_t0) oa_movers_update_t0 = now;
+        double el = *mt ? (now - oa_movers_update_t0) / 1e9 - atof(mt) : -1;
         if (el >= 0 && el < 2) {
-            if (held < 0) {
+            if (oa_movers_update_held < 0) {
                 float bd = 1e30f;
                 for (int t = 0; t < MOVER_TRACK; t++) {
                     if (!g_mv[t].a || !oa_alive_rewatch(g_mv[t].a, &g_mv[t].w)) continue;
                     const float *m = (const float *)(uintptr_t)(g_mv[t].a + 0x398);
                     float dx = m[3] - link[0], dz = m[11] - link[2], d = dx * dx + dz * dz;
-                    if (d < bd) bd = d, held = t;
+                    if (d < bd) bd = d, oa_movers_update_held = t;
                 }
-                if (held >= 0) {
+                if (oa_movers_update_held >= 0) {
                     char n[48];
-                    oa_actor_name_of(g_mv[held].a, n);
-                    memcpy(from, (const float *)(uintptr_t)(g_mv[held].a + 0x398), sizeof from);
-                    LOG("[online] mechanism test: moving %s %u\n", n, g_mv[held].hash);
+                    oa_actor_name_of(g_mv[oa_movers_update_held].a, n);
+                    memcpy(from, (const float *)(uintptr_t)(g_mv[oa_movers_update_held].a + 0x398), sizeof from);
+                    LOG("[online] mechanism test: moving %s %u\n", n, g_mv[oa_movers_update_held].hash);
                     const char *as = getenv("SAVAGEWIND_ONLINE_MOVER_TEST_AS");
-                    if (as) LOG("[online] mechanism test: AS %s %s\n", as, oa_play_as(c, g_mv[held].a, as, 0, 0, -1, true) ? "plays" : "not played");
+                    if (as) LOG("[online] mechanism test: AS %s %s\n", as, oa_play_as(c, g_mv[oa_movers_update_held].a, as, 0, 0, -1, true) ? "plays" : "not played");
                 }
             }
-            static uint32_t held_h;
-            if (held >= 0 && !held_h) held_h = g_mv[held].hash;
+            if (oa_movers_update_held >= 0 && !held_h) held_h = g_mv[oa_movers_update_held].hash;
             for (int t = 0; t < MOVER_TRACK && held_h; t++)  // (by its HashId: the game may make it again)
-                if (g_mv[t].hash == held_h && g_mv[t].a) held = t;
-            if (held >= 0 && oa_alive_rewatch(g_mv[held].a, &g_mv[held].w)) {
+                if (g_mv[t].hash == held_h && g_mv[t].a) oa_movers_update_held = t;
+            if (oa_movers_update_held >= 0 && oa_alive_rewatch(g_mv[oa_movers_update_held].a, &g_mv[oa_movers_update_held].w)) {
                 float to[12];
                 memcpy(to, from, sizeof to);
                 to[7] -= (float)el;
-                uint64_t a = g_mv[held].a;
-                if (*(uint8_t *)(uintptr_t)(a + 0x64) != 1) oa_call(c, FN_ACTOR_WAKE, a, 0, 0, 0, 0, 0), g_mv[held].w = oa_watch(a);
+                uint64_t a = g_mv[oa_movers_update_held].a;
+                if (*(uint8_t *)(uintptr_t)(a + 0x64) != 1) oa_call(c, FN_ACTOR_WAKE, a, 0, 0, 0, 0, 0), g_mv[oa_movers_update_held].w = oa_watch(a);
                 uint64_t body = *(uint64_t *)(uintptr_t)(a + 0x190);
                 if (oa_has_body(a)) oa_call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
                 oa_call(c, FN_SET_MTX, a, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
@@ -412,7 +419,7 @@ void oa_movers_update(Cpu *c, uint64_t player, const float link[3], const Online
             if (!finite) continue;
             bool tracked = false;
             for (int t = 0; t < MOVER_TRACK && !tracked; t++) tracked = g_mv[t].hash == o->hash && g_mv[t].a;
-            if (!tracked && tick % 15 == 0) rescan = true;
+            if (!tracked && oa_movers_update_tick % 15 == 0) rescan = true;
             for (int t = 0; t < MOVER_TRACK; t++) {
                 if (g_mv[t].hash != o->hash || !oa_alive_rewatch(g_mv[t].a, &g_mv[t].w)) continue;
                 // (ours moving it now, his too: the first one's - the lower player number keeps it)
@@ -710,9 +717,11 @@ static void world_enforce(Cpu *c, uint64_t player, const float link[3]) {
 // While we break nothing new, the world's list goes round in our pose's last broken slot, one each WORLD_ROTATE_NS:
 // a player who joined later gets what was broken before him (each game takes a HashId once: world_has)
 #define WORLD_ROTATE_NS 1500000000ull
+// world_rotate's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int next;
+static uint64_t at;
+
 static void world_rotate(void) {
-    static int next;
-    static uint64_t at;
     uint64_t now = plat_now_ns();
     if (!g_nworld || now - g_broken_new_t < 3 * WORLD_ROTATE_NS || now - at < WORLD_ROTATE_NS) return;
     at = now;
@@ -720,13 +729,22 @@ static void world_rotate(void) {
     oa_g_broken[7] = g_world[next++].h;
 }
 
+// oa_breaks_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_breaks_update_tick;
+static float was[3];
+static uint32_t oa_breaks_update_told[256];  // (each once: a bush cut grows again as itself, and went again and again)
+static int ntold;
+static uint64_t d0;
+static bool dropped;
+static uint64_t oa_breaks_update_t0;
+static bool tested;
+static bool oa_breaks_update_told_2;
+
 void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
-    static int tick;
-    static float was[3];
     if (online_state() != ONLINE_CONNECTED) world_clear();
     cutting_update(c);
     world_rotate();
-    if (tick % 60 == 30) world_enforce(c, player, link);  // (about once a second)
+    if (oa_breaks_update_tick % 60 == 30) world_enforce(c, player, link);  // (about once a second)
     // what is being made (the others' stumps and trunks): placed once ready
     for (int k = 0; k < 8; k++) {
         if (!g_spawn[k].h) continue;
@@ -765,7 +783,7 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
         }
         memset(&g_breaking[k], 0, sizeof g_breaking[k]);
     }
-    if (tick++ % 6) return;
+    if (oa_breaks_update_tick++ % 6) return;
     float mx = link[0] - was[0], mz = link[2] - was[2];
     bool jumped = mx * mx + mz * mz > 10.0f * 10.0f;  // (a load, a teleport: what went isn't broken)
     memcpy(was, link, sizeof was);
@@ -808,14 +826,12 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
                     break;
                 }
             }
-            static uint32_t told[256];  // (each once: a bush cut grows again as itself, and went again and again)
-            static int ntold;
             // (one of the world's list already - another's, broken here for him, or ours again after a load - isn't
             // told as ours: else each game sent the other's cut back to it, and it made the tree's stump and trunk
             // again, a pile of them)
             if (cut && world_has(g_brk[k].hash)) cut = false;
-            for (int q = 0; q < ntold && cut; q++) cut = told[q] != g_brk[k].hash;
-            if (cut) told[ntold++ % 256] = g_brk[k].hash, ntold = ntold > 256 ? 256 : ntold;
+            for (int q = 0; q < ntold && cut; q++) cut = oa_breaks_update_told[q] != g_brk[k].hash;
+            if (cut) oa_breaks_update_told[ntold++ % 256] = g_brk[k].hash, ntold = ntold > 256 ? 256 : ntold;
             if (cut) {
                 memmove(oa_g_broken + 1, oa_g_broken, sizeof oa_g_broken - sizeof *oa_g_broken);
                 oa_g_broken[0] = g_brk[k].hash;
@@ -833,7 +849,7 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
             LOG("[online] our trunk of %u chopped\n", g_our_cut[k].hash);
             g_our_cut[k].trunk = 0;
         }
-    if (tick % 5 == 1) {  // (those near us now: twice a second - a crate struck at once went untracked at 3 s)
+    if (oa_breaks_update_tick % 5 == 1) {  // (those near us now: twice a second - a crate struck at once went untracked at 3 s)
         if (na < 0) na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         for (int k = 0; k < na; k++) {
             uint64_t a = oa_g_actors[k];
@@ -893,8 +909,6 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
     {   // (test: SAVAGEWIND_ONLINE_DROP_TEST=<s>[,<actor>]: that many seconds in, an item - Item_Fruit_A unless named -
         // made 1.5 m before our Link, as if it fell there: what drops_update gives everyone)
         const char *dt = getenv("SAVAGEWIND_ONLINE_DROP_TEST");
-        static uint64_t d0;
-        static bool dropped;
         if (dt && !d0) d0 = plat_now_ns();
         if (dt && !dropped && plat_now_ns() - d0 > (uint64_t)(atof(dt) * 1e9)) {
             dropped = true;
@@ -907,10 +921,8 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
     }
     // (test: the nearest tree cut here, as the others' are, that many seconds in)
     const char *bt = getenv("SAVAGEWIND_ONLINE_BREAK_TEST");
-    static uint64_t t0;
-    static bool tested;
-    if (bt && !t0) t0 = plat_now_ns();
-    if (bt && !tested && plat_now_ns() - t0 > (uint64_t)(atof(bt) * 1e9)) {  // (none near yet: again later)
+    if (bt && !oa_breaks_update_t0) oa_breaks_update_t0 = plat_now_ns();
+    if (bt && !tested && plat_now_ns() - oa_breaks_update_t0 > (uint64_t)(atof(bt) * 1e9)) {  // (none near yet: again later)
         float bd = 1e30f;
         int best = -1;
         for (int k = 0; k < BREAKS; k++) {
@@ -938,8 +950,7 @@ void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const Online
             world_seen(g_brk[best].hash, g_brk[best].a);  // (cut here now: not again by world_enforce, a second trunk)
             memset(&g_brk[best], 0, sizeof g_brk[best]);
         } else {
-            static bool told;
-            if (!told) told = true, LOG("[online] break test: no tree near yet\n");
+            if (!oa_breaks_update_told_2) oa_breaks_update_told_2 = true, LOG("[online] break test: no tree near yet\n");
         }
     }
 }
@@ -953,4 +964,49 @@ void oa_world_frame(Cpu *c, uint64_t player, const float link[3], int me) {
         oa_movers_update(c, player, link, op, me);
         oa_breaks_update(c, player, link, op, me);
     }
+}
+
+// A reboot (runtime/main.c teardown): the objects, mechanisms, breakables, trunks and requests followed here were
+// actors and handles of the last boot, gone with its memory - forgotten, never deleted (nothing here calls the game);
+// the session's broken world, the counters and the tests start again as in a fresh process (held: -1)
+RT_ON_RESET(oa_world_reset) {
+    g_break_test_t = 0;
+    memset(g_obj_seen, 0, sizeof g_obj_seen);
+    last = 0;
+    // oa_objs_update's
+    oa_objs_update_tick = 0;
+    oa_objs_update_t0 = 0;
+    oa_objs_update_held = -1;
+    oa_objs_update_told = false;
+    memset(to, 0, sizeof to);
+    oa_objs_update_told_2 = logged = 0;
+    memset(g_mv, 0, sizeof g_mv);
+    // oa_movers_update's
+    oa_movers_update_tick = 0;
+    rescan = false;
+    oa_movers_update_t0 = 0;
+    oa_movers_update_held = -1;
+    memset(from, 0, sizeof from);
+    held_h = 0;
+    memset(g_brk, 0, sizeof g_brk);
+    memset(g_our_cut, 0, sizeof g_our_cut);
+    memset(g_spawn, 0, sizeof g_spawn);
+    g_spawn_ours = false;
+    memset(g_their_trunk, 0, sizeof g_their_trunk);
+    memset(g_breaking, 0, sizeof g_breaking);
+    memset(g_cutting, 0, sizeof g_cutting);
+    memset(g_world, 0, sizeof g_world);
+    g_nworld = 0;
+    memset(g_widx, 0, sizeof g_widx);
+    g_broken_new_t = 0;
+    next = 0;
+    at = 0;
+    // oa_breaks_update's
+    oa_breaks_update_tick = 0;
+    memset(was, 0, sizeof was);
+    memset(oa_breaks_update_told, 0, sizeof oa_breaks_update_told);
+    ntold = 0;
+    d0 = 0;
+    dropped = tested = oa_breaks_update_told_2 = false;
+    oa_breaks_update_t0 = 0;
 }
