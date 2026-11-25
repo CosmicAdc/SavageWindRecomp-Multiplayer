@@ -67,7 +67,7 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   modelo sugerido: medio
 
 - [~] T203 [net] Pruebas de trama y codificación sin el juego.
-  reclamada: agente Sonnet trama-t203 (coop/T203, en curso)
+  reclamada: agente Sonnet trama-t203 (integrada `baf62ff`, adelantada) — Windows: test-online-wire 16647/0 (error SKEL máx. 9,93e-5 rad, tolerancia 2e-4), test-online-net 309/0; el orquestador agrandó el búfer de la prueba (255 enemigos no cabían); FALTA Docker
   files: `tools/test_online_wire.c` (nuevo), `tools/test_online_net.c`, `Makefile` (bloque al final)
   verify: `make test-online-wire test-online-net` terminan con 0 en Windows; en Docker: `docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas sh -c 'make B=/tmp/b GEN=/nonexistent test-online-wire test-online-net'` termina con 0
   depende de: T202
@@ -83,7 +83,7 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   modelo sugerido: medio
 
 - [~] T204 [net] Pruebas de la máquina de estados de sesión.
-  reclamada: agente Sonnet sesion-t204 (coop/T204, en curso)
+  reclamada: agente Sonnet sesion-t204 (coop/T204 `fde83e8`, escrita; sin integrar) — Windows imprime el aviso y sale 0; FALTA Docker (solo POSIX); R_FULL y expulsión por silencio quedan PENDIENTE (T218)
   files: `tools/test_online_session.c` (nuevo), `Makefile` (bloque al final)
   verify: en Docker: `docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas sh -c 'make B=/tmp/b GEN=/nonexistent test-online-session'` termina con 0 y lista al menos los nueve casos de `pasos`; en Windows `make test-online-session` imprime que la prueba es solo POSIX y termina con 0
   depende de: T203
@@ -112,7 +112,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no añadas secretos; no edites otros flujos; no hagas el push tú.
   modelo sugerido: bajo
 
-- [ ] T213 [net] Capa única de validación de lo que llega por red.
+- [~] T213 [net] Capa única de validación de lo que llega por red.
+  reclamada: agente Opus valida-t213 (coop/T213, en curso)
   files: `runtime/online_validate.h`, `runtime/online_validate.c` (nuevos), `runtime/online.c`, `tools/test_online_validate.c` (nuevo), `Makefile` (bloque al final)
   verify: `make test-online-validate` termina con 0 (casos dirigidos + 100 000 estructuras aleatorias con semilla fija); `make test-online-wire test-online-net` siguen en 0; `grep -n "online_validate_" runtime/online.c` muestra una llamada en cada `case` de `cl_message` que guarda datos; recorrido de F1 completo con firma igual a la referencia; bot con `BOT_NAN=1`, `BOT_LOOT=...` y `BOT_SHIELD=1`: el juego sigue y registra los descartes
   depende de: T204
