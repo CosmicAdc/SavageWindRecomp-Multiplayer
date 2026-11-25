@@ -81,10 +81,14 @@ lanzar() {
         cd "$RAIZ" || exit 1
         export SAVAGEWIND_SAVE_DIR="$guardado" SAVAGEWIND_SETTINGS="$ajustes"
         export SAVAGEWIND_NO_LAUNCHER=1 SAVAGEWIND_AUDIO_GAIN=0
-        export SAVAGEWIND_TEST_WARP=plateau SAVAGEWIND_INPUT="900:A:8,1400:A:8,1900:A:8"
+        export SAVAGEWIND_TEST_WARP=plateau
         export SAVAGEWIND_ONLINE_PORT="$PUERTO_SESION" SAVAGEWIND_ONLINE="$online"
         export SAVAGEWIND_ONLINE_NAME="$nombre" SAVAGEWIND_CONTROL="$ctl"
-        if [ "$ventana" = 1 ]; then unset SAVAGEWIND_HIDDEN; else export SAVAGEWIND_HIDDEN=1; fi
+        if [ "$ventana" = 1 ]; then
+            unset SAVAGEWIND_HIDDEN SAVAGEWIND_INPUT
+        else
+            export SAVAGEWIND_HIDDEN=1 SAVAGEWIND_INPUT="900:A:8,1400:A:8,1900:A:8"
+        fi
         if [ "$modo" = ">>" ]; then
             nohup "$EXE" >> "$log" 2>&1 < /dev/null &
         else

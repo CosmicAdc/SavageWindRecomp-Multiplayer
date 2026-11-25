@@ -114,11 +114,17 @@ class Ctx:
 
     # -- movimiento ------------------------------------------------------------------------------------------
     def esperar_quieto(self, x, minimo=10, maximo=120):
-        """Espera a que `pos` responda y deje de cambiar (el mundo carga y Link termina de caer)."""
+        """Espera a que `pos` responda, termine el teletransporte y Link deje de moverse."""
         ini = time.monotonic()
         time.sleep(minimo)
         previa = None
+        ocupado = {"scanning", "probing", "testing", "verifying", "settling"}
         while time.monotonic() - ini < maximo:
+            cod_tp, d_tp, _ = self.sw(x, "teleport", "status", timeout=8)
+            if cod_tp == 0 and d_tp and str(d_tp.get("state", "")).lower() in ocupado:
+                previa = None
+                time.sleep(3)
+                continue
             cod, d, _ = self.sw(x, "pos", timeout=8)
             if cod == 0 and d:
                 p = (float(d["x"]), float(d["y"]), float(d["z"]))
@@ -154,7 +160,7 @@ class Ctx:
         self.ok(x, "set", "god_mode", "true" if valor else "false")
 
     def dos_juegos(self, *orden):
-        p = subprocess.run(["bash", str(DOS_JUEGOS), *orden], capture_output=True, text=True)
+        p = subprocess.run(["bash", DOS_JUEGOS.as_posix(), *orden], capture_output=True, text=True)
         if p.returncode != 0:
             raise Falla(f"dos_juegos.sh {' '.join(orden)} fallo: {(p.stderr or p.stdout).strip()}")
 
@@ -180,9 +186,16 @@ def paso1(c):
 
 def _en_mundo(c, x, maximo=240):
     ini = time.monotonic()
+    intentos = 0
     while time.monotonic() - ini < maximo:
         if c.sw(x, "pos", timeout=8)[0] == 0:
             return
+        intentos += 1
+        if time.monotonic() - ini > 35:
+            if intentos == 8:
+                c.sw(x, "press", "b", "8", timeout=8)
+                time.sleep(1)
+            c.sw(x, "press", "a", "8", timeout=8)
         time.sleep(5)
     raise Falla(f"{x}: el mundo no cargo en {maximo}s (pos da error)")
 
