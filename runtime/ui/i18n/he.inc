@@ -1326,3 +1326,4 @@ T("Link", "")
 T("%s%u ms", "")
 
 T("%s  %.1f km", "")
+T("amiibo can't be used during an online session", "לא ניתן להשתמש ב-amiibo במהלך מפגש מקוון")
