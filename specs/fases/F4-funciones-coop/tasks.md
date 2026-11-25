@@ -938,7 +938,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no escribas código; no toques parches ni sitios.
   modelo sugerido: alto
 
-- [ ] T451 [investigación] Eventide y Prueba de la Espada: entrar los dos juntos (ADR-025 n.º 7; HE-16).
+- [x] T451 [investigación] Eventide y Prueba de la Espada: entrar los dos juntos (ADR-025 n.º 7; HE-16).
+  hecha: agente Sonnet ag-t451 (integrada) — `specs/bitacora/F4-T451-retos-juntos.md`; viable si M5 y M7 salen bien; propone T458–T464 (numeración de la bitácora, pendiente de pasar a esta lista tras medir)
   files: `specs/bitacora/F4-T451-retos-juntos.md`
   verify: la bitácora responde el paso 1 y propone diseño y tareas, o dice "no viable" con el motivo; `git diff --check`
   depende de: —
