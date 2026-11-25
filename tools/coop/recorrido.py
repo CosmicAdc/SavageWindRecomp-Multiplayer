@@ -46,6 +46,10 @@ class Falla(Exception):
     """El paso no se cumple; el texto va en la linea de salida."""
 
 
+class TeleportFallido(Falla):
+    """`teleport status` = failed justo despues de un goto o teleport (herramienta, HE-13)."""
+
+
 class JuegoCaido(Exception):
     """Un juego no responde a `state`: el recorrido se detiene sin cerrar el otro."""
 
@@ -139,7 +143,7 @@ class Ctx:
                 time.sleep(3)
                 continue
             if tp and cod_tp == 0 and d_tp and str(d_tp.get("state", "")).lower() == "failed":
-                raise Falla(f"{x}: el teletransporte fallo ({d_tp.get('message', 'sin mensaje')})")
+                raise TeleportFallido(f"{x}: el teletransporte fallo ({d_tp.get('message', 'sin mensaje')})")
             cod, d, _ = self.sw(x, "pos", timeout=8)
             if cod == 0 and d:
                 p = (float(d["x"]), float(d["y"]), float(d["z"]))
@@ -166,7 +170,7 @@ class Ctx:
         tp = {x: self.mover(x, "goto", *destino) for x in xs}
         res = {}
         for x in xs:
-            p = self.esperar_quieto(x, tp=tp[x])
+            p = self._quieto_reintentando(x, tp[x], destino)
             dxz = math.hypot(p[0] - destino[0], p[2] - destino[2])
             dy = destino[1] - p[1]
             if dxz > margen_xz or abs(dy) > margen_y:
@@ -174,6 +178,19 @@ class Ctx:
                             f"y {dy:.1f} m por debajo")
             res[x] = p
         return res
+
+    def _quieto_reintentando(self, x, tp, destino, reintentos=2):
+        """esperar_quieto; si el teletransporte falla (HE-13: "Position verification failed" o "Position not found"),
+        lo repite hasta `reintentos` veces con `teleport` a las coordenadas, que en la sesion del 2026-11-25 desbloqueo
+        a Link. Cada reintento se anota en la salida para no esconder el fallo de la herramienta."""
+        for intento in range(reintentos + 1):
+            try:
+                return self.esperar_quieto(x, tp=tp)
+            except TeleportFallido as e:
+                if intento == reintentos:
+                    raise
+                print(f"  aviso: {e}; reintento {intento + 1} con teleport", flush=True)
+                tp = self.mover(x, "teleport", *destino)
 
     def esperar_actor(self, x, texto, cantidad_min=1, maximo=60):
         ini = time.monotonic()
