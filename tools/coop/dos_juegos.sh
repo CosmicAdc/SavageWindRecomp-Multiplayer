@@ -49,6 +49,7 @@ die() { echo "dos_juegos: $*" >&2; exit 1; }
 ruta_win() { (cd "$1" && pwd -W 2>/dev/null || pwd); }
 
 preparar() {
+    local x
     [ -f "$EXE" ] || die "no existe $EXE (compilar antes: make -j8)"
     mkdir -p "$PRUEBAS/guardado-A" "$PRUEBAS/guardado-B" "$LOGS"
     for x in A B; do
