@@ -475,7 +475,8 @@ adivinar, para y pregunta: no inventes.
   no hagas: no llames a nada de esto desde el hilo del juego ni el de presentación; no sigas URL de control que apunten fuera de la red local; no dejes la redirección puesta al salir; no añadas ninguna otra biblioteca; no cambies `RT_SRC` ni `LDFLAGS` del `Makefile` (pásale al integrador, T337, lo que haga falta enlazar).
   modelo sugerido: alto
 
-- [ ] T325 [P] [módulo] Reunir la información de versión de este juego
+- [x] T325 [P] [módulo] Reunir la información de versión de este juego
+  hecha: agente Sonnet ag-t325 (integrada) — `online_version` + prueba (OK) en CI; `OnlineBuildInfo` provisional hasta T308; T314 llama a `online_build_init`. ADR-027 n.º 5-6: solo mismo sistema, DLC distinto se rechaza
   files: runtime/online_version.c, runtime/online_version.h, tests/test_online_version.c
   verify: `clang -Wall -Iruntime tests/test_online_version.c runtime/online_version.c -o build/test_online_version && build/test_online_version` sale con 0
   depende de: T307, T308

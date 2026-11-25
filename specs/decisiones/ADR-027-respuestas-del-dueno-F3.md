@@ -11,5 +11,7 @@
 | 2 | P3-3 · ¿Se comparan los mods cargados al conectar? | **Avisar, no rechazar**: si no coinciden, se conecta igual con el aviso "mods distintos: puede haber fallos" | T325 (campo de mods), T314 (aviso, no rechazo), T329 (texto) |
 | 3 | P3-4 · ¿Qué hacer con `--server`? | **Dejarlo como relé sin mundo** y decirlo claramente en la ayuda (el anfitrión sigue siendo un jugador) | T339 |
 | 4 | T305 · ¿Cómo se decide TCP o UDP? | **El orquestador mide y presenta tabla y recomendación; decide el dueño** | T303, T304, T305 |
+| 5 | ¿Windows y Linux juntos? (`GAMELIB_ID` difiere entre sistemas, T325) | **Solo el mismo sistema**: se compara `GAMELIB_ID` tal cual; el motivo de rechazo debe decir que el otro usa otro sistema o compilación | T314, T325, T329 |
+| 6 | DLC distinto al conectar | **Rechazar** con motivo claro (R3-15) | T314 |
 
 Junto con ADR-025 n.º 6 (Master Mode distinto: se rechaza al conectar, T314/T325).
