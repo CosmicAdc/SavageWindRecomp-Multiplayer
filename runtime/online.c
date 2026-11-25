@@ -920,6 +920,32 @@ static bool sample_equip(WireEquip *e) {
     return ok;
 }
 
+// What arrives is hostile until shown otherwise (specs/contratos/validacion-red.md): a number that is not finite, or
+// is far outside any world, never reaches a queue or a snapshot. A message (or, in a list, an entry) that fails is
+// dropped whole, never repaired; each kind is counted and logged the first time only.
+#define NUM_LIMIT 100000.0f  // (what sample_local already holds its own position to)
+enum { D_STATE, D_TIME, D_HIT, D_ENEMIES, D_ESTATE, D_LOOT_ADD, D_LOOTS, D_PICK, D_COUNT };
+static const char *const g_drop_name[D_COUNT] = {"STATE", "TIME", "HIT", "ENEMIES", "ESTATE", "LOOT_ADD", "LOOTS", "PICK"};
+static unsigned g_drop_n[D_COUNT];
+
+static bool floats_ok(const float *f, int n, float lim) {
+    for (int k = 0; k < n; k++)
+        if (!isfinite(f[k]) || fabsf(f[k]) > lim) return false;
+    return true;
+}
+
+static void drop_note(int kind) {
+    if (g_drop_n[kind]++ == 0) LOG("[online] dropped a %s with a number out of range (more are counted, not logged)\n", g_drop_name[kind]);
+}
+
+static bool enemy_ok(const OnlineEnemy *e) {
+    return floats_ok(e->m, 12, NUM_LIMIT) && floats_ok(e->wm, 12, NUM_LIMIT) && floats_ok(e->sm, 12, NUM_LIMIT);
+}
+
+static bool loot_ok(const OnlineLoot *l) {
+    return floats_ok(l->pos, 3, NUM_LIMIT) && floats_ok(l->rot, 9, NUM_LIMIT);
+}
+
 static void remote_snap(int id, const WireState *w) {  // (lock held)
     Remote *r = &g.r[id];
     Snap *s = &r->s[r->head];
@@ -1019,6 +1045,10 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 1 + (int)sizeof(WireState) && p[0] < ONLINE_MAX && g.r[p[0]].used) {
             WireState w;
             memcpy(&w, p + 1, sizeof w);
+            if (!floats_ok(w.pos, 3, NUM_LIMIT) || !floats_ok(&w.yaw, 1, NUM_LIMIT)) {
+                drop_note(D_STATE);
+                break;
+            }
             remote_snap(p[0], &w);
         }
         break;
@@ -1060,17 +1090,37 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 13 && !g.hosting) {
             int n = p[12];
             if (n > ONLINE_ENEMIES || len < 13 + n * (int)sizeof(OnlineEnemy)) break;
+            float centre[3];
+            memcpy(centre, p, 12);
+            if (!floats_ok(centre, 3, NUM_LIMIT)) {
+                drop_note(D_ENEMIES);
+                break;
+            }
             g.en[0] = g.en[1];
             g.en[1].t = plat_now_ns();
             memcpy(g.en[1].centre, p, 12);
-            g.en[1].n = n;
-            memcpy(g.en[1].e, p + 13, n * sizeof(OnlineEnemy));
-            for (int k = 0; k < n; k++)
-                g.en[1].e[k].name[39] = g.en[1].e[k].as[31] = g.en[1].e[k].weapon[39] = g.en[1].e[k].shield[39] = 0;
+            int kept = 0;
+            for (int k = 0; k < n; k++) {  // (an entry that fails goes alone)
+                OnlineEnemy *e = &g.en[1].e[kept];
+                memcpy(e, p + 13 + k * sizeof(OnlineEnemy), sizeof *e);
+                if (!enemy_ok(e)) {
+                    drop_note(D_ENEMIES);
+                    continue;
+                }
+                e->name[39] = e->as[31] = e->weapon[39] = e->shield[39] = 0;
+                kept++;
+            }
+            g.en[1].n = kept;
         }
         break;
     case M_LOOT_ADD:
         if (len >= 1 + (int)sizeof(OnlineLoot) && g.hosting && g.nla_in < 32) {
+            OnlineLoot l;
+            memcpy(&l, p + 1, sizeof l);
+            if (!loot_ok(&l)) {
+                drop_note(D_LOOT_ADD);
+                break;
+            }
             memcpy(&g.la_in[g.nla_in], p + 1, sizeof(OnlineLoot));
             g.la_in[g.nla_in].origin = p[0], g.la_in[g.nla_in].name[39] = 0;
             g.nla_in++;
@@ -1090,6 +1140,12 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         break;
     case M_PICK:
         if (len >= 52 && g.npick_in < 16) {
+            float pos[3];
+            memcpy(pos, p + 40, 12);
+            if (!floats_ok(pos, 3, NUM_LIMIT)) {
+                drop_note(D_PICK);
+                break;
+            }
             memcpy(g.pick_in[g.npick_in].name, p, 40), g.pick_in[g.npick_in].name[39] = 0;
             memcpy(g.pick_in[g.npick_in].pos, p + 40, 12);
             g.npick_in++;
@@ -1099,9 +1155,16 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         if (len >= 1 && !g.hosting) {
             int n = p[0];
             if (n > ONLINE_LOOT || len < 1 + n * (int)sizeof(OnlineLoot)) break;
-            memcpy(g.loots, p + 1, n * sizeof(OnlineLoot));
-            for (int k = 0; k < n; k++) g.loots[k].name[39] = 0;
-            g.nloots = n;
+            int kept = 0;
+            for (int k = 0; k < n; k++) {  // (an entry that fails goes alone)
+                memcpy(&g.loots[kept], p + 1 + k * sizeof(OnlineLoot), sizeof(OnlineLoot));
+                if (!loot_ok(&g.loots[kept])) {
+                    drop_note(D_LOOTS);
+                    continue;
+                }
+                g.loots[kept++].name[39] = 0;
+            }
+            g.nloots = kept;
         }
         break;
     case M_ESTATE:
@@ -1109,6 +1172,10 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
             int n = p[1];
             for (int k = 0; k < n && 2 + (k + 1) * (int)sizeof(OnlineEnemy) <= len && g.nest_in < 64; k++) {
                 memcpy(&g.est_in[g.nest_in], p + 2 + k * sizeof(OnlineEnemy), sizeof(OnlineEnemy));
+                if (!enemy_ok(&g.est_in[g.nest_in])) {  // (the next entry overwrites it)
+                    drop_note(D_ESTATE);
+                    continue;
+                }
                 g.est_in[g.nest_in].name[39] = g.est_in[g.nest_in].as[31] = g.est_in[g.nest_in].weapon[39] =
                     g.est_in[g.nest_in].shield[39] = 0;
                 g.est_from[g.nest_in++] = p[0];
@@ -1117,15 +1184,27 @@ static bool cl_message(uint8_t type, const uint8_t *p, int len) {
         break;
     case M_HIT:
         if (len >= 9 && g.nhit_in < 64) {
+            int32_t dmg;
+            memcpy(&dmg, p + 4, 4);
+            if (dmg < 0) {  // (a negative one would give the enemy life)
+                drop_note(D_HIT);
+                break;
+            }
             memcpy(&g.hit_in[g.nhit_in].id, p, 4);
-            memcpy(&g.hit_in[g.nhit_in].damage, p + 4, 4);
+            g.hit_in[g.nhit_in].damage = dmg;
             g.hit_in[g.nhit_in].element = p[8] < ONLINE_ELEM_COUNT ? p[8] : ONLINE_ELEM_NONE;
             g.nhit_in++;
         }
         break;
     case M_TIME:
         if (len >= 4 && !g.hosting) {
-            memcpy(&g.host_hour, p, 4);
+            float h;
+            memcpy(&h, p, 4);
+            if (!isfinite(h) || h < 0 || h > 24) {
+                drop_note(D_TIME);
+                break;
+            }
+            g.host_hour = h;
             g.host_hour_t = plat_now_ns();
         }
         break;

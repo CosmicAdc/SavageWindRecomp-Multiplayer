@@ -208,12 +208,150 @@ static void test_estate_strings_terminated(void) {
     CHECK(strlen(e[0].name) <= 39 && strlen(e[0].as) <= 31 && strlen(e[0].weapon) <= 39);
 }
 
+// A STATE whose position or heading is not finite, or beyond any world, is dropped whole: the player stays as he was
+static void test_state_not_finite_dropped(void) {
+    set_connected();
+    CHECK(send_join(1, "Bot"));
+    CHECK(send_state(1, 10.0f, 20.0f, -30.0f, 1.5f));
+    const float bad[] = {NAN, INFINITY, -INFINITY, 1e30f, -100001.0f};
+    unsigned before = g_drop_n[D_STATE];
+    for (size_t k = 0; k < sizeof bad / sizeof *bad; k++) {
+        CHECK(send_state(1, bad[k], 20.0f, -30.0f, 1.5f));
+        CHECK(send_state(1, 10.0f, bad[k], -30.0f, 1.5f));
+        CHECK(send_state(1, 10.0f, 20.0f, bad[k], 1.5f));
+        CHECK(send_state(1, 99.0f, 99.0f, 99.0f, bad[k]));
+    }
+    CHECK(g_drop_n[D_STATE] - before == 4 * (sizeof bad / sizeof *bad));
+    OnlinePlayer out[ONLINE_MAX];
+    CHECK(online_players(out));
+    CHECK(out[1].pos[0] == 10.0f && out[1].pos[1] == 20.0f && out[1].pos[2] == -30.0f && out[1].yaw == 1.5f);
+    CHECK(send_state(1, 100000.0f, -100000.0f, 0.0f, 0.0f));  // (the limit itself is fine)
+    CHECK(g_drop_n[D_STATE] - before == 4 * (sizeof bad / sizeof *bad));
+}
+
+// TIME is an hour, 0..24; anything else is not delivered
+static void test_time_range(void) {
+    float hour;
+    set_connected();
+    const float bad[] = {99.0f, -0.5f, 24.5f, NAN, INFINITY};
+    for (size_t k = 0; k < sizeof bad / sizeof *bad; k++) {
+        memcpy(msg, &bad[k], 4);
+        CHECK(cl_message(M_TIME, msg, 4));
+        CHECK(!online_host_hour(&hour));
+    }
+    const float good[] = {0.0f, 12.5f, 24.0f};
+    for (size_t k = 0; k < sizeof good / sizeof *good; k++) {
+        memcpy(msg, &good[k], 4);
+        CHECK(cl_message(M_TIME, msg, 4));
+        CHECK(online_host_hour(&hour) && hour == good[k]);
+    }
+}
+
+// A HIT with negative damage would heal the enemy: it never reaches online_take_hits
+static void test_hit_negative_dropped(void) {
+    uint32_t id[4];
+    int32_t damage[4];
+    uint8_t element[4];
+    set_connected();
+    pthread_mutex_lock(&g.lock);
+    g.hosting = true;
+    pthread_mutex_unlock(&g.lock);
+    uint32_t eid = 7;
+    int32_t d = -50;
+    memcpy(msg, &eid, 4);
+    memcpy(msg + 4, &d, 4);
+    msg[8] = ONLINE_ELEM_NONE;
+    CHECK(cl_message(M_HIT, msg, 9));
+    CHECK(online_take_hits(id, damage, element, 4) == 0);
+    d = 50;
+    memcpy(msg + 4, &d, 4);
+    CHECK(cl_message(M_HIT, msg, 9));
+    CHECK(online_take_hits(id, damage, element, 4) == 1 && id[0] == 7 && damage[0] == 50);
+}
+
+// ENEMIES / ESTATE drop the entry whose matrices are bad, not the message; LOOTS the same; LOOT_ADD and PICK drop whole
+static void test_lists_not_finite_dropped(void) {
+    static uint8_t buf[13 + ONLINE_LOOT * sizeof(OnlineLoot) + ONLINE_ENEMIES * sizeof(OnlineEnemy)];
+    static OnlineEnemy en[ONLINE_ENEMIES], in[3];
+    static OnlineLoot loots[ONLINE_LOOT];
+    float centre[3];
+    uint64_t age;
+    uint8_t from[8];
+    char pn[16][40];
+    float pp[16][3];
+
+    // ENEMIES (a guest's game): three entries, the middle one with NAN in its weapon matrix
+    set_connected();
+    memset(buf, 0, sizeof buf);
+    buf[12] = 3;
+    for (int k = 0; k < 3; k++) snprintf((char *)buf + 13 + k * sizeof(OnlineEnemy) + offsetof(OnlineEnemy, name), 40, "Enemy_%d", k);
+    float fnan = NAN;
+    memcpy(buf + 13 + 1 * sizeof(OnlineEnemy) + offsetof(OnlineEnemy, wm) + 5 * 4, &fnan, 4);
+    unsigned before = g_drop_n[D_ENEMIES];
+    CHECK(cl_message(M_ENEMIES, buf, 13 + 3 * (int)sizeof(OnlineEnemy)));
+    CHECK(online_enemies(centre, en, &age) == 2);
+    CHECK(!strcmp(en[0].name, "Enemy_0") && !strcmp(en[1].name, "Enemy_2"));
+    CHECK(g_drop_n[D_ENEMIES] - before == 1);
+    memcpy(buf, &fnan, 4);  // (a centre that is not finite: the whole message goes)
+    CHECK(cl_message(M_ENEMIES, buf, 13 + 3 * (int)sizeof(OnlineEnemy)));
+    CHECK(online_enemies(centre, en, &age) == 2);
+
+    // LOOTS: the one with a huge position goes, the others stay
+    set_connected();
+    memset(buf, 0, sizeof buf);
+    buf[0] = 3;
+    for (int k = 0; k < 3; k++) snprintf((char *)buf + 1 + k * sizeof(OnlineLoot) + offsetof(OnlineLoot, name), 40, "Item_%d", k);
+    float huge = 1e30f;
+    memcpy(buf + 1 + 0 * sizeof(OnlineLoot) + offsetof(OnlineLoot, pos) + 8, &huge, 4);
+    memcpy(buf + 1 + 2 * sizeof(OnlineLoot) + offsetof(OnlineLoot, rot) + 4, &fnan, 4);
+    CHECK(cl_message(M_LOOTS, buf, 1 + 3 * (int)sizeof(OnlineLoot)));
+    CHECK(online_loots(loots) == 1 && !strcmp(loots[0].name, "Item_1"));
+
+    // the host's game: ESTATE with the first of three entries bad, then LOOT_ADD and PICK
+    set_connected();
+    pthread_mutex_lock(&g.lock);
+    g.hosting = true;
+    pthread_mutex_unlock(&g.lock);
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1, buf[1] = 3;
+    for (int k = 0; k < 3; k++) snprintf((char *)buf + 2 + k * sizeof(OnlineEnemy) + offsetof(OnlineEnemy, name), 40, "Enemy_%d", k);
+    memcpy(buf + 2 + 0 * sizeof(OnlineEnemy) + offsetof(OnlineEnemy, m), &fnan, 4);
+    memcpy(buf + 2 + 1 * sizeof(OnlineEnemy) + offsetof(OnlineEnemy, sm) + 44, &huge, 4);
+    CHECK(cl_message(M_ESTATE, buf, 2 + 3 * (int)sizeof(OnlineEnemy)));
+    CHECK(online_take_estates(in, from, 8) == 1);
+    CHECK(!strcmp(in[0].name, "Enemy_2") && from[0] == 1);
+
+    memset(buf, 0, sizeof buf);
+    buf[0] = 1;
+    snprintf((char *)buf + 1 + offsetof(OnlineLoot, name), 40, "Item_Test");
+    memcpy(buf + 1 + offsetof(OnlineLoot, pos), &fnan, 4);
+    CHECK(cl_message(M_LOOT_ADD, buf, 1 + (int)sizeof(OnlineLoot)));
+    CHECK(g.nla_in == 0);
+    memset(buf + 1 + offsetof(OnlineLoot, pos), 0, 4);
+    CHECK(cl_message(M_LOOT_ADD, buf, 1 + (int)sizeof(OnlineLoot)));
+    CHECK(g.nla_in == 1);
+
+    memset(buf, 0, sizeof buf);
+    snprintf((char *)buf, 40, "%s", "Weapon_Test");
+    memcpy(buf + 40 + 4, &huge, 4);
+    CHECK(cl_message(M_PICK, buf, 52));
+    CHECK(online_take_picks(pn, pp, 16) == 0);
+    memset(buf + 40, 0, 12);
+    CHECK(cl_message(M_PICK, buf, 52));
+    CHECK(online_take_picks(pn, pp, 16) == 1);
+    stop_all();
+}
+
 int main(void) {
     test_state_reaches_players();
     test_state_without_join_ignored();
     test_slot_out_of_range_ignored();
     test_stop_clears_session();
     test_estate_strings_terminated();
+    test_state_not_finite_dropped();
+    test_time_range();
+    test_hit_negative_dropped();
+    test_lists_not_finite_dropped();
     stop_all();
     printf("test_online_net: %d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
