@@ -217,7 +217,7 @@ Cada requisito tiene un identificador que usan `tasks.md` y `verificacion.md`.
 | # | Pregunta | Quién | Bloquea |
 |---|---|---|---|
 | P3-1 | ¿Plazo de gracia de reconexión? | **RESUELTA (ADR-008, decisión 18): 10 minutos** | — |
-| P3-2 | ¿La contraseña del invitado se recuerda entre sesiones? Propuesta: no, salvo casilla "recordar" | Dueño | T331 |
-| P3-3 | ¿Se comparan también los mods cargados (lista o suma) al conectar? | Dueño | T325 (campo opcional) |
-| P3-4 | ¿Qué hacer con `--server`? Propuesta: dejarlo como relé sin mundo y decirlo en la ayuda | Dueño (no bloquea: T339 se construye con la propuesta) | — |
+| P3-2 | ¿La contraseña del invitado se recuerda entre sesiones? | **RESUELTA (ADR-027 n.º 1): solo con casilla "recordar"**, nunca en claro | — |
+| P3-3 | ¿Se comparan también los mods cargados (lista o suma) al conectar? | **RESUELTA (ADR-027 n.º 2): avisar, no rechazar** | — |
+| P3-4 | ¿Qué hacer con `--server`? | **RESUELTA (ADR-027 n.º 3): relé sin mundo**, dicho en la ayuda | — |
 | P3-5 | ¿Se acepta incluir código de terceros (ENet, miniupnpc)? | **RESUELTA (ADR-007, decisión 11): sí**, con licencia compatible con MIT y anotadas en `docs/third-party.md`. T305 sigue esperando medidas, no permiso | — |
