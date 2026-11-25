@@ -924,7 +924,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   no hagas: no escribas código; no toques `tools/patches.py` ni `tools/game_sites.py`; nada de proyectos de descompilación.
   modelo sugerido: alto
 
-- [ ] T450 [investigación] Luna de Sangre del anfitrión: la escena también en el invitado (ADR-025 n.º 5; HE-08).
+- [x] T450 [investigación] Luna de Sangre del anfitrión: la escena también en el invitado (ADR-025 n.º 5; HE-08).
+  hecha: agente Sonnet ag-t450 (integrada) — `specs/bitacora/F4-T450-luna-de-sangre.md`; propone T450-a..f (a y f ya; f = T455) y pruebas PE-T450-1..5 en el juego
   files: `specs/bitacora/F4-T450-luna-de-sangre.md`
   verify: la bitácora responde el paso 1 con `fichero:línea` y propone diseño y tareas; `git diff --check`
   depende de: —
