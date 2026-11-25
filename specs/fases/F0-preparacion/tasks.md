@@ -402,7 +402,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## F. Cierre
 
-- [ ] T024 [bitácora] Entrada de bitácora de F0 y criterios de salida.
+- [x] T024 [bitácora] Entrada de bitácora de F0 y criterios de salida.
+  reclamada: orquestador (Opus), 2026-11-24 — S1-S10 con evidencia en verificacion.md §6; aprobado por el dueño el 2026-11-24
   files: `specs/bitacora/<fecha>-F0.md`, `specs/fases/F0-preparacion/verificacion.md`
   verify: los diez criterios S1-S10 de `spec.md` tienen evidencia (comando y salida resumida) o un "no cumplido" con motivo; el dueño da el visto bueno
   depende de: T014, T015, T016, T017, T018, T019, T022, T023
@@ -416,7 +417,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no pegues logs crudos ni rutas personales; no marques un criterio sin evidencia.
   modelo sugerido: bajo
 
-- [ ] T025 [git] Subir `coop/main` al fork, solo si el dueño lo pide.
+- [x] T025 [git] Subir `coop/main` al fork, solo si el dueño lo pide.
+  reclamada: orquestador (Opus), 2026-11-24 — pedido por el dueño; push de coop/main al fork (HTTPS, sin --force)
   files: ninguno
   verify: `git ls-remote --heads origin coop/main` devuelve el commit local; `git ls-remote --heads upstream coop/main` no devuelve nada
   depende de: T024
