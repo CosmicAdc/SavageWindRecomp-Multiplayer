@@ -3,6 +3,9 @@
 #include "online_actors_internal.h"
 #include "hle.h"  // (RT_ON_RESET)
 
+// The enemies' puppets, their weapons and the element sources keep their pieces in the world's pool row
+// (OA_POOL_WORLD), no player's: one going out of reach or leaving (oa_drop) doesn't take them
+
 // ---- The host's enemies (protocol 11, ENEMIES): his game sends those near any player, each by its id, as it is (its
 // name, matrix, the AS it plays); the others delete their own near his Link and show his with OnlineEnemy_* actors
 // (tools/online_mod.py: an enemy's model, AS list and AS, no AI), each where his is, playing what his plays. When his
@@ -231,7 +234,7 @@ static bool own_ready(Cpu *c, Own *o, const OnlineEnemy *e) {
             snprintf(o->made.name, sizeof o->made.name, "%s", e->name);
         }
     }
-    oa_piece_update(c, 0, &o->made, e->name, "own");
+    oa_piece_update(c, OA_POOL_WORLD, &o->made, e->name, "own");
     if (!o->made.actor) return false;
     o->actor = o->made.actor, o->w = o->made.w, o->state = OWN_HAVE, o->remade = true;
     memset(&o->made, 0, sizeof o->made);
@@ -281,7 +284,7 @@ static void elem_update(Cpu *c) {
             continue;
         }
         if (!g_esrc[k].made) {
-            oa_piece_update(c, 0, &g_esrc[k].p, k_elem_source[g_esrc[k].elem], "element");
+            oa_piece_update(c, OA_POOL_WORLD, &g_esrc[k].p, k_elem_source[g_esrc[k].elem], "element");
             if (!g_esrc[k].p.actor) continue;
             const float *m = (const float *)(uintptr_t)(o->actor + 0x398);
             float sm[12] = {1, 0, 0, m[3], 0, 1, 0, m[7] + 1.0f, 0, 0, 1, m[11]};
@@ -445,7 +448,7 @@ void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlineP
             who = -1, until = 0, oa_enemies_host_turn++, next = plat_now_ns() + 2000000000ull;
         }
         if (who >= 0 && !until) {
-            oa_piece_update(c, 0, &src, name, "element test");
+            oa_piece_update(c, OA_POOL_WORLD, &src, name, "element test");
             if (src.actor && oa_alive(oa_g_own[who].actor, oa_g_own[who].w)) {
                 const float *m = (const float *)(uintptr_t)(oa_g_own[who].actor + 0x398);
                 float sm[12] = {1, 0, 0, m[3], 0, 1, 0, m[7] + 1.0f, 0, 0, 1, m[11]};
@@ -839,7 +842,7 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
             LOG("[online] the host's %s %u died\n", e[k].name, e[k].id);
             continue;
         }
-        if (oa_piece_update(c, 0, p, pa ? pa : "", "host")) {
+        if (oa_piece_update(c, OA_POOL_WORLD, p, pa ? pa : "", "host")) {
             g_puppet[s2].as[0] = 0;
             g_puppet[s2].life = 0;  // (a new actor: what it has is its own life, no hit)
             LOG("[online] the host's %s %u at %.1f %.1f %.1f, AS %s\n", e[k].name, e[k].id, e[k].m[3], e[k].m[7], e[k].m[11], e[k].as);
@@ -853,7 +856,7 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
             const char *ga = gn[0] ? oa_gear_actor(gn) : NULL;
             Piece *w = h ? &g_puppet[s2].sh : &g_puppet[s2].w;
             if (w->name[0] && strcmp(w->name, ga ? ga : "")) oa_delete_piece(c, w);
-            oa_piece_update(c, 0, w, ga ? ga : "", "host");
+            oa_piece_update(c, OA_POOL_WORLD, w, ga ? ga : "", "host");
             if (!w->actor) continue;
             if (getenv("SAVAGEWIND_ONLINE_SCALE_LOG") && slog2++ % 300 == 0) {
                 const float *am = (const float *)(uintptr_t)(w->actor + 0x398);
@@ -995,7 +998,7 @@ void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh,
                 for (int j = 0; j < PUPPETS && at < 0; j++)
                     if (g_puppet[j].id && !g_puppet[j].dying && g_puppet[j].p.actor) at = j, oa_enemies_show_t0_2 = plat_now_ns();
             if (at >= 0 && plat_now_ns() - oa_enemies_show_t0_2 >= (uint64_t)(atof(ft) * 1e9)) {
-                oa_piece_update(c, 0, &fire, "FireWood", "fire test");
+                oa_piece_update(c, OA_POOL_WORLD, &fire, "FireWood", "fire test");
                 uint64_t a = g_puppet[at].p.actor;
                 if (fire.actor && a && oa_alive(a, g_puppet[at].p.w)) {
                     const float *m = (const float *)(uintptr_t)(a + 0x398);

@@ -289,7 +289,10 @@ void oa_call_sret(Cpu *c, uint64_t fn, uint64_t out, uint64_t a0, uint64_t a1);
 uint64_t oa_call(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5);
 const char *oa_playing(Cpu *c, uint64_t actor, int slot, int bank);
 bool oa_play_as(Cpu *c, uint64_t actor, const char *name, int slot, int bank, float blend, bool again);
-extern Piece oa_g_pool[ONLINE_MAX][POOL];
+// each player's pool (oa_core.c), and one row more, no player's: the world's (the enemies' puppets, their weapons,
+// the element sources), which a player going out of reach or leaving (oa_drop) doesn't touch
+#define OA_POOL_WORLD ONLINE_MAX
+extern Piece oa_g_pool[ONLINE_MAX + 1][POOL];
 void oa_orphan(Piece *p);
 void oa_orphans_update(Cpu *c);
 void oa_delete_piece(Cpu *c, Piece *p);
