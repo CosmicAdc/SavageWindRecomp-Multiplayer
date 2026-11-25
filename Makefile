@@ -1004,3 +1004,19 @@ test-online-validate: $(B)/test_online_validate
 	$(B)/test_online_validate
 
 .PHONY: test-online-validate
+
+# The online server's session state machine (runtime/online.c srv_message / srv_drop) over socketpairs: POSIX only
+ifeq ($(PLATFORM),windows)
+test-online-session:
+	@echo "test-online-session: la prueba es solo POSIX (socketpair); en Windows no se ejecuta. Corre en Docker/Linux."
+else
+$(B)/test_online_session: tools/test_online_session.c runtime/online.c runtime/online_wire.h $(RT_HDRS)
+	@mkdir -p $(B)
+	$(CC) -O1 -g -fno-strict-aliasing -Wall -Wno-unused-function $(OSFLAGS) -Iruntime -o $@ tools/test_online_session.c \
+	    -lpthread -lm
+
+test-online-session: $(B)/test_online_session
+	$(B)/test_online_session
+endif
+
+.PHONY: test-online-session
