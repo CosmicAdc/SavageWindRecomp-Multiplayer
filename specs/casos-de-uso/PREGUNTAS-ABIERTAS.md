@@ -11,6 +11,28 @@ Cómo se usa:
   se convierte en regla `[DUEÑO]` en el caso y, si cambia el diseño, se escribe un ADR en `../decisiones/`.
 - "Bloquea" indica qué no se puede cerrar sin la respuesta. Con el valor por defecto se puede **empezar**, no cerrar.
 
+
+## Resueltas por el dueño
+
+**Ronda 1 (2026-11-24):** Q-06-1, Q-06-3, Q-07-1, Q-07-4, Q-09 (forma de envío), Q-11-1, Q-13-1, Q-14-1, Q-14-2,
+Q-14-4, librerías de terceros y reglas de acceso. Las respuestas están en
+[`../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`](../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md)
+y **mandan sobre los valores por defecto de este archivo**. Tres cambian el valor por defecto: Q-07-1 (recompensas
+para los dos siempre, también al unirse tarde), Q-07-4 (el invitado empieza de cero) y Q-14-4 (se puede continuar
+solo de inmediato, con confirmación). Pregunta nueva: Q-07-7, en el ADR-007.
+
+**Ronda 2 (2026-11-24):** Q-07-7, Q-07-6, Q-07-5, Q-11-2, Q-08-1, Q-08-3, Q-12-1, Q-12-3, Q-05-1 y Q-14-7. Respuestas en
+[`../decisiones/ADR-008-respuestas-del-dueno-ronda-2.md`](../decisiones/ADR-008-respuestas-del-dueno-ronda-2.md).
+Cambia un valor por defecto: Q-05-1 (el sitio se reserva 10 minutos, no 2). Requisito nuevo: poder pasarse los
+santuarios juntos sube de prioridad en F5.
+
+**Ronda 3 (2026-11-24):** Q-14-3, Q-13-3, Q-04-3, Q-09-2, Q-09-3, Q-10-1, Q-10-2 y Q-10-4. Respuestas en
+[`../decisiones/ADR-009-respuestas-del-dueno-ronda-3.md`](../decisiones/ADR-009-respuestas-del-dueno-ronda-3.md).
+Cambian dos valores por defecto: Q-04-3 (si la conexión directa es imposible no se ofrece nada: sin guía de red
+virtual ni servicio de presentación) y Q-09-2 (no se envían armas hasta que viajen durabilidad y bonificaciones).
+
+**Sigue abierta solo Q-10-5** (botón del ping y de la rueda): requiere revisar qué botones están libres.
+
 ## Las diez que más bloquean
 
 | # | Pregunta | Por defecto | Bloquea |

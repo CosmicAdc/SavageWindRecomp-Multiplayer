@@ -106,7 +106,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no inventes la URL del fork de los autores; no cambies el `origin` de `pr294-online/`; no hagas `git push`.
   modelo sugerido: bajo
 
-- [ ] T005 [entorno] Instalar MSYS2 UCRT64, dependencias y el venv de Python.
+- [x] T005 [entorno] Instalar MSYS2 UCRT64, dependencias y el venv de Python.
+  reclamada: orquestador (Opus), 2026-11-24 — verify = 0 (clang 23.1.5, make 4.4.1, venv OK); 8m33s; MSYS2 3,5 GB
   files: `tools/venv/` (ignorado por git); instalación de MSYS2 y Python fuera del repositorio
   verify: en MSYS2 UCRT64, `clang --version && make --version` responden y `tools/venv/Scripts/python.exe -c "import capstone, unicorn, lz4, oead"` termina con 0
   depende de: T004
@@ -137,7 +138,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no edites el contenido de los flujos aquí (eso es T008); no toques nada fuera de `.github/`.
   modelo sugerido: bajo
 
-- [ ] T007 [runtime] Decidir y aplicar qué hace el actualizador en el fork.
+- [x] T007 [runtime] Decidir y aplicar qué hace el actualizador en el fork.
+  reclamada: agente Sonnet t007-update, rama coop/T007 (a4588cc), integrada en 87ef166; verify orquestador: runtime-objs 0, test-update-core all passed
   files: `specs/decisiones/<n>-actualizador.md`; opción A: `runtime/post_update.c`; opción B: `runtime/platform/windows_update.c`, `runtime/update_appimage.c`, `runtime/platform/sw_update_key.h`, `recomplauncher.json`
   verify: `make test-update-core` termina con 0; `grep -rn "Revivedx/SavageWindRecomp" runtime recomplauncher.json` devuelve solo lo que la decisión deja a propósito y la decisión lo enumera
   depende de: T005, T006
@@ -271,7 +273,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## D. Línea base de pruebas sin juego
 
-- [ ] T016 [P] [pruebas] Ejecutar las pruebas Python sin juego y anotar su resultado.
+- [x] T016 [P] [pruebas] Ejecutar las pruebas Python sin juego y anotar su resultado.
+  reclamada: orquestador (Opus), 2026-11-24 — test_game_sites 0, test_layout 0, i18n_check 1 (esperado: 51 textos de Online sin traducir por idioma); test_simd 0 (159 968 casos, 2m40s)
   files: ninguno (solo lectura); resultado en `specs/bitacora/`
   verify: los cuatro comandos ejecutados y su código de salida anotado en `verificacion.md` §3. Esperado hoy: `i18n_check.py` sale con 1
   depende de: T005
@@ -313,7 +316,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no instales paquetes nuevos sin preguntar; no regeneres `runtime/launch_flags_table.c`.
   modelo sugerido: bajo
 
-- [ ] T019 [git] Pasar la comprobación de trampas de nombres sobre todo lo añadido en F0.
+- [x] T019 [git] Pasar la comprobación de trampas de nombres sobre todo lo añadido en F0.
+  reclamada: orquestador (Opus), 2026-11-24 — sin nombres prohibidos ni rutas personales en lo añadido respecto a upstream/test
   files: `specs/fases/F0-preparacion/verificacion.md` (resultado)
   verify: las dos órdenes de `plan.md` §8 terminan con `1` sobre `git diff --cached`; `git diff --name-only --diff-filter=A upstream/test...HEAD | grep -iE '(^|/)(input|save|keys|dump|build|generated[^/]*|extracted)/'` no devuelve nada
   depende de: T009
@@ -328,7 +332,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
 
 ## E. Docker (en paralelo con C y D)
 
-- [ ] T020 [P] [docker] Comprobar que la rama compila en Linux.
+- [x] T020 [P] [docker] Comprobar que la rama compila en Linux.
+  reclamada: orquestador (Opus), 2026-11-24 — **FALLA** (código 1, 1m53s): `runtime/control.h:93` usa `size_t` sin `#include <stddef.h>` (el PR lo perdió; upstream/test lo tiene). Pasa a F1
   files: ninguno (el script monta el árbol en solo lectura)
   verify: `ENGINE=docker JOBS=4 tools/linux/distro_build.sh debian:13` termina con 0; si falla, el primer error queda en la bitácora
   depende de: T006
@@ -342,7 +347,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no arregles el error en esta tarea; no montes la carpeta del juego.
   modelo sugerido: bajo
 
-- [ ] T021 [P] [docker] Crear la imagen de pruebas.
+- [x] T021 [P] [docker] Crear la imagen de pruebas.
+  reclamada: agente Sonnet t021-docker, rama coop/T021 (cea84f2), integrada en c0e1046; verify orquestador: build 0 (3m33s, 1,23 GB), clang 0, python 0
   files: `tools/docker/Dockerfile.pruebas`
   verify: `docker build -f tools/docker/Dockerfile.pruebas -t swcoop-pruebas .` termina con 0; `docker run --rm swcoop-pruebas clang --version` responde; `docker run --rm swcoop-pruebas /opt/venv/bin/python -c "import lz4, capstone, unicorn"` termina con 0
   depende de: T006
@@ -356,7 +362,8 @@ Cada tarea está escrita para que la ejecute **un agente sin más contexto que e
   no hagas: no copies el código ni el juego dentro de la imagen (se montan al ejecutar); no pongas el Dockerfile en una carpeta llamada `build`.
   modelo sugerido: medio
 
-- [ ] T022 [docker] Ejecutar en la imagen las pruebas Python sin juego.
+- [x] T022 [docker] Ejecutar en la imagen las pruebas Python sin juego.
+  reclamada: orquestador (Opus), 2026-11-24 — Docker: test_layout 0, test_game_sites 0, i18n_check 1 (igual que T016)
   files: ninguno
   verify: `docker run --rm -v "$PWD":/src:ro -w /src swcoop-pruebas /opt/venv/bin/python tools/test_layout.py` y lo mismo con `tools/test_game_sites.py` terminan con 0; `python3 tools/i18n_check.py` da el mismo resultado que T016
   depende de: T021
