@@ -433,10 +433,10 @@ oa_rules.c:dlog                              partida   contador de log de oa_rul
 # oa_runes.c
 oa_runes.c:g_rune                            puntero   runas de los otros (actores, Watch, Piece, efectos)
 oa_runes.c:g_ice                             puntero   pilares de hielo de los otros (Piece)
-oa_runes.c:chains_place:told                 partida   contador de log
-oa_runes.c:oa_stop_update:told               partida   contador de log
+oa_runes.c:chains_place_told                 partida   contador de log
+oa_runes.c:oa_stop_update_told               partida   contador de log
 oa_runes.c:oa_grab_update:kn                 permitir  cadena constante
-oa_runes.c:oa_grab_update:told               partida   contador de log
+oa_runes.c:oa_grab_update_told               partida   contador de log
 # oa_sample.c
 oa_sample.c:oa_k_channel                     permitir  tabla constante
 oa_sample.c:oa_k_bones                       permitir  tabla constante

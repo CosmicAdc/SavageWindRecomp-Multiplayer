@@ -1,6 +1,7 @@
 // Online play's actors, oa_runes: the remote players' runes here: Magnesis, Stasis, Cryonis. What the modules share:
 // runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 #define MAGNET_TIP 0.8f  // (the magnet over the hands, from them to its tips, toward what is held: in metres)
 
@@ -111,6 +112,9 @@ static bool fx_on(const void *h);
 static void fx_end(Cpu *c, void *h);
 static void rune_keep(Cpu *c, int i, Piece *p, const char *name, const char *who);
 
+// chains_place's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int chains_place_told;
+
 // The Stasis chains' place and size, as the rune sets them after it plays BitaLocked_Start (1.9.0 0x70011f5970): the
 // effect's matrix (+0xc0, flags +0x180 | 8, +0xb4..+0xbc 1) scaled by the stopped object's model's largest extent (its
 // box from the model unit's vtable +0x208: x1 6 floats out, min then max) and put at the object. Not set, the chains
@@ -137,9 +141,11 @@ static void chains_place(Cpu *c, uint64_t h, uint64_t a) {
     float one[3] = {1, 1, 1};
     memcpy((void *)(uintptr_t)(h + 0xb4), one, sizeof one);
     *(uint32_t *)(uintptr_t)(h + 0x180) |= 8;
-    static int told;
-    if (told++ < 2) LOG("[online] Stasis chains placed: size %.2f\n", s);
+    if (chains_place_told++ < 2) LOG("[online] Stasis chains placed: size %.2f\n", s);
 }
+
+// oa_stop_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_stop_update_told;
 
 // What the others stopped with the Stasis rune: the same object here (as Magnesis: the one of that name nearest where it
 // was), held where it is in his game (its body taken there each frame: it stays still as his does), drawn as stopped,
@@ -195,8 +201,7 @@ void oa_stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
         if (oa_running(fxa) && !g_rune[i].chained) {
             oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&g_rune[i].chains, fxa, (uint64_t)(uintptr_t)"BitaLocked_Start");
             g_rune[i].chained = fx_on(&g_rune[i].chains);
-            static int told;
-            if (told++ < 4) LOG("[online] %s's Stasis chains: BitaLocked_Start %s\n", pl[i].name, fx_on(&g_rune[i].chains) ? "on" : "not made");
+            if (oa_stop_update_told++ < 4) LOG("[online] %s's Stasis chains: BitaLocked_Start %s\n", pl[i].name, fx_on(&g_rune[i].chains) ? "on" : "not made");
         }
         if (fx_on(&g_rune[i].chains)) chains_place(c, g_rune[i].chains.p, g_rune[i].stop);
     }
@@ -286,6 +291,9 @@ static void rune_pieces(Cpu *c, int i, bool holding, const char *who) {
         }
     }
 }
+
+// oa_grab_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_grab_update_told;
 
 void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
     for (int i = 0; i < ONLINE_MAX; i++) {
@@ -427,8 +435,7 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
             oa_call(c, FN_SET_MTX, mf, (uint64_t)(uintptr_t)hm, 0, 0, 0, 0);
             if (oa_running(mf) && !fx_on(&g_rune[i].magnet)) {
                 oa_call_sret(c, FN_EFFECT_EMIT, (uint64_t)(uintptr_t)&g_rune[i].magnet, mf, (uint64_t)(uintptr_t)"Hand");
-                static int told;
-                if (told++ < 4) LOG("[online] %s's magnet: Hand %s\n", pl[i].name, fx_on(&g_rune[i].magnet) ? "on" : "not made");
+                if (oa_grab_update_told++ < 4) LOG("[online] %s's magnet: Hand %s\n", pl[i].name, fx_on(&g_rune[i].magnet) ? "on" : "not made");
             }
         }
         if (oa_running(fxa) && !fx_on(&g_rune[i].beam[0])) {
@@ -453,4 +460,12 @@ void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me) {
             oa_call_f(c, FN_MAGNE_BEAM_SET, (uint64_t)(uintptr_t)hd, (uint64_t)(uintptr_t)mtx, 0, 0, 0, 0, 0, bl);
         }
     }
+}
+
+// A reboot (runtime/main.c teardown): the others' runes (what they held or stopped, the effects, the Cryonis pillars)
+// were actors of the last boot, gone with its memory - forgotten, never deleted (nothing here calls the game)
+RT_ON_RESET(oa_runes_reset) {
+    memset(g_rune, 0, sizeof g_rune);
+    memset(g_ice, 0, sizeof g_ice);
+    chains_place_told = oa_stop_update_told = oa_grab_update_told = 0;
 }
