@@ -6,7 +6,8 @@ F5 se verifica **bloque a bloque** (tarea T539). Un bloque se cierra con OK, con
 Las secciones siguen la letra de bloque. El **orden de trabajo** es el de `plan.md` §10: primero el bloque C
 (santuarios juntos, sección 3), que es el objetivo prioritario `[DUEÑO]` (ADR-008, decisión 20), y después B, H, E,
 A, G, F y D. Las reglas marcadas `[DUEÑO]` salen de `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
-`ADR-008-respuestas-del-dueno-ronda-2.md` y `ADR-009-respuestas-del-dueno-ronda-3.md`. Todo se prueba con 2
+`ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md` y
+`ADR-011-respuestas-del-dueno-ronda-4.md`. Todo se prueba con 2
 jugadores salvo el bloque G (ADR-007, decisión 12).
 
 ## 0. Preparación
@@ -93,7 +94,7 @@ Si el bloque se cierra como "no viable": ADR con las evidencias. La solución fi
 color y el marcador con forma** del overlay (F4) `[DUEÑO]` (ADR-009, decisión 22); comprueba que siguen
 funcionando (fila A.10) y sigue con los demás bloques: este cierre no bloquea nada.
 
-## 2. Bloque B — CU-14a: teletransporte entre mapas
+## 2. Bloque B — CU-14c: teletransporte entre mapas
 
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
@@ -105,6 +106,7 @@ funcionando (fila A.10) y sigue con los demás bloques: este cierre no bloquea n
 | B.6 | Bestia | A dentro de una Bestia | Llega, o rechazo claro si no está soportado | ☐ |
 | B.7 | Aviso de recarga | Si se usa la recarga de guardado (aceptada: ADR-008, decisión 20) | Aviso antes de viajar: se cargará el último guardado. El invitado guarda en su perfil cooperativo; su partida individual no cambia | ☐ |
 | B.8 | La sesión sobrevive | Durante el viaje | El compañero ve "cargando" y luego al jugador; sin desconexión, o reconexión automática de F3 dentro del plazo de 10 minutos (ADR-008, decisión 18) | ☐ |
+| B.8b | Viaja el anfitrión por recarga (ADR-011, decisión 32) | El anfitrión viaja al mapa del invitado por el camino de recarga | Antes se pide confirmación y se avisa de que la sesión terminará; al confirmar, el invitado ve el aviso de fin de sesión y puede reintentar; sin crash | ☐ |
 | B.9 | Nombre de mapa falso | Bot que anuncia un mapa con caracteres raros o inexistente | El viaje se rechaza; sin crash | ☐ |
 | B.10 | Bloqueos | En evento, muerto, PvP activo | Rechazo con motivo | ☐ |
 | B.11 | Progreso | Tras 5 viajes, comprobar inventario y flags de muestra | Nada perdido salvo lo avisado en B.7 | ☐ |
@@ -141,7 +143,7 @@ funcionando (fila A.10) y sigue con los demás bloques: este cierre no bloquea n
 | D.5 | Desde fuera | Bitácora de T517 | Una de las tres respuestas, con evidencia | ☐ |
 | D.6 | 20 minutos dentro | Sesión continua | Sin crash | ☐ |
 
-## 5. Bloque E — CU-14c: momentos de historia con los dos presentes
+## 5. Bloque E — CU-14a: momentos de historia con los dos presentes
 
 | # | Comprobación | Cómo | Esperado | ☐ |
 |---|---|---|---|---|
@@ -149,17 +151,18 @@ funcionando (fila A.10) y sigue con los demás bloques: este cierre no bloquea n
 | E.2 | Catálogo | Bitácora de T518 | Una fila por momento de la lista | ☐ |
 | E.3 | Lógica | `build/test_coop_story` | Pasa | ☐ |
 | E.4 | Opción apagada | "Story needs both players" desactivada | Comportamiento igual que antes de F5 | ☐ |
-| E.5 | Botón, compañero lejos | A junto a un punto de la tabla; B a más de 30 m; A pulsa el botón | No empieza; A ve "Waiting for your partner" y la oferta de traer a B; B ve aviso y marca | ☐ |
+| E.5 | Botón, compañero lejos (lo verifica T523; T521 lo verifica por el registro `[story] … WAIT`) | A junto a un punto de la tabla; B a más de 30 m; A pulsa el botón | No empieza; A ve "Waiting for your partner" y la oferta de traer a B; B ve aviso y marca | ☐ |
 | E.5b | Oferta de teletransporte | A elige traer a B; B acepta. Repite con B rechazando | Si acepta, B aparece junto a A y el evento puede empezar; si rechaza, B no se mueve (ADR-007, decisión 4; ADR-008, decisión 16) | ☐ |
 | E.6 | Botón, compañero cerca | B llega a menos de 30 m en el mismo mapa | A puede empezar. Solo A ve la escena; B está presente y recibe el progreso (flags de muestra en B y en el anfitrión). No se lanza la escena en el juego de B (ADR-009, decisión 21) | ☐ |
 | E.7 | 3 eventos de botón | Repite E.5 y E.6 con tres eventos distintos | Igual en los tres | ☐ |
 | E.8 | No estorba | Lejos de los puntos de la tabla | A funciona con normalidad (hablar, recoger, abrir cofres) | ☐ |
 | E.9 | Zona (si T522) | Evento que arranca al entrar en una zona, compañero lejos | No empieza; al llegar el compañero, empieza. 10 repeticiones sin cuelgue | ☐ |
 | E.10 | Compañero desconectado | B sale de la sesión; A (anfitrión) junto a un punto de la tabla | A ve la espera y puede continuar solo tras confirmar, en ese momento; no hay que esperar al plazo de reconexión de 10 minutos (ADR-007, decisión 6; ADR-008, decisión 18) | ☐ |
-| E.10b | Continuar solo, compañero conectado | B conectado pero lejos; A (anfitrión) elige continuar y confirma. Repite cancelando el diálogo | Al confirmar, el evento empieza de inmediato y B recibe un aviso y el progreso; al cancelar, sigue la espera. Sin cuenta atrás | ☐ |
+| E.10b | Continuar solo, compañero conectado (lo verifica T523; T521, por `[story] … HOST_CONTINUE`) | B conectado pero lejos; A (anfitrión) elige continuar y confirma. Repite cancelando el diálogo | Al confirmar, el evento empieza de inmediato y B recibe un aviso y el progreso; al cancelar, sigue la espera. Sin cuenta atrás | ☐ |
 | E.10c | El invitado no puede continuar solo | B (invitado) junto a un punto de la tabla, A lejos | B no tiene la acción de continuar solo; un STORY "continúa solo" enviado por un bot que no es anfitrión se rechaza | ☐ |
 | E.11 | Compañero en otro mapa | B dentro de un santuario | Cuenta como ausente | ☐ |
 | E.12 | Fin de sesión | Salir con una espera activa | El bloqueo de A desaparece | ☐ |
+| E.13 | Regla de avance (T542) | B (invitado) lejos de A (anfitrión) y sin confirmación; un bot envía un flag de un momento de la tabla | El anfitrión no lo aplica y lo registra; con `host_confirmed` o con los dos presentes, sí | ☐ |
 | E.13 | El pedestal y las torres siguen bien | Prueba original del PR con `BOT_DEMO=1` | El bloqueo de 30 m sigue funcionando | ☐ |
 | E.14 | Bloqueo existente frente a la lista corta | Bitácora de T521, paso 1 | Anotado qué cubre hoy el bloqueo de A; la exigencia de presencia solo alcanza a la piedra y a la primera torre, no a las demás torres ni a ningún santuario (ADR-007, decisión 3) | ☐ |
 
@@ -205,7 +208,7 @@ funcionando (fila A.10) y sigue con los demás bloques: este cierre no bloquea n
 | H.5 | Carga | Registro de arranque | Línea `[gamelib] ... (game version 1.9.0, N sites)` con N mayor que antes | ☐ |
 | H.6 | Sin regresión | Recorrido de 30 minutos de F1 tras **cada** lote | Sin crash; mismo comportamiento | ☐ |
 | H.7 | Grupo ausente | Prueba sintética: quitar un sitio de un grupo opcional de `KNOWN` en una copia local y generar con `--any-version` sobre un binario de prueba, o simular `g_site.<x> = 0` | Ese subsistema se desactiva solo y lo registra una vez; nada salta a una dirección 0 | ☐ |
-| H.8 | Nº de recompilaciones | Lista de valores de `GAMELIB_ID` durante el bloque | Como mucho 3 cambios | ☐ |
+| H.8 | Nº de recompilaciones | Lista de valores de `GAMELIB_ID` durante **toda F5**, incluidos los sitios de T513 y T522 | Como mucho 3 cambios | ☐ |
 | H.9 | Sin valores cambiados | Revisión del diff de T537 | Ningún desplazamiento cambió de valor | ☐ |
 
 ## 9. Regresión general (al cerrar cada bloque)

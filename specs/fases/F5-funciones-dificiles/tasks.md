@@ -26,6 +26,12 @@ documento, no código de producción.
 
 ## Reglas que valen para todas las tareas (léelas una vez)
 
+- **ADR-006 manda sobre los pasos de cada tarea.** El subagente solo escribe código y documentos, hace commit y marca
+  todo como "NO verificado". **No compila, no ejecuta pruebas, no lanza el juego ni Docker, no descarga dependencias,
+  no genera patrones ni regenera el juego (`make gen`, `make -j8`) y no hace push.** Todo paso que diga "ejecuta",
+  "mide", "compila", "lanza", "regenera" o "genera el patrón" (incluidos los `verify` y las capturas) lo hace **el
+  orquestador** o el dueño, de uno en uno, y anota la salida en `specs/bitacora/`. El subagente solo puede usar `grep`
+  y `git diff`.
 - Repositorio: el fork, rama creada desde `coop/main`. Rutas siempre **relativas a la raíz del repo**. Nunca rutas
   absolutas ni nombres de usuario.
 - Las líneas `fichero:línea` son del PR #294 original (HEAD `350c5f8`). `runtime/online_actors.c` se partió en F2 en
@@ -50,15 +56,19 @@ documento, no código de producción.
 - Todo lo que llega por red es hostil: longitud, rango, terminador, `isfinite`, nombres contra lista permitida.
 - Estado por arranque del juego: `RT_ON_RESET` (`runtime/hle.h`); no guardes punteros del juego entre reinicios.
 - Cualquier cambio de comportamiento va tras una opción **apagada por defecto**.
-- Texto visible: en inglés en un `.mm` de `runtime/ui/` y añadido a
+- Texto visible: en inglés en un `.mm` de `runtime/ui/`, envuelto con `tr()`, y añadido a
   `specs/fases/F5-funciones-dificiles/textos-nuevos.txt`.
 - Pruebas con guardados: siempre copias.
 - Comprobación mínima de cualquier cambio en `runtime/`: `make runtime-objs` sin avisos nuevos.
 - Hecho = `verify` pasa **y** hay entrada en `specs/bitacora/`.
 - Las respuestas del dueño (`specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
-  `ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md`) mandan sobre cualquier tarea.
-  Lo que sale de ellas va marcado `[DUEÑO]`. El límite es de 2 jugadores por ahora: diseña para N, prueba con 2
-  (ADR-007, decisión 12).
+  `ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md`,
+  `ADR-011-respuestas-del-dueno-ronda-4.md`) mandan sobre cualquier tarea. Lo que sale de ellas va marcado `[DUEÑO]`. El
+  límite es de 2 jugadores por ahora: diseña para N, prueba con 2 (ADR-007, decisión 12). De la ronda 4 valen aquí:
+  si cae el anfitrión, la sesión termina sin traspaso (decisión 32); el anfitrión es siempre el mismo (29); saltarse una
+  escena compartida, cada uno la suya, en una versión futura (42); un cambio que obligue a recompilar sombreadores solo
+  con aprobación del dueño tras presentar el coste (43); menús que no pausan y colisión activada, apagable por el
+  anfitrión (44, 45).
 
 ## Orden de los bloques
 
@@ -66,6 +76,8 @@ Los bloques están en el **orden de trabajo** de `plan.md` §10, no en orden alf
 juntos)** → B → H → E → A → G → F → D → Cierre. `[DUEÑO]` (ADR-008, decisión 20): pasarse los santuarios juntos es
 el objetivo prioritario y va antes que el tinte 3D (A) y que la historia (E). Los identificadores de tarea no han
 cambiado: por eso no van correlativos al leer el fichero de arriba abajo (T540 es la primera tarea del bloque C).
+Las letras 14a/14b/14c son las de `casos-de-uso/CU-14-…md` (14a = historia con los dos presentes, 14b = santuarios
+y Bestias juntos, 14c = teletransporte entre mapas); ante la duda, cita por el nombre de la sección.
 
 ---
 
@@ -82,7 +94,7 @@ cambiado: por eso no van correlativos al leer el fichero de arriba abajo (T540 e
     4. Versión 1: basta con estar allí; uno ve la escena y el otro recibe el progreso. Verla a la vez queda como mejora posterior, sin tareas activas (ADR-009, decisión 21).
 
 - [ ] T502 [protocolo] Cambio de cable de F5 (primer salto)
-  files: runtime/online.h, runtime/online.c (solo `PROTOCOL`, mensajes y estructuras), runtime/online_authority.c, la cabecera compartida con el bot, tools/online_bot.c, tests/test_online_wire.c, specs/contratos/protocolo.md
+  files: runtime/online.h, runtime/online.c (solo `PROTOCOL`, mensajes y estructuras), runtime/online_authority.c, la cabecera compartida con el bot, tools/online_bot.c, tests/test_online_wire.c, tests/test_online_authority.c, specs/contratos/protocolo.md
   verify: `make test-online` sale con 0 y `sh tools/nettest/run.sh smoke` sale con 0
   depende de: F4 completa
   quién: agente designado como **dueño del protocolo**
@@ -90,10 +102,10 @@ cambiado: por eso no van correlativos al leer el fichero de arriba abajo (T540 e
   pasos:
     1. Sube `PROTOCOL` al siguiente número libre; regístralo en `specs/contratos/protocolo.md`.
     2. STATE: en `coop_flags` añade bit 2 "esperando a su compañero para un evento" y bit 3 "tinte 3D activado".
-    3. Mensaje STORY (emisor → todos): nombre de evento `char[40]`, estado `u8` (quiere empezar, empezó, terminó, el anfitrión continúa solo). El último solo se acepta del anfitrión (ADR-007, decisión 6): anótalo en la tabla de autoridad.
-    4. Mensaje STATE_MIN (S→C, lo genera el servidor): ranura, posición `float[3]`, mapa `char[40]`, indicadores. Lo usará el filtrado por interés.
-    5. Tabla de autoridad y límites de tasa para STORY (2/s).
-    6. `_Static_assert` de tamaños; actualiza el bot.
+    3. Dos mensajes distintos, para que la autoridad dependa del **tipo** y no del contenido: STORY (emisor → todos): nombre de evento `char[40]`, estado `u8` (quiere empezar, empezó, terminó); y STORY_ALONE (**solo del anfitrión** → todos): nombre de evento `char[40]`, "el anfitrión continúa solo" (ADR-007, decisión 6). Anótalos en la tabla de autoridad: STORY_ALONE de un no anfitrión se descarta.
+    4. Mensaje STATE_MIN (S→C, lo genera el servidor): ranura, posición `float[3]`, mapa `char[40]`, indicadores. Lo usará el filtrado por interés. **Un cliente nunca puede enviarlo**: el servidor lo descarta si llega de un cliente.
+    5. Tabla de autoridad y límites de tasa para STORY y STORY_ALONE (2/s). Validación al recibir (regla 9): longitud exacta, nombre terminado y acotado (contra la lista de `coop_story_table.inc` cuando T518 la haya creado), estado dentro de rango; para STATE_MIN en el cliente, posición finita y acotada, mapa en formato estricto y ranura `< ONLINE_MAX`.
+    6. `_Static_assert` de tamaños; actualiza el bot; pruebas de la tabla de autoridad (`tests/test_online_authority.c`) para STORY, STORY_ALONE y STATE_MIN.
   hecho cuando: juego y bot se conectan con la versión nueva y `protocolo.md` está al día.
   no hagas: no implementes lógica; no cambies la versión más de una vez; el STATE por bloques no va aquí (es T530).
   modelo sugerido: alto
@@ -109,7 +121,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   verify: la bitácora contiene la tabla pedida en el paso 6, rellena con lo visto en los dos juegos, las órdenes usadas y la sección "lo que no se comprobó"
   depende de: F1 (dos juegos funcionando en un PC)
   quién: dueño (ejecuta los dos juegos) + agente (prepara las órdenes y ordena el resultado)
-  contexto: El dueño quiere que los dos puedan pasarse los santuarios juntos (ADR-008, decisión 20). Hoy, según la documentación del PR, quien está en un santuario o en una Bestia Divina **no aparece** en el mundo de los demás (`docs/ONLINE.md`, sección "Players on other maps"), y la tabla de huecos de `specs/mapa/07-pr294-integracion-juego.md` dice de "Shrines/Divine Beasts together": "Partial, untested, high". La misma documentación dice que los que están en el mismo santuario se ven y que sus bolas y cajas se envían como objetos del mundo (`docs/ONLINE.md:996-997`). Nada de esto se ha ejecutado en este proyecto: antes de planificar la matriz (T514) y los arreglos hay que verlo.
+  contexto: El dueño quiere que los dos puedan pasarse los santuarios juntos (ADR-008, decisión 20). Hoy, según la documentación del PR, quien está en un santuario o en una Bestia Divina **no aparece** en el mundo de los demás (`docs/ONLINE.md`, sección "Players on other maps"), y la tabla de huecos de `specs/mapa/07-pr294-integracion-juego.md` (§7, fila "Santuarios y Bestias Divinas juntos") dice: PARCIAL, "No probado", prioridad alta. La misma documentación dice que los que están en el mismo santuario se ven y que sus bolas y cajas se envían como objetos del mundo (`docs/ONLINE.md:996-997`). Nada de esto se ha ejecutado en este proyecto: antes de planificar la matriz (T514) y los arreglos hay que verlo.
   pasos:
     1. Pregunta exacta: con dos instancias en un PC, ¿qué ocurre hoy cuando los dos jugadores entran al mismo santuario? ¿Se ven dentro? ¿Qué ve cada uno mientras solo uno está dentro? ¿Qué pasa al completarlo y al salir?
     2. Montaje: dos juegos en un PC como en `verificacion.md` §0.2, cada uno con una **copia** de guardado situada junto a un santuario sin completar. Elige el más simple que tengas a mano (una "bendición" o uno de un solo mecanismo). Al santuario se entra andando: `teleport` y `goto` no cambian de mapa.
@@ -137,20 +149,35 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   no hagas: no uses el guardado real; no marques como fallo lo que el diseño no sincroniza a propósito (el estado interno del rompecabezas): anótalo como límite; no marques como fallo que uno pueda completar el santuario sin el otro: un santuario no es un momento de historia (ADR-007, decisión 3).
   modelo sugerido: medio
 
+- [ ] T541 [decisión] ADR: enmienda de la regla 11 para ENEMIES por mapa
+  files: specs/decisiones/ADR-enmienda-regla-11-enemigos-por-mapa.md
+  verify: el fichero existe, enmienda la regla 11 de `specs/constitution.md` con el texto exacto nuevo, define cómo se acota el mapa declarado (paso 3) y lleva la línea `Decidido por: <nombre>, <fecha>`; `git diff --check` sin errores
+  depende de: T514 (debe confirmar el problema)
+  quién: dueño (un agente redacta el borrador)
+  contexto: La regla 11 de la constitución dice que ENEMIES solo lo origina el anfitrión de la partida. T515 quiere que, en un mapa donde no está el anfitrión, lo origine "el dueño de la lista de ese mapa". Eso cambia la regla, y la constitución exige el ADR **antes** del código.
+  pasos:
+    1. Redacta el texto nuevo de la regla 11: ENEMIES lo origina el anfitrión si está en ese mapa; si no, el jugador de menor ranura presente en él; los flags, el botín y la hora siguen siendo solo del anfitrión.
+    2. Propón cómo se acota el mapa que declara un cliente: el servidor toma el mapa del último STATE **ya validado** (formato estricto, longitud < 40, contra la lista de mapas conocidos); un mapa desconocido o nuevo no da autoridad; la autoridad cubre solo ENEMIES **de ese mapa** y solo se reenvía a los jugadores que el servidor ve en ese mapa.
+    3. Lista los riesgos (un invitado que miente sobre su mapa para originar ENEMIES) y cómo los acota el paso 2.
+    4. El dueño revisa y firma.
+  hecho cuando: el ADR está firmado; T515 puede empezar.
+  no hagas: no decidas por el dueño; no cambies la constitución en esta tarea (el ADR la enmienda cuando se firme, con el texto exacto).
+  modelo sugerido: alto
+
 - [ ] T515 [mundo] Enemigos compartidos en un mapa donde no está el anfitrión
   files: el módulo de enemigos de `online_actors`, runtime/online.c (encaminamiento de ENEMIES por mapa), runtime/online_authority.c, tests/test_online_authority.c
   verify: `make test-online` sale con 0 y recorrido manual: dos invitados (o invitado + bot) en un santuario de combate sin el anfitrión ven al mismo enemigo con la misma vida
-  depende de: T514 (debe confirmar el problema), T502
-  quién: agente + dueño
+  depende de: T514 (debe confirmar el problema), T502, T541 (ADR firmado que enmienda la regla 11; sin él no se escribe código)
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: La lista de enemigos compartidos la construye el juego del anfitrión con los enemigos de **su** mundo (`runtime/online_actors.c:1987-2636`), y un jugador en otro mapa "has none of its enemies" (`docs/ONLINE.md:406-407`; `can_own`, `runtime/online_actors.c:2367-2370`). Por lectura del código, en un mapa sin el anfitrión cada invitado simula sus propios enemigos; T514 debe haberlo confirmado.
   pasos:
     1. Si T514 no confirmó el problema, cierra esta tarea como "no aplica".
     2. Define "dueño de lista de un mapa": el anfitrión si está en ese mapa; si no, el jugador de menor ranura presente en él.
-    3. El servidor conoce el mapa de cada jugador por su último STATE; acepta ENEMIES del dueño de lista de cada mapa y lo reenvía solo a los jugadores de ese mapa.
+    3. El servidor conoce el mapa de cada jugador por su último STATE **ya validado**; acepta ENEMIES del dueño de lista de cada mapa y lo reenvía solo a los jugadores de ese mapa, acotando el mapa declarado exactamente como dice el ADR de T541 (formato estricto, mapa conocido, autoridad solo sobre ENEMIES de ese mapa).
     4. El módulo de enemigos usa "soy dueño de lista de mi mapa" donde hoy usa "soy anfitrión" para construir y enviar la lista.
     5. Al cambiar el dueño (alguien entra o sale del mapa), la lista se reconstruye; prueba que no deja enemigos duplicados.
   hecho cuando: los `verify` pasan y el campo abierto se comporta como antes.
-  no hagas: no cambies la autoridad sobre flags, botín ni hora (siguen siendo del anfitrión); no confíes en el mapa que declara un cliente para darle autoridad sobre otro mapa.
+  no hagas: no cambies la autoridad sobre flags, botín ni hora (siguen siendo del anfitrión); no confíes en el mapa que declara un cliente para darle autoridad sobre otro mapa (solo vale lo que fije el ADR de T541); no escribas código antes de que T541 esté firmada.
   modelo sugerido: alto
 
 ## Bloque B — Teletransporte entre mapas (CU-14)
@@ -171,32 +198,33 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
 
 - [ ] T512 [investigación] Spike: cambiar de mapa recargando el guardado con la posición reescrita
   files: specs/bitacora/F5-T512-recarga-dirigida.md
-  verify: la bitácora responde a las 3 preguntas con tiempos medidos en 5 repeticiones
+  verify: `grep -c '^| [1-4] |' specs/bitacora/F5-T512-recarga-dirigida.md` da 4 (una fila por pregunta, con tiempos medidos en 5 repeticiones)
   depende de: F1
-  quién: agente + dueño
-  contexto: El runtime ya reescribe en memoria la posición y el mapa guardados cuando el juego lee el guardado (`runtime/services/test_warp.c`, activado con `SAVAGEWIND_TEST_WARP`); hoy solo al arrancar. Existe además el reinicio del juego dentro del proceso (`teardown`, `runtime/main.c:148-168`; `SAVAGEWIND_REBOOT_AT`).
+  quién: agente redacta; orquestador y dueño ejecutan las pruebas y las medidas
+  contexto: El runtime ya reescribe en memoria la posición y el mapa guardados cuando el juego lee el guardado (`runtime/services/test_warp.c`, activado con `SAVAGEWIND_TEST_WARP`); hoy solo al arrancar. Existe además el reinicio del juego dentro del proceso (`teardown`, `runtime/main.c:150-170`; `SAVAGEWIND_REBOOT_AT`).
   pasos:
     1. Pregunta 1: ¿se puede activar el mecanismo de `test_warp` con un destino dado en tiempo de ejecución (no por variable de entorno) y que se aplique en la siguiente lectura del guardado?
     2. Pregunta 2: ¿qué formas hay de provocar esa lectura sin ingeniería inversa? (reinicio en caliente + "Continuar" con entrada guionizada; otras). ¿Cuánto tarda cada una?
-    3. Pregunta 3: ¿se pierde progreso no guardado? ¿Qué pasa con la sesión de red durante la recarga?
+    3. Pregunta 3: ¿se pierde progreso no guardado? ¿Qué pasa con la sesión de red durante la recarga? **Pregunta 4 (ADR-011, decisión 32):** si quien recarga es el **anfitrión**, la recarga corta su servidor y la sesión termina sin traspaso: ¿qué ve el invitado y cuánto tarda en poder reintentar? El sitio reservado de 10 minutos (ADR-008, decisión 18) vale solo para el invitado.
     4. Forma de la respuesta: tabla (método | funciona | segundos | qué se pierde) y recomendación.
   hecho cuando: T513 puede usar el camino 2 con datos.
   no hagas: no escribas en el fichero de guardado en disco; no cambies código de producción en esta tarea.
   modelo sugerido: alto
 
 - [ ] T513 [reglas] Teletransporte al compañero en otro mapa
-  files: runtime/coop_tp.c, tests/test_coop_tp.c, el módulo de reglas de `online_actors`, runtime/services/test_warp.c (solo si se usa el camino 2), tools/game_sites.py y runtime/game_sites.h (solo si se usa el camino 1)
-  verify: `build/test_coop_tp` sale con 0 y recorrido manual §CU-14a de `verificacion.md` (5 viajes campo → santuario y 5 santuario → campo sin cuelgue)
+  files: runtime/coop_tp.c, tests/test_coop_tp.c, el módulo de reglas de `online_actors`, runtime/services/test_warp.c (solo si se usa el camino 2), tools/game_sites.py y runtime/game_sites.h (solo si se usa el camino 1; el sitio entra en el lote abierto del bloque H, no en un lote propio), specs/fases/F5-funciones-dificiles/textos-nuevos.txt
+  verify: `build/test_coop_tp` sale con 0 y recorrido manual §CU-14c de `verificacion.md` (5 viajes campo → santuario y 5 santuario → campo sin cuelgue)
   depende de: T511 o T512 (el que resultó viable), F4 (teletransporte en el mismo mapa)
-  quién: agente + dueño
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: F4 dejó "ir con mi compañero" para el mismo mapa: `coop_tp_can` rechaza con el motivo "mapa distinto". El mapa de cada jugador llega en su STATE (`pose.map`). `[DUEÑO]` (ADR-008, decisión 20): el viaje a otro mapa está aceptado con pantalla de carga y guardado; sirve al objetivo de pasarse los santuarios juntos. Las reglas de F4 siguen valiendo aquí: ir con el compañero está siempre disponible, también en combate, con 30 s de espera entre usos, e invocar al otro requiere que acepte (ADR-008, decisión 16).
   pasos:
     1. En `coop_tp.c`: nuevo resultado "requiere cambio de mapa" en lugar de rechazo, y estado `LOADING_MAP`.
     2. Destino: la **entrada** del mapa del compañero, no su posición exacta.
     3. Camino 1 (si T511): llama a la función de cambio de mapa por `g_site` desde el hilo del juego, con las precondiciones de la bitácora.
-    4. Camino 2 (si T512): fija el destino para `test_warp` y provoca la recarga por el método recomendado; avisa antes al jugador ("se cargará tu último guardado"). El guardado del invitado es el de su perfil cooperativo (F4), nunca el de su partida individual (ADR-007, decisiones 1 y 5).
-    5. Valida el nombre de mapa recibido contra un formato estricto (letras, dígitos, `/` y `_`, longitud < 40) antes de usarlo.
-    6. Si ninguno está disponible: marca hacia la entrada del santuario (camino 3) y texto explicativo.
+    4. Camino 2 (si T512): fija el destino para `test_warp` y provoca la recarga por el método recomendado; avisa antes al jugador ("se cargará tu último guardado"; el aviso nace por identificador, con su literal en `coop_hud.mm` dentro de `tr()`, como en F4). El guardado del invitado es el de su perfil cooperativo (F4), nunca el de su partida individual (ADR-007, decisiones 1 y 5).
+    5. **Si quien viaja por recarga es el anfitrión** (ADR-011, decisión 32: si cae el anfitrión, la sesión termina; sin traspaso): `[PROPUESTA]` (pendiente del dueño) no se carga sin avisar: se pide confirmar "Travelling will end the session for your partner" y la sesión termina limpiamente; el invitado recibe el aviso de fin de sesión y puede reintentar. El sitio reservado de 10 minutos solo vale para el invitado que viaja.
+    6. Valida el nombre de mapa recibido contra un formato estricto (letras, dígitos, `/` y `_`, longitud < 40) antes de usarlo.
+    7. Si ninguno está disponible: marca hacia la entrada del santuario (camino 3) y texto explicativo.
   hecho cuando: el recorrido pasa.
   no hagas: no uses un nombre de mapa de la red sin validar; no cambies de mapa durante un evento; no escribas direcciones en un `.c`.
   modelo sugerido: alto
@@ -222,14 +250,14 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   files: tools/game_sites.py, runtime/game_sites.h, runtime/oa_core.c (o el módulo que tenga crear/pedir/borrar actores, matrices, huesos y handles)
   verify: `cd tools && ../tools/venv/Scripts/python.exe game_sites.py find ../extracted/exefs/main` lista cada sitio nuevo como `ok` y sale con 0; `tools/venv/Scripts/python.exe tools/test_game_sites.py` sale con 0; tras `make gen && make -j8`, el recorrido de 10 minutos de dos juegos funciona igual
   depende de: T533, F1 (puerta de versión)
-  quién: agente + dueño (necesita `extracted/exefs/main` del dueño para generar los patrones y recompilar)
+  quién: agente escribe; orquestador y dueño generan los patrones, regeneran y recompilan (necesita `extracted/exefs/main` del dueño)
   contexto: Las funciones de crear, pedir, recoger y borrar actores, poner matrices, despertar, y leer o escribir huesos están como `#define FN_... 0x70...` al principio del fichero (`runtime/online_actors.c:30-57` y `:666-670` en el PR). Un patrón se genera con `tools/game_sites.py pattern <main> <dirección> code` (imprime una línea `Site(...)` lista para pegar) y debe encontrar exactamente un lugar.
   pasos:
-    1. Para cada función del módulo (lista del CSV de T533): genera su patrón con la orden anterior.
+    1. Para cada función del módulo (lista del CSV de T533): el orquestador o el dueño genera su patrón con la orden anterior y se lo pasa al agente.
     2. Pega la línea en `SITES` con un comentario de qué hace, añade la entrada a `KNOWN['1.9.0']`, y mete todas en un grupo nuevo de `OPTIONAL_GROUPS` llamado como el subsistema.
     3. Añade `X(<nombre>)` a `GAME_SITES_OPTIONAL` en `runtime/game_sites.h`.
     4. En el `.c`: sustituye cada literal por `g_site.<nombre>`, y haz que `online_actors_on()` (la función que decide si el modo en línea tiene actores) devuelva falso si alguno de este grupo es 0.
-    5. Regenera y recompila (`make gen`, `make -j8`) y comprueba la línea `[gamelib] ... sites` del registro.
+    5. El orquestador regenera y recompila (`make gen`, `make -j8`) y comprueba la línea `[gamelib] ... sites` del registro. El agente no ejecuta nada de esto.
   hecho cuando: los tres `verify` pasan y no queda ningún literal `0x70…` de función en ese módulo.
   no hagas: no escribas patrones a mano; no pongas los sitios como obligatorios (romperías el arranque sin modo en línea); no cambies el comportamiento; no abras otro lote hasta fusionar este.
   modelo sugerido: medio
@@ -238,7 +266,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   files: tools/game_sites.py, runtime/game_sites.h, los demás módulos `runtime/oa_*.c` con direcciones de función
   verify: los mismos tres de T534, más `tools/venv/Scripts/python.exe tools/coop_addr_inventory.py` mostrando 0 direcciones de función
   depende de: T534
-  quién: agente + dueño
+  quién: agente escribe; orquestador y dueño generan, regeneran y recompilan
   contexto: Quedan las funciones de efectos y sonido, datos de juego y flags, eventos, bolsa, runas, física de cuerpos, mapa, retirar objetos y las cuatro o cinco que están en línea en el bloque de "menús sin pausa" (mapa 07 §3.3).
   pasos:
     1. Mismo procedimiento que T534, con un grupo opcional por subsistema (efectos, flags, eventos, runas, mundo, pausa).
@@ -266,7 +294,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
 
 - [ ] T537 [limpieza] Código sin uso y desplazamientos en una cabecera
   files: los módulos `runtime/oa_*.c`, runtime/oa_offsets.h (nuevo)
-  verify: `make runtime-objs` sin avisos; `grep -n "FN_ARMOR_INIT\|FN_SPECIAL_FX_A\b" runtime/` no devuelve nada; recorrido de 10 minutos de dos juegos igual que antes
+  verify: `make runtime-objs` sin avisos; `grep -rn "FN_ARMOR_INIT\|FN_SPECIAL_FX_A\b" runtime/` no devuelve nada; recorrido de 10 minutos de dos juegos igual que antes
   depende de: T536
   quién: agente
   contexto: Dos funciones del juego están definidas y no se usan (`FN_ARMOR_INIT`, `FN_SPECIAL_FX_A`; mapa 07 §3.3) y queda código de la época en que se vestía la armadura real del juego. Además hay unos 67 desplazamientos de estructura (`+ 0x...`) repartidos como literales, todos de 1.9.0 (mapa 07 §3.5).
@@ -299,7 +327,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   verify: la bitácora contiene la respuesta y la prueba (aplazar 10 s un evento de zona, 10 repeticiones, sin cuelgue), o "no viable"
   depende de: T518
   quién: dueño
-  contexto: Para exigir presencia en eventos que arrancan al entrar en una zona hay que poder **aplazar** el arranque. El PR ya sabe pedir un evento al gestor (`start_event`, `runtime/online_actors.c:3703-3713`, con funciones del juego de dirección fija) y leer el evento activo, pero no interceptar las peticiones del propio juego. Lanzar eventos fuera de contexto puede colgar (`docs/ONLINE.md:751-752`).
+  contexto: Para exigir presencia en eventos que arrancan al entrar en una zona hay que poder **aplazar** el arranque. El PR ya sabe pedir un evento al gestor (`start_event`, `runtime/online_actors.c:3699-3714`, con funciones del juego de dirección fija) y leer el evento activo, pero no interceptar las peticiones del propio juego. Lanzar eventos fuera de contexto puede colgar (`docs/ONLINE.md:751-752`).
   pasos:
     1. Pregunta exacta: ¿existe una función por la que pasan todas las peticiones de inicio de evento (por botón y por zona), que reciba el nombre del evento, y cuyo rechazo o aplazamiento deje al juego en un estado sano (la zona vuelve a pedirlo más tarde)?
     2. Punto de partida: los llamadores de la función de petición que ya usa `start_event`.
@@ -325,40 +353,40 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   modelo sugerido: bajo
 
 - [ ] T521 [reglas] Puerta de presencia para eventos que arrancan con un botón
-  files: el módulo de reglas de `online_actors` (bloque del bloqueo de A), runtime/online.c (STORY y bits de STATE)
-  verify: recorrido manual §CU-14c de `verificacion.md` para 3 eventos de botón de la tabla
+  files: el módulo de reglas de `online_actors` (bloque del bloqueo de A), runtime/online.c (STORY, STORY_ALONE y bits de STATE), specs/fases/F5-funciones-dificiles/textos-nuevos.txt
+  verify: `build/test_coop_story` sale con 0 y, con dos juegos (o juego + bot) y 3 eventos de botón de la tabla, el registro muestra por cada uno `[story] <evento> WAIT` con el compañero lejos, `[story] <evento> ALLOW` con el compañero cerca y `[story] <evento> HOST_CONTINUE` tras confirmar el anfitrión, y el otro juego registra el bit "esperando" de STATE (la parte visible —aviso, oferta de traer, diálogo— la verifica T523)
   depende de: T502, T520
-  quién: agente + dueño
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
   contexto: El bloque de `runtime/online_actors.c:5981-6001` pone `g_online_block_a = 1` cuando otro jugador con el bit `ONLINE_E_DEMO` está a menos de 30 m y este juego no está en un evento; `runtime/hle/input.c:1207-1208` quita entonces el botón A de lo que ve el juego.
   pasos:
     1. Revisa el bloqueo actual contra la lista corta `[DUEÑO]` (ADR-007, decisión 3) y anota el resultado en la bitácora: hoy cubre el pedestal de la piedra y las torres. Consérvalo tal cual como protección contra empezar lo mismo a la vez (no exige presencia). La exigencia de presencia nueva sale **solo** de la tabla de T518: piedra, primera torre, final de cada Bestia Divina, recuerdos y jefes finales. Ninguna fila de santuario.
-    2. Añade: cada fotograma, `coop_story_near(mapa, posición del Link local)`; si devuelve un evento y `coop_story_gate` dice `WAIT`, activa el bloqueo de A, pon el bit "esperando" en STATE y envía un aviso (una vez cada 5 s) al compañero.
+    2. Añade: cada fotograma, `coop_story_near(mapa, posición del Link local)`; si devuelve un evento y `coop_story_gate` dice `WAIT`, activa el bloqueo de A, pon el bit "esperando" en STATE, escribe una línea de registro `[story] <evento> WAIT` (una vez por cambio de estado) y envía STORY al compañero (una vez cada 5 s). Las líneas `ALLOW` y `HOST_CONTINUE` se registran igual.
     3. No bloquees si este juego ya está en un evento (`framepace_in_event`).
-    4. Continuar solo `[DUEÑO]` (ADR-007, decisión 6): si este juego es el anfitrión y confirma el diálogo de T523, marca `host_confirmed` para ese evento, quita el bloqueo en ese mismo fotograma y envía STORY "el anfitrión continúa solo". Sin cuenta atrás ni espera mínima. La confirmación vale para ese evento; se borra al terminar o al alejarse del punto.
+    4. Continuar solo `[DUEÑO]` (ADR-007, decisión 6): si este juego es el anfitrión y confirma el diálogo de T523, marca `host_confirmed` para ese evento, quita el bloqueo en ese mismo fotograma y envía STORY_ALONE (T502). Sin cuenta atrás ni espera mínima. La confirmación vale para ese evento; se borra al terminar o al alejarse del punto.
     5. Cuando el evento empieza y termina, envía STORY para que el otro lo sepa. El progreso llega al compañero por los flags, como hoy; **no** se lanza la escena en su juego (ADR-009, decisión 21).
     6. Opción de sesión del anfitrión "Story needs both players" (apagada por defecto).
-  hecho cuando: con el compañero lejos, A no inicia el evento y se ve el aviso; con el compañero cerca, sí; el anfitrión, tras confirmar, lo inicia solo de inmediato.
+  hecho cuando: con el compañero lejos, A no inicia el evento y el registro lo muestra (`WAIT`); con el compañero cerca, sí (`ALLOW`); el anfitrión, tras confirmar, lo inicia solo de inmediato (`HOST_CONTINUE`). El aviso en pantalla y el diálogo los entrega T523.
   no hagas: no bloquees A lejos de los puntos de la tabla (rompería recoger objetos y hablar); no añadas puntos de santuario a la tabla; no pongas temporizadores; no aceptes "continuar solo" de quien no es anfitrión; no lances eventos en el otro juego; no dejes el bloqueo puesto al salir de sesión.
   modelo sugerido: alto
 
 - [ ] T522 [reglas] Puerta de presencia para eventos que arrancan por zona
   files: tools/game_sites.py, tools/patches.py, runtime/game_sites.h, el módulo de reglas de `online_actors`
-  verify: `tools/venv/Scripts/python.exe tools/test_game_sites.py` sale con 0; recorrido manual §CU-14c para 2 eventos de zona (10 repeticiones cada uno, sin cuelgue)
+  verify: `tools/venv/Scripts/python.exe tools/test_game_sites.py` sale con 0; recorrido manual §CU-14a para 2 eventos de zona (10 repeticiones cada uno, sin cuelgue)
   depende de: T519 (respuesta viable), T521
   quién: agente + dueño
   contexto: La bitácora de T519 describe la función por la que pasan los inicios de evento y cómo aplazar uno de forma segura.
   pasos:
     1. Lee la bitácora de T519. Si dice "no viable", **no hagas esta tarea**.
-    2. Añade el sitio y el parche en un grupo opcional nuevo; el parche llama a `rt_coop_story_event(nombre)` y, si devuelve "esperar", hace lo que T519 describe para aplazar.
+    2. Añade el sitio y el parche en un grupo opcional nuevo **dentro del lote abierto del bloque H** (no abras un lote propio; regla 14). El parche **afirma con `assert` la instrucción original** que sustituye y reproduce su efecto (regla 13); llama a `rt_coop_story_event(nombre)` y, si devuelve "esperar", hace lo que T519 describe para aplazar.
     3. `rt_coop_story_event` copia el nombre con longitud acotada, consulta una decisión **ya calculada** por el hilo del juego (variable atómica por evento cercano) y devuelve.
     4. Agrupa el cambio de `game_sites.py`/`patches.py` con cualquier otro lote pendiente.
   hecho cuando: los `verify` pasan.
-  no hagas: no hagas trabajo pesado ni tomes cerrojos dentro de la función llamada desde el parche (puede ejecutarse en cualquier hilo del juego); no escribas direcciones en un `.c`.
+  no hagas: no hagas trabajo pesado ni tomes cerrojos dentro de la función llamada desde el parche (puede ejecutarse en cualquier hilo del juego); no escribas direcciones en un `.c`; no escribas un parche sin el `assert` de la instrucción original.
   modelo sugerido: alto
 
 - [ ] T523 [ui] "Esperando a tu compañero", oferta de teletransporte y confirmación para continuar solo
   files: runtime/ui/coop_hud.mm, specs/fases/F5-funciones-dificiles/textos-nuevos.txt
-  verify: `make runtime-objs` sin avisos; captura de las dos pantallas durante una espera
+  verify: `make runtime-objs` sin avisos; `tools/venv/Scripts/python.exe tools/i18n_check.py --missing es` lista los textos de `textos-nuevos.txt`; captura de las dos pantallas durante una espera, con las filas E.5, E.5b y E.10b de `verificacion.md`
   depende de: T521
   quién: agente
   contexto: F4 dejó en `runtime/ui/coop_hud.mm` avisos en pantalla y marcas en el mundo, y el teletransporte al compañero con invocación aceptada. La puerta de historia necesita decir por qué A no responde y dónde está el punto. `[DUEÑO]`: si falta uno, el juego avisa y ofrece teletransportarlo (ADR-007, decisión 4); invocar al otro requiere que acepte (ADR-008, decisión 16); el anfitrión puede continuar solo de inmediato con una confirmación (ADR-007, decisión 6).
@@ -367,9 +395,23 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
     2. En el compañero: aviso "<nombre> is waiting for you" y una marca de tipo "aquí" en la posición del que espera, con flecha de borde.
     3. En el compañero: botón rápido "Go to" si el teletransporte está disponible (si está en otro mapa, lo que haya entregado T513).
     4. Solo en el anfitrión: acción "Continue without your partner", que abre un diálogo de confirmación (sí / no, con "no" preseleccionado). Al confirmar, avisa a T521; el compañero ve "<nombre> continued the story without you".
-  hecho cuando: la captura lo muestra, el aviso desaparece al empezar el evento y el invitado no ve la acción de continuar solo.
+  hecho cuando: la captura lo muestra, el aviso desaparece al empezar el evento y el invitado no ve la acción de continuar solo (E.5, E.5b y E.10b de `verificacion.md` quedan verificadas aquí, no en T521).
   no hagas: no dependas solo del color; no llames al juego desde el dibujo; no pongas cuenta atrás en el diálogo; no teletransportes al compañero sin su aceptación.
   modelo sugerido: bajo
+
+- [ ] T542 [reglas] Regla de avance: el anfitrión no acepta flags de un momento de historia sin presencia o sin su confirmación
+  files: runtime/coop_story.c, runtime/coop_story.h, tests/test_coop_story.c, el módulo de flags de `online_actors`, specs/bitacora/F5-T542-regla-de-avance.md
+  verify: `clang -Wall -Iruntime tests/test_coop_story.c runtime/coop_story.c -lm -o build/test_coop_story && build/test_coop_story` sale con 0 (casos nuevos de `coop_story_flag_ok`) y el orquestador ejecuta el recorrido de la fila E.13 de `verificacion.md`
+  depende de: T520, T521
+  quién: agente escribe; orquestador y dueño ejecutan el recorrido
+  contexto: `casos-de-uso/CU-14-…md` (punto 6 de las reglas y CA-5) pide una **regla de avance**: los flags de un momento de la tabla solo se aceptan en el anfitrión si en ese instante los dos estaban presentes, o si el anfitrión confirmó continuar solo. Sin ella, un invitado que avanza la historia sin presencia lo vuelca en el mundo del anfitrión. T521 solo bloquea el botón A; no filtra los flags que llegan.
+  pasos:
+    1. En `coop_story.c`: `bool coop_story_flag_ok(const CoopStoryEvent *e, const CoopStoryWho *yo, const CoopStoryWho *otros, int n, const CoopStoryRules *r);` (misma lógica de presencia que `coop_story_gate`, para decidir si se acepta un flag de ese momento). Pruebas: presentes → acepta; falta uno sin confirmación → rechaza; con `host_confirmed` → acepta; flag que no es de la tabla → acepta (no es asunto de esta regla).
+    2. En el módulo de flags del anfitrión, donde se aplican los flags aceptados de un invitado (T411 de F4), consulta `coop_story_flag_ok`; si rechaza, no aplica el flag y registra una línea.
+    3. Solo en el anfitrión; la tabla de la que sale el nombre del evento es la de T518.
+  hecho cuando: la prueba pasa y, con el compañero lejos y sin confirmación, un flag de un momento de la tabla enviado por un bot no cambia nada en el anfitrión.
+  no hagas: no cambies las reglas de T411; no filtres flags que no sean de un momento de la tabla; no pongas temporizadores.
+  modelo sugerido: medio
 
 ## Bloque A — Tinte 3D del segundo Link (CU-13)
 
@@ -377,7 +419,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   files: specs/bitacora/F5-T503-dibujos-del-companero.md
   verify: la bitácora contiene la tabla pedida, rellena a partir de registros reales, y las órdenes usadas
   depende de: F1 (dos juegos funcionando)
-  quién: agente + dueño (ejecutar el juego)
+  quién: agente prepara la tabla; orquestador y dueño ejecutan el juego y recogen los registros
   contexto: El renderizador no sabe a qué actor pertenece un dibujo. Tiene herramientas de depuración: `SAVAGEWIND_DEBUG_PICK=<x>,<y>` lista qué dibujos cambiaron ese píxel con su hash de sombreador, y `SAVAGEWIND_DEBUG_FRAME=<f>` vuelca cada pase a `build/pass_NNN.png` y registra cada dibujo en líneas `[draw]` (código en `runtime/nvn/vulkan/exec.c`, función `debug_draw` y bloque de `DEBUG_PICK`).
   pasos:
     1. Pregunta exacta: ¿qué dibujos pintan los píxeles del Link del compañero, en qué pases y con qué hash de sombreador de fragmento? ¿Son los mismos hashes que usa el Link local?
@@ -389,10 +431,10 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   modelo sugerido: medio
 
 - [ ] T504 [investigación] Dónde está el color base en el G-buffer
-  files: specs/bitacora/F5-T504-objetivos-gbuffer.md
+  files: specs/bitacora/F5-T504-objetivos-gbuffer.md, runtime/nvn/vulkan/exec.c (solo el cambio temporal del paso 3, que no se fusiona)
   verify: la bitácora responde con una tabla por objetivo de color y la prueba descrita en el paso 3
   depende de: T503
-  quién: agente + dueño
+  quién: agente prepara el cambio temporal; orquestador y dueño lo compilan y capturan la pantalla
   contexto: El tinte que ya emite el traductor solo modifica el **objetivo de color 0** (`runtime/nvn/maxwell/shader.h:89`; mezcla en `runtime/nvn/maxwell/translate.c:2424-2425`). El juego usa sombreado diferido y la documentación del proyecto dice que el color base está en el objetivo 1; lo que contiene el objetivo 0 no está comprobado.
   pasos:
     1. Pregunta exacta: en el pase donde se dibuja el cuerpo de un personaje, ¿qué guarda cada objetivo de color (0, 1, 2…)? ¿Teñir el objetivo 0 cambia el color final del personaje?
@@ -407,7 +449,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   files: specs/bitacora/F5-T505-senal-del-companero.md
   verify: la bitácora contiene la respuesta y, si hay señal, 3 fotogramas de prueba donde identifica bien todos los dibujos del compañero y ninguno del Link local
   depende de: T503
-  quién: agente + dueño
+  quién: agente prepara la comparación; orquestador y dueño ejecutan el juego
   contexto: El Link del compañero es el actor `OnlinePlayer` (modelos de `PauseMenuPlayer`, `tools/online_mod.py:277-286`) y su ropa son actores `OnlineArmor_*`. Puede que usen los mismos recursos que el Link local o copias distintas. El renderizador ya calcula por dibujo una identidad para los vectores de movimiento (`runtime/nvn/vulkan/mvec.c` y `mvec.h`: sombreadores, flujos de vértices, dirección de índices) y su comentario dice que los sombreadores de escena tienen la matriz de mundo del objeto en un bloque de constantes.
   pasos:
     1. Pregunta exacta: ¿existe algún dato disponible en `draw_` (direcciones de texturas, de buffers de vértices o de constantes; contenido de un bloque de constantes) que sea distinto para el compañero y estable entre fotogramas?
@@ -434,10 +476,10 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   modelo sugerido: alto
 
 - [ ] T507 [investigación] Alternativa por el juego: tinte de armadura y brillo de material
-  files: specs/bitacora/F5-T507-tinte-por-el-juego.md
+  files: specs/bitacora/F5-T507-tinte-por-el-juego.md, el módulo de marionetas de `online_actors` (solo la prueba temporal del paso 2, que no se fusiona)
   verify: la bitácora responde a las dos preguntas con capturas descritas
   depende de: F1
-  quién: agente + dueño
+  quién: agente prepara la prueba temporal; orquestador y dueño la ejecutan
   contexto: El tinte de armadura de cada jugador ya viaja y se aplica al crear cada pieza con el parámetro `ArmorDyeColor` (`runtime/online_actors.c:6069-6077`), pero `docs/ONLINE.md:1003-1008` dice que no se ha visto en pantalla y que quizá haya que poner el color en los materiales. Existen además escritores de parámetros de material para el brillo de Magnesis y de Stasis (`FN_SPECIAL_FX_B`, `runtime/online_actors.c:1458`).
   pasos:
     1. Pregunta 1: con el anfitrión llevando una pieza teñida en la tienda de tintes, ¿la pieza `OnlineArmor_*` del otro juego se ve teñida?
@@ -452,27 +494,28 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   verify: el fichero existe con el camino elegido (por datos / por ámbito / por el juego / no viable), la evidencia de T503-T507 y la firma del dueño
   depende de: T504, T505, T507 (y T506 si se hizo)
   quién: dueño (un agente redacta)
-  contexto: Hay cuatro caminos descritos en `plan.md` §1. Cambiar el traductor de sombreadores invalida las cachés de todos los jugadores (la parte de P5-4 que sigue abierta: solo con aprobación expresa). `[DUEÑO]` Lo que se busca es un tinte suave sobre todo el Link del compañero, con el Link propio normal (ADR-007, decisión 8). Si no es viable, el resultado final es nombre en color y marcador con forma (F4), y eso no bloquea el resto de F5 (ADR-009, decisión 22).
+  contexto: Hay cuatro caminos descritos en `plan.md` §1. Cambiar el traductor de sombreadores invalida las cachés de todos los jugadores: `[DUEÑO]` (ADR-011, decisión 43) solo con aprobación del dueño, **presentando antes el coste** (caché de sombreadores invalidada y tiempo de recompilación que pagaría cada jugador). `[DUEÑO]` Lo que se busca es un tinte suave sobre todo el Link del compañero, con el Link propio normal (ADR-007, decisión 8). Si no es viable, el resultado final es nombre en color y marcador con forma (F4), y eso no bloquea el resto de F5 (ADR-009, decisión 22).
   pasos:
     1. Resume cada investigación en dos líneas.
     2. Para cada camino: viable sí/no, coste, riesgo.
-    3. Recomendación y decisión firmada.
+    3. Si algún camino obliga a cambiar el traductor: presenta al dueño el coste de recompilar los sombreadores (paso 2) **antes** de recomendarlo y espera su aprobación expresa (ADR-011, decisión 43).
+    4. Recomendación y decisión firmada.
   hecho cuando: T509 puede empezar, o el bloque A se cierra como "no viable" con nombre en color y marcador con forma como solución final (no hace falta otra consulta al dueño para eso).
   no hagas: no recomiendes cambiar el traductor sin decirlo claramente en la primera línea.
   modelo sugerido: alto
 
 - [ ] T509 [render] Tinte por dibujo para el compañero
-  files: runtime/nvn/vulkan/exec.c (una función nueva y una llamada), runtime/coop_tint.c, runtime/coop_tint.h, tests/test_coop_tint.c
+  files: runtime/nvn/vulkan/exec.c (una función nueva y una llamada), runtime/coop_tint.c, runtime/coop_tint.h, tests/test_coop_tint.c, el módulo de marionetas de `online_actors` (solo publicar las señales), specs/bitacora/F5-T509-tinte-medidas.md
   verify: `clang -Wall -Iruntime tests/test_coop_tint.c runtime/coop_tint.c -o build/test_coop_tint && build/test_coop_tint` sale con 0; y en el juego: captura con la opción apagada idéntica a la de antes (`cmp` de los dos ficheros) y captura con la opción encendida donde solo cambia el compañero
   depende de: T508 (camino "por datos" o "por ámbito"), T502
-  quién: agente + dueño
+  quién: agente escribe; orquestador y dueño compilan, miden y capturan
   contexto: En `draw_` de `runtime/nvn/vulkan/exec.c` hay `float tint[8] = {0};` (línea 9161 en el PR) que se pasa al enlace 19 de cada dibujo; con peso 0 el sombreador no cambia nada. `exec.c` corre en el hilo de traducción, que limita los fps.
   pasos:
     1. `coop_tint.c`: estructura propia con mutex que el hilo del juego rellena cada fotograma con la "señal" de cada compañero (la que definió el ADR) y su color; función `bool coop_tint_lookup(const CoopDrawKey *k, float out[8])` sin reservas de memoria y O(nº de jugadores).
     2. Prueba unitaria de `coop_tint_lookup` con claves sintéticas.
     3. En `exec.c`: sustituye la inicialización a cero por una llamada a una función nueva `static void coop_draw_tint(float tint[8])` que construye la clave del dibujo en curso y llama a `coop_tint_lookup`; si la opción está apagada, devuelve ceros sin tomar el mutex.
     4. El hilo del juego publica las señales desde el módulo de marionetas; se limpian al salir de sesión y en `RT_ON_RESET`.
-    5. Mide fps y tiempo de fotograma antes y después en la misma escena (60 s).
+    5. El orquestador o el dueño miden fps y tiempo de fotograma antes y después en la misma escena (60 s) y lo anotan en la bitácora; el agente deja preparado el procedimiento.
   hecho cuando: los `verify` pasan y la medida está en bitácora.
   no hagas: no tiñas al Link local (ADR-007, decisión 8); no bloquees el hilo de traducción (usa `trylock` o una copia atómica; si no hay dato, no tiñas); no toques `translate.c`; no cambies nada más de `exec.c`; no leas memoria del juego desde `exec.c` para esto.
   modelo sugerido: alto
@@ -494,14 +537,14 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
 ## Bloque G — Más de 2 jugadores
 
 - [ ] T526 [medidas] Ancho de banda con 2, 4 y 8 jugadores
-  files: tools/nettest/measure_n.sh, specs/bitacora/F5-T526-ancho-de-banda-n.md
+  files: tools/nettest/measure_n.sh, tools/online_bot.c (solo el modo `BOT_SKEL`), specs/bitacora/F5-T526-ancho-de-banda-n.md
   verify: `sh tools/nettest/measure_n.sh` sale con 0 y escribe `build/nettest/n/resumen.csv` con filas para N = 2, 4, 8
   depende de: F3 (arnés de Docker)
-  quién: agente
+  quién: agente escribe; orquestador ejecuta las medidas (Docker)
   contexto: Por cálculo, cada jugador sube unos 100 kB/s (STATE de 3375 bytes y SKEL de ~1,6 kB, ambos 20 veces por segundo) y el servidor reenvía cada flujo a los N−1 restantes: el total crece con N² (mapa 06 §2.5). No está medido. Además el bot no envía SKEL.
   pasos:
-    1. Añade al bot (si falta) un modo `BOT_SKEL=1` que envíe un SKEL de tamaño real con datos sintéticos.
-    2. Lanza el servidor y N bots (2, 4, 8) durante 120 s en dos disposiciones: todos juntos, y repartidos (cada uno a más de 1 km y la mitad en otro mapa).
+    1. Añade al bot (`tools/online_bot.c`, si falta) un modo `BOT_SKEL=1` que envíe un SKEL de tamaño real con datos sintéticos.
+    2. (Orquestador, al ejecutar `measure_n.sh`.) Lanza el servidor y N bots (2, 4, 8) durante 120 s en dos disposiciones: todos juntos, y repartidos (cada uno a más de 1 km y la mitad en otro mapa).
     3. Mide bytes/s de entrada y salida en la interfaz del servidor y uso de CPU.
     4. Forma de la respuesta: CSV y tabla en bitácora (N | disposición | subida del servidor | bajada | CPU).
   hecho cuando: hay línea base para comparar T528, T530 y T531.
@@ -557,8 +600,8 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
 
 - [ ] T530 [protocolo] Enviar STATE por bloques (segundo salto de versión)
   files: runtime/online.h, runtime/online.c, la cabecera compartida con el bot, tools/online_bot.c, tests/test_online_wire.c, specs/contratos/protocolo.md
-  verify: `make test-online` y `sh tools/nettest/run.sh all` salen con 0; `measure_n.sh` muestra con 4 bots juntos una subida del servidor ≤ 50 % de la de T528
-  depende de: T528, T529
+  verify: `make test-online` y `sh tools/nettest/run.sh all` salen con 0; `measure_n.sh` muestra con 4 bots juntos una subida del servidor ≤ 50 % de la de T528, y con `BOT_SKEL=1` la reducción de SKEL
+  depende de: T528, T529, T531
   quién: agente designado como **dueño del protocolo**
   contexto: T529 dejó un codificador probado. El servidor guarda el último STATE de cada cliente para dárselo a quien entra y para el filtro de interés; con bloques debe reconstruir el estado completo por cliente.
   pasos:
@@ -566,37 +609,38 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
     2. Cliente emisor: `statecodec_encode` contra lo último enviado; mensaje completo al conectar, al reanudar y cuando llega un JOIN.
     3. Servidor: decodifica sobre su copia por cliente (valida), y reenvía a cada destinatario codificando contra lo último que **ese destinatario** recibió de ese origen (necesario porque el filtro de interés hace que cada uno reciba ritmos distintos y porque la cola reemplazable descarta mensajes).
     4. Cliente receptor: `statecodec_decode` sobre su copia por jugador; si devuelve -1, descarta y pide completo.
-    5. Actualiza el bot y las pruebas.
+    5. **SKEL en el mismo salto** (regla 15): el formato de SKEL por huesos movidos (máscara de huesos presentes + huesos) se define aquí, con el codificador que dejó T531, y no cambia después. El servidor y el cliente lo usan con las mismas reglas que STATE (reenvío codificado contra lo último que recibió cada destinatario).
+    6. Actualiza el bot y las pruebas.
   hecho cuando: los `verify` pasan y dos juegos reales se ven igual que antes durante 10 minutos.
   no hagas: no reenvíes en el servidor los bloques tal cual llegan (un destinatario que se perdió un mensaje quedaría desincronizado); no cambies la versión más veces; no mezcles con otros cambios de cable.
   modelo sugerido: alto
 
-- [ ] T531 [red] SKEL: enviar solo los huesos que cambian
-  files: runtime/online.c (`skel_encode`, `skel_decode` y su envío), tests/test_online_skel.c
-  verify: `clang ... tests/test_online_skel.c` (orden en la cabecera de la prueba) sale con 0; `measure_n.sh` con `BOT_SKEL=1` muestra la reducción
-  depende de: T530
+- [ ] T531 [P] [lógica] SKEL: codificador de solo los huesos que cambian (sin tocar el cable)
+  files: runtime/coop_skelcodec.c, runtime/coop_skelcodec.h, tests/test_coop_skelcodec.c
+  verify: `clang -Wall -Iruntime tests/test_coop_skelcodec.c runtime/coop_skelcodec.c -o build/test_coop_skelcodec && build/test_coop_skelcodec` sale con 0 (la reducción medida con `measure_n.sh` y `BOT_SKEL=1` se comprueba en T530)
+  depende de: T502
   quién: agente
   contexto: SKEL lleva 121 huesos (más los del arco) a 12 bytes por hueso, 20 veces por segundo: unos 30 kB/s por jugador (`SKEL_BONE_BYTES`, `runtime/online.c:53-56`; `docs/ONLINE.md:55-57`). `docs/ONLINE.md:1001` lo lista como pendiente: "only the bones that moved".
   pasos:
-    1. Formato nuevo dentro del mismo mensaje (aprovecha el salto de T530; coordínalo con el dueño del protocolo): máscara de bits de huesos presentes + los huesos presentes.
+    1. Codificador **puro**, sin sockets ni cabeceras del juego y **sin cambiar el cable ni `PROTOCOL`** (el formato en el cable lo cablea T530, el único salto de F5): máscara de bits de huesos presentes + los huesos presentes, a partir de `skel_encode`/`skel_decode` de `runtime/online.c` (léelos, no los edites).
     2. Un hueso se envía si su rotación o traslación cuantizadas difieren de lo último enviado; cada hueso se reenvía al menos una vez por segundo; esqueleto completo al conectar y ante un JOIN.
     3. El receptor mantiene el último valor por hueso; valida la máscara contra el número de huesos y la longitud.
     4. Pruebas: ida y vuelta, nada cambia, todo cambia, mensaje truncado, máscara con bits de más.
-  hecho cuando: los `verify` pasan y la animación del compañero se ve igual (anotado en bitácora).
-  no hagas: no cambies la cuantización de un hueso; no aceptes índices de hueso fuera de rango.
+  hecho cuando: la prueba pasa; T530 lo integra y la animación del compañero se ve igual (anotado en bitácora de T530).
+  no hagas: no cambies la cuantización de un hueso; no aceptes índices de hueso fuera de rango; no edites `online.c`, `online.h`, el bot ni `protocolo.md` (son de T530, dueño del protocolo).
   modelo sugerido: alto
 
 - [ ] T532 [reglas] Quitar los supuestos de "ranura 0" y de "solo dos"
   files: los módulos de reglas, enemigos, botín y marionetas de `online_actors`
   verify: sesión de 20 minutos con 2 juegos y 2 bots (4 jugadores) sin crash, con entrada en bitácora; `grep -n "pl\[0\]\|piece_update(c, 0" runtime/oa_*.c` no devuelve usos sin comentario que los justifique
   depende de: F3 (ranura del anfitrión garantizada y anunciada en WELCOME)
-  quién: agente + dueño
+  quién: agente escribe; orquestador y dueño ejecutan los 20 minutos con 2 juegos y 2 bots
   contexto: `[DUEÑO]` (ADR-007, decisión 12): el límite sigue en 2 jugadores por ahora; esta tarea no lo sube, deja el código listo para N. Las reglas de sesión se leen de `pl[0]` (`runtime/online_actors.c:2838-2840`); las marionetas de enemigo, el botín, las fuentes de elemento y las pruebas usan el pool de piezas del jugador 0 (`piece_update(c, 0, ...)`, líneas 2231, 3044, 3058, 2281), de modo que `drop(c, 0, true)` les borra piezas y el pool de 24 se llena antes.
   pasos:
     1. Sustituye `pl[0]` por la ranura del anfitrión que da la capa de red.
     2. Crea un pool propio "del mundo" (índice aparte de los 8 de jugadores) para enemigos, botín y fuentes de elemento.
     3. Revisa cada bucle `for (i < ONLINE_MAX)` que elige "el otro jugador": debe funcionar con 3 o más.
-    4. Prueba con 2 bots además de los 2 juegos.
+    4. Prueba con 2 bots además de los 2 juegos (la lanza el orquestador).
   hecho cuando: los `verify` pasan.
   no hagas: no cambies el tamaño de `ONLINE_MAX`; no mezcles esta tarea con cambios de comportamiento.
   modelo sugerido: alto
@@ -607,7 +651,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   files: specs/bitacora/F5-T524-cuerpo-de-la-marioneta.md
   verify: la bitácora responde a las 5 preguntas con lo visto en el juego
   depende de: F1
-  quién: agente + dueño
+  quién: agente prepara; orquestador y dueño ejecutan las pruebas en el juego
   contexto: El Link del compañero (`OnlinePlayer`) se genera con `tools/online_mod.py` a partir de los ficheros del usuario; su física se toma de `PauseMenuPlayer` quitándole las partes de contacto y de cuerpos rígidos (`tools/online_mod.py:277-286`). Hoy los jugadores no chocan: cada juego empuja a su Link 0,7 m fuera del otro (`players_collide`, `runtime/online_actors.c:2833-2872`). Las marionetas de enemigo con controlador de personaje "se quedan donde están" (`docs/ONLINE.md:576-577`).
   pasos:
     1. En una copia local de `tools/online_mod.py` (no se fusiona), genera `OnlinePlayer` conservando un cuerpo rígido simple, sin controlador de personaje.
@@ -622,7 +666,7 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
   modelo sugerido: alto
 
 - [ ] T525 [reglas] Colisión con cuerpo físico
-  files: tools/online_mod.py (incluido su número de versión), runtime/main.c (solo el número de versión del overlay que comprueba), el módulo de marionetas y el de reglas de `online_actors`
+  files: tools/online_mod.py (incluido su número de versión), runtime/main.c (solo el número de versión del overlay que comprueba), el módulo de marionetas y el de reglas de `online_actors`, runtime/ui/online_ui.mm (solo el selector de modo de colisión del anfitrión), specs/fases/F5-funciones-dificiles/textos-nuevos.txt
   verify: recorrido manual §Colisión de `verificacion.md` (20 carreras contra el compañero: 0 traspasos; sesión de 20 min sin crash)
   depende de: T524 (veredicto viable)
   quién: agente + dueño
@@ -673,11 +717,11 @@ bloque es el primero de la fase. Hacer un santuario juntos es posible, no obliga
 - [ ] T538 [i18n] Traducir los textos nuevos de F5 a los 13 idiomas
   files: runtime/ui/i18n/*.inc
   verify: `tools/venv/Scripts/python.exe tools/i18n_check.py` → `0 missing` en los 13 y sale con 0
-  depende de: T510, T513, T521, T523, T525
+  depende de: T510, T513, T521, T523, T525 (cada una, o cerrada como "no aplica"/"no viable" con su ADR: la i18n de lo que sí se entregó no espera a lo que no)
   quién: agente (dueño único de los `.inc`)
   contexto: Cada tarea dejó sus textos en inglés en `specs/fases/F5-funciones-dificiles/textos-nuevos.txt`. La clave de traducción es el texto inglés: `T("English", "traducción")` en cada `runtime/ui/i18n/<idioma>.inc`.
   pasos:
-    1. `tools/i18n_check.py --missing <idioma>` para cada uno.
+    1. El orquestador ejecuta `tools/i18n_check.py --missing <idioma>` para cada uno y te pasa la lista.
     2. Añade las líneas al bloque `// Online (co-op)` de cada fichero.
     3. Conserva `%s`/`%d` en el mismo orden.
   hecho cuando: `0 missing`.

@@ -10,8 +10,9 @@ Convenciones:
   `runtime/online_actors.c`; `DOC:n` = `docs/ONLINE.md`; `MOD:n` = `tools/online_mod.py`. Las referencias al
   renderizador que vienen del mapa 04 (rama `test`) se han vuelto a localizar en el PR donde se indica.
 - "[sin verificar]" = no comprobado. En esta fase hay muchas: por eso cada bloque empieza con investigación.
-- **Decisiones del dueño.** Las tres rondas de respuestas (`../../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
-  `ADR-008-respuestas-del-dueno-ronda-2.md` y `ADR-009-respuestas-del-dueno-ronda-3.md`) mandan sobre este
+- **Decisiones del dueño.** Las cuatro rondas de respuestas (`../../decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`,
+  `ADR-008-respuestas-del-dueno-ronda-2.md`, `ADR-009-respuestas-del-dueno-ronda-3.md` y
+  `ADR-011-respuestas-del-dueno-ronda-4.md`) mandan sobre este
   documento. Lo que sale de ellas va marcado `[DUEÑO]` con el ADR y el número de decisión.
 - **Este documento no contiene direcciones, desplazamientos ni estructuras nuevas.** Las que cita ya están en el
   código del PR. Lo que falte se obtiene del Ghidra del dueño y entra como sitio por patrón. No se copia nada de
@@ -36,9 +37,9 @@ Resolver, de una en una, las funciones que no se pueden construir solo con lógi
 | CU | Hoy (verificado) | Qué entrega F5 |
 |---|---|---|
 | CU-13 Color en el modelo 3D del segundo Link | Nada en el renderizador. Existe un tinte por dibujo cableado pero siempre a cero (`runtime/nvn/vulkan/exec.c:9161`). El color de ranura solo se ve en el overlay 2D | Tinte suave sobre todo el modelo del compañero (el Link propio se ve normal), tras una opción apagada por defecto `[DUEÑO]` (ADR-007, decisión 8). Si no es viable: nombre en color y marcador con forma, sin bloquear el resto de F5 `[DUEÑO]` (ADR-009, decisión 22) |
-| CU-14a Teletransporte entre mapas | Un jugador en otro mapa no tiene Link en el mundo de los demás (`same_map`, OA:1484-1486; decisión en OA:6013-6014). El teletransporte solo funciona dentro de un mapa (DOC:747-748) | Ir con el compañero aunque esté en un santuario o una Bestia. Aceptado con pantalla de carga y guardado `[DUEÑO]` (ADR-008, decisión 20) |
+| CU-14c Teletransporte entre mapas | Un jugador en otro mapa no tiene Link en el mundo de los demás (`same_map`, OA:1484-1486; decisión en OA:6013-6014). El teletransporte solo funciona dentro de un mapa (DOC:747-748) | Ir con el compañero aunque esté en un santuario o una Bestia. Aceptado con pantalla de carga y guardado `[DUEÑO]` (ADR-008, decisión 20) |
 | CU-14b Santuarios y Bestias juntos | Los que están en el mismo santuario se ven y sus objetos móviles se envían (DOC:996-997); los mecanismos se sincronizan pero no está probado montado ni dentro de una Bestia (DOC:984-986, 1013-1014) | **Prioritario** `[DUEÑO]` (ADR-008, decisión 20). Investigación de qué pasa hoy (T540), matriz de pruebas, arreglos y límites documentados |
-| CU-14c Momentos de historia con los dos | Solo existe un bloqueo del botón A a 30 m de un jugador que está en el pedestal de la piedra o de una torre (OA:5981-6001; `runtime/hle/input.c:1207-1208`) | Una puerta de presencia para la lista corta del dueño (inicio: piedra y primera torre; final de cada Bestia Divina; recuerdos; jefes finales). Los santuarios quedan fuera `[DUEÑO]` (ADR-007, decisión 3) |
+| CU-14a Momentos de historia con los dos | Solo existe un bloqueo del botón A a 30 m de un jugador que está en el pedestal de la piedra o de una torre (OA:5981-6001; `runtime/hle/input.c:1207-1208`) | Una puerta de presencia para la lista corta del dueño (inicio: piedra y primera torre; final de cada Bestia Divina; recuerdos; jefes finales). Los santuarios quedan fuera `[DUEÑO]` (ADR-007, decisión 3) |
 
 Fuera de los CU numerados, pedidos por el dueño: colisión con el compañero, Bestias Divinas en movimiento, más de 2
 jugadores, reducción de direcciones fijas.
@@ -173,15 +174,15 @@ demuestra: entonces el criterio es un ADR con la evidencia y la alternativa.
 
 ## 7. Preguntas para el dueño
 
-Las contestadas remiten a las tres rondas de respuestas (ADR-007, ADR-008 y ADR-009, en `../../decisiones/`).
-Siguen abiertas P5-6 y la parte de P5-4 sobre las cachés de sombreadores.
+Las contestadas remiten a las cuatro rondas de respuestas (ADR-007, ADR-008, ADR-009 y ADR-011, en `../../decisiones/`).
+Sigue abierta P5-6. La parte de P5-4 sobre las cachés de sombreadores quedó resuelta por ADR-011, decisión 43.
 
 | # | Pregunta | Estado y respuesta | Afecta a |
 |---|---|---|---|
 | P5-1 | ¿Qué es un "momento de historia"? | RESUELTA (ADR-007, decisión 3): lista corta: inicio (piedra y primera torre), final de cada Bestia Divina, recuerdos y jefes finales. Los santuarios no | Bloque E |
 | P5-2 | Si el compañero no está, ¿el anfitrión puede avanzar la historia solo? | RESUELTA (ADR-007, decisión 6): sí, de inmediato, con una confirmación del anfitrión. Sin temporizador | T520, T521, T523 |
 | P5-3 | ¿Qué distancia cuenta como "presente"? | RESUELTA (ADR-007, decisión 4): mismo mapa y a menos de 30 m; si falta uno, el juego avisa y ofrece teletransportarlo | T520, T523 |
-| P5-4 | Si no se puede teñir el modelo sin tocar el traductor, ¿se acepta invalidar las cachés de sombreadores? | RESUELTA en parte (ADR-009, decisión 22): si el tinte no es viable, nombre en color y marcador con forma. Invalidar cachés sigue **ABIERTA**; por defecto: solo con ADR aprobado | T508 |
+| P5-4 | Si no se puede teñir el modelo sin tocar el traductor, ¿se acepta invalidar las cachés de sombreadores? | RESUELTA (ADR-009, decisión 22: si el tinte no es viable, nombre en color y marcador con forma; ADR-011, decisión 43: un cambio que obligue a recompilar sombreadores solo con aprobación del dueño, presentando antes el coste) | T508 |
 | P5-5 | ¿Orden de los bloques? | RESUELTA en parte (ADR-008, decisión 20): santuarios juntos (C) va antes que el tinte (A) y que la historia (E). El resto del orden sigue siendo propuesta: `plan.md` §10 | Planificación |
 | P5-6 | ¿Cuántos jugadores como objetivo real: 3, 4 u 8? | **ABIERTA**. Por defecto: 4. El límite vigente es 2 (ADR-007, decisión 12): se diseña para N y se prueba con 2 | T526-T532 |
 | P5-7 | Teletransporte entre mapas por recarga de guardado (una pantalla de carga): ¿aceptable? | RESUELTA (ADR-008, decisión 20): aceptado con pantalla de carga y guardado | T513 |
