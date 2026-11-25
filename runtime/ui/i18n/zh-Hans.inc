@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "无法在端口 %s 上创建会话（已�
 T("Type the host's address first", "请先输入主机地址")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

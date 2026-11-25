@@ -1324,3 +1324,5 @@ T("Can't host on port %s (in use?)", "אי אפשר לארח בפורט %s (בש
 T("Type the host's address first", "הקלידו קודם את כתובת המארח")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

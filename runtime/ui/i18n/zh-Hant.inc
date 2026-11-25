@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "無法在連接埠 %s 上建立工作階�
 T("Type the host's address first", "請先輸入主機位址")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

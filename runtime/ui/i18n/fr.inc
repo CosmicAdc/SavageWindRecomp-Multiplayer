@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "Impossible d'héberger sur le port %s (dé
 T("Type the host's address first", "Saisissez d'abord l'adresse de l'hôte")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

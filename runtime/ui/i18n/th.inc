@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "สร้างเซสชันบนพ
 T("Type the host's address first", "พิมพ์ที่อยู่ของโฮสต์ก่อน")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

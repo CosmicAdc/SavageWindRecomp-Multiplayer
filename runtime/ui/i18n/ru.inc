@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "Не удаётся создать сес�
 T("Type the host's address first", "Сначала введите адрес хоста")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

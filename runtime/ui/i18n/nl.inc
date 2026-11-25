@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "Kan niet hosten op poort %s (in gebruik?)"
 T("Type the host's address first", "Typ eerst het adres van de host")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")

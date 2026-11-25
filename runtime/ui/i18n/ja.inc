@@ -1325,3 +1325,5 @@ T("Can't host on port %s (in use?)", "ポート%sでホストできません（�
 T("Type the host's address first", "先にホストのアドレスを入力してください")
 T("Link", "")
 T("%s%u ms", "")
+
+T("%s  %.1f km", "")
