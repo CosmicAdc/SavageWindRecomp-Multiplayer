@@ -155,7 +155,9 @@ con prioridad baja.
   de la decisión 24).
 - **R4-15** (envío directo, segunda entrega) Dar un objeto es una transacción: nunca se duplica ni se pierde si la
   conexión cae a mitad.
-- **R4-16** (envío directo) El receptor comprueba que le cabe antes de aceptar.
+- **R4-16** (envío directo) El receptor comprueba que le cabe antes de aceptar. Pendiente del dueño: ADR-011, decisión 38,
+  dice que un objeto marcado que no cabe "se queda en el suelo"; no está dicho si vale también para el envío directo
+  (donde el objeto no está en el suelo).
 - **R4-17** (envío directo) Los nombres de objeto se validan contra la lista del propio juego del receptor
   (`runtime/items.c` solo admite objetos con la etiqueta `CanGetPouch`, sin `Important`).
 
