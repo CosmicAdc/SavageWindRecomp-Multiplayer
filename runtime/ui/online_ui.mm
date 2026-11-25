@@ -61,7 +61,7 @@ extern "C" void online_tab_draw(float scale) {
             if (p > 0 && p < 65536) g_online.port = p;
             online_settings_save();
         }
-        if (opt_text("Password", g_online.password, sizeof g_online.password, tr("none"),
+        if (opt_text_secret("Password", g_online.password, sizeof g_online.password, tr("none"),
                      "Players need it to join. Empty: anyone who knows the address can."))
             online_settings_save();
         char addrs[256];

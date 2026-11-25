@@ -299,22 +299,41 @@ bool opt_action(const char *label, const char *value, const char *desc, bool upp
 static ImGuiID g_text_editing;  // the text row turned into a field (one at a time)
 bool opt_text_editing(const char *label) { return g_text_editing && g_text_editing == ImGui::GetID(label); }
 
-bool opt_text(const char *label, char *buf, size_t cap, const char *hint, const char *desc) {
+static bool text_row(const char *label, char *buf, size_t cap, const char *hint, const char *desc, bool secret) {
     ImGuiID &editing = g_text_editing;
     static int focus;        // frames left to give it the keyboard focus
     ImGuiID id = ImGui::GetID(label);
     if (editing != id) {
-        if (row(label, buf[0] ? buf : (hint ? tr(hint) : ""), false, desc) == 2) editing = id, focus = 2;
+        char mask[64];
+        const char *shown = buf[0] ? buf : (hint ? tr(hint) : "");
+        if (secret && buf[0]) {  // one * per character (UTF-8 continuation bytes don't count)
+            size_t n = 0;
+            for (const unsigned char *c = (const unsigned char *)buf; *c && n < sizeof mask - 1; c++)
+                if ((*c & 0xC0) != 0x80) mask[n++] = '*';
+            mask[n] = 0;
+            shown = mask;
+        }
+        if (row(label, shown, false, desc) == 2) editing = id, focus = 2;
         return false;
     }
     ImGui::PushID(label);
     ImGui::SetNextItemWidth(-1);
     if (focus > 0) ImGui::SetKeyboardFocusHere(), focus--;
-    bool done = ui_input_text("##text", buf, cap, ImGuiInputTextFlags_EnterReturnsTrue, hint, label);
+    ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+    if (secret) flags |= ImGuiInputTextFlags_Password;
+    bool done = ui_input_text("##text", buf, cap, flags, hint, label);
     if (ImGui::IsItemFocused()) g_desc_focus = desc ? tr(desc) : "";
     if (done || ui_input_text_cancelled() || (focus == 0 && !ImGui::IsItemActive() && !osk_is_open())) editing = 0;
     ImGui::PopID();
     return done;
+}
+
+bool opt_text(const char *label, char *buf, size_t cap, const char *hint, const char *desc) {
+    return text_row(label, buf, cap, hint, desc, false);
+}
+
+bool opt_text_secret(const char *label, char *buf, size_t cap, const char *hint, const char *desc) {
+    return text_row(label, buf, cap, hint, desc, true);
 }
 
 void opt_end(void) {
