@@ -4912,7 +4912,7 @@ static void movers_update(Cpu *c, uint64_t player, const float link[3], const On
                 uint64_t a = g_mv[held].a;
                 if (*(uint8_t *)(uintptr_t)(a + 0x64) != 1) call(c, FN_ACTOR_WAKE, a, 0, 0, 0, 0, 0), g_mv[held].w = watch(a);
                 uint64_t body = *(uint64_t *)(uintptr_t)(a + 0x190);
-                if (VALID(body)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
+                if (has_body(a)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
                 call(c, FN_SET_MTX, a, (uint64_t)(uintptr_t)to, 0, 0, 0, 0);
             }
         }
@@ -4939,7 +4939,7 @@ static void movers_update(Cpu *c, uint64_t player, const float link[3], const On
                     g_mv[t].w = watch(a);
                 }
                 uint64_t body = *(uint64_t *)(uintptr_t)(a + 0x190);
-                if (VALID(body)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)o->m, 0, 0, 0, 0);
+                if (has_body(a)) call(c, FN_BODY_TO, body, (uint64_t)(uintptr_t)o->m, 0, 0, 0, 0);
                 call(c, FN_SET_MTX, a, (uint64_t)(uintptr_t)o->m, 0, 0, 0, 0);
                 if (o->as[0] && strcmp(playing(c, a, 0, 0), o->as)) {
                     bool ok = play_as(c, a, o->as, 0, 0, -1, false);
