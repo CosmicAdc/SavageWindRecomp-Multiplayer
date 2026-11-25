@@ -1,0 +1,321 @@
+# F4 — Funciones cooperativas: plan
+
+Lee antes `spec.md`. Referencias del checkout `pr294-online` (HEAD `350c5f8`); `OA:n` = `runtime/online_actors.c`.
+Tras F2 las funciones de `online_actors.c` viven en módulos `oa_*`: búscalas por nombre.
+
+## 0. Idea de construcción
+
+Cada función nueva se parte en dos:
+
+1. **Lógica pura** en un fichero nuevo `runtime/coop_<tema>.c`: sin punteros del juego, sin sockets, con reloj
+   inyectado. Se prueba sola con `tests/test_coop_<tema>.c`. Se puede hacer en paralelo.
+2. **Integración** pequeña en los ficheros compartidos (módulo `oa_*`, `online.c`, `online_ui.mm`), en serie y con
+   dueño único.
+
+Así los modelos menos capaces hacen la parte pura con una prueba clara, y la parte delicada (memoria del juego, hilos)
+queda concentrada en pocas tareas.
+
+Hilos (regla que no se rompe):
+
+- Hilo de red: solo sockets y colas.
+- Hilo del juego (`rt_online_frame`, y `rt_item_tick` para la bolsa): único sitio donde se llama al juego.
+- Hilo de presentación (overlay y pestaña): solo lee estados publicados con mutex; nunca llama al juego ni a la red.
+- Patrón de paso entre hilos ya existente: cola con mutex + contador atómico de `runtime/items.c`
+  (`items_request :367`, `rt_item_tick :420`, limpieza con `RT_ON_RESET` en `:337`).
+
+## 1. Diseño por elemento
+
+### A. Flags autoritativos del anfitrión (CU-06)
+
+**Hoy.** `quests_update` (OA:3851) corre cada 60 llamadas. `online_mod/quests.txt` lista hasta 32 768 flags
+compartidos (25 767 en el mod v37, DOC:991). Cada juego envía un bit por flag (QUEST, 4096 bytes); el cliente
+anfitrión guarda el de cada ranura (`runtime/online.c:1065-1070`) y `online_take_quests` hace el OR de todos
+(`online.c:664-670`); el anfitrión añade los suyos y reparte la unión (QUESTS, OA:3929-3931); cada juego activa los
+que le faltan con el setter del juego (`set_bool_flag`, OA:3794-3804). Resultado: un invitado con una partida
+avanzada vuelca todo su progreso en el guardado del anfitrión, sin vuelta atrás.
+
+**Diseño (línea base por invitado).**
+
+1. Al entrar un invitado, el primer QUEST que envía es su **línea base**. El anfitrión la guarda y **no la aplica**.
+2. A partir de ahí, por cada QUEST del invitado, el anfitrión calcula `nuevo = actual & ~línea_base & ~ya_aceptado`.
+   Solo esos bits son candidatos.
+3. Cada candidato pasa un filtro:
+   - categoría permitida (tabla por prefijo de nombre de flag, construida al cargar `quests.txt`);
+   - tope de N candidatos por envío (propuesta: 16; por encima se descarta el envío entero y se registra: es la
+     misma señal que usa el código para detectar una Luna Carmesí con 64 flags, OA:3913-3924);
+   - el invitado está en sesión y no "cargando".
+4. Los aceptados se activan en el juego del anfitrión y entran en QUESTS, que sigue siendo "los flags del anfitrión".
+5. El invitado activa lo que QUESTS trae y él no tiene (como hoy). Sus flags de más se quedan en su perfil
+   cooperativo y no viajan.
+6. Reconexión (F3): la línea base se conserva junto a la ranura reservada; un jugador nuevo en la ranura la reinicia
+   (arregla de paso el hallazgo T-2 del mapa 06).
+7. La lógica de Luna Carmesí (`held_off`, OA:3913-3955) no se toca.
+
+La parte de bits (línea base, candidatos, tope, categorías) es pura: `runtime/coop_flags.c`.
+
+**Sin ingeniería inversa.** Todo ocurre en `quests_update` y en `online.c`.
+
+### B. Copia de seguridad y perfil cooperativo (CU-06, CU-07)
+
+**Hoy.** La carpeta de guardado se decide una vez por arranque (`sp_session_begin`, `runtime/main.c:589`;
+`runtime/services/fs.c:2096`). Existen perfiles (`sp_set_active` en `runtime/services/save_profiles.c:389`, `sp_copy`
+en `:428`) y copia automática al arrancar (`save_backup_at_start`, `runtime/save_backup.c:55`), que **no** se hace si
+está `SAVAGEWIND_SAVE_DIR` (`:57`). La pestaña Online solo existe dentro del juego (`runtime/ui/menu.mm:2245`,
+`:2357`), así que hoy uno se une con la partida que tenga cargada.
+
+**Diseño.**
+
+1. **Identidad de mundo.** El anfitrión genera una vez un identificador aleatorio de 16 bytes por perfil de guardado
+   y lo guarda en un fichero propio del fork junto al perfil (`coop-world.txt`, fuera de `save_0`). Lo anuncia en un
+   mensaje WORLD al entrar cada invitado. Parte pura: `runtime/coop_world.c` (generar, leer, escribir, nombre de
+   perfil `coop-<8 hex>`).
+2. **Copia de seguridad.** Función nueva que copia el perfil activo a la carpeta de copias con sello de fecha antes
+   de la primera sesión del día, también con `SAVAGEWIND_SAVE_DIR`. Reutiliza `sp_copy` o el código de
+   `save_backup.c`.
+3. **Perfil cooperativo del invitado.** Al unirse a un mundo por primera vez se crea `coop-<id>` como copia del
+   perfil actual del invitado (así empieza con su personaje). Las siguientes veces se usa el que ya existe.
+4. **Cambio de perfil.** Como la carpeta se fija por arranque, hay dos caminos; el spike T402 decide:
+   - (a) reinicio del juego dentro del proceso al aceptar "Unirse" (existe el reinicio en caliente: `teardown`,
+     `runtime/main.c:148-168`, y los hilos de red sobreviven, mapa 06 §1.4);
+   - (b) unirse desde la pantalla de inicio (la pestaña de ajustes se comparte entre overlay y pantalla de inicio,
+     `menu_tabs_draw`, mapa 05 §1.1), eligiendo el perfil antes de arrancar el juego.
+5. El anfitrión no cambia de perfil: su mundo es su partida.
+
+### C. Flags idénticos al cargar (opcional)
+
+**Hoy.** El runtime ya sabe reescribir flags del `game_data.sav` en memoria al leerlo, por CRC32 del nombre
+(`runtime/services/test_warp.c:57-79`, enganchado en `runtime/services/fs.c:2058-2068`; solo se usa con variables de
+prueba).
+
+**Diseño.** Si el spike T403 confirma que sirve para fijar **y borrar** flags booleanos de la lista compartida, al
+cargar el perfil cooperativo se aplican los QUESTS recibidos del anfitrión antes de que el juego lea el fichero. El
+invitado queda con el mismo mundo que el anfitrión sin efectos a medias. Es una mejora sobre A, no un requisito.
+
+### D. Política de recompensas (CU-07)
+
+**Hoy.** Al activar un flag recibido, `quests_update` entrega objetos (OA:3987-3997):
+
+| Flag recibido | Entrega actual | Función |
+|---|---|---|
+| `IsGet_PortableUnit` | Piedra Sheikah | `give_item` (OA:3751) |
+| runa de la piedra (`slate_rune`) | La runa | `give_item` |
+| `FindDungeon_Finish` | Paravela | `give_item` |
+| Kolog encontrado lejos | Semilla Kolog | `give_item` |
+| `Clear_Dungeon*` | Orbe espiritual | `give_item` |
+| `IsGet_Obj_HeroSoul_*` | Habilidad de campeón | `give_item` |
+| `Get_HeartUtuwa_*` | Contenedor de corazón | `give_heart` (OA:3763) |
+
+Además, a un invitado recién llegado a un mundo avanzado le caen de golpe todas las entregas pendientes.
+
+**Diseño.** Tabla de política en `runtime/coop_rewards.c` (pura), que el dueño fija en el ADR de T401. Propuesta:
+
+| Clase | Ejemplos | Durante la sesión | Al unirse a un mundo avanzado |
+|---|---|---|---|
+| Capacidad del mundo | Piedra, runas, paravela, mejoras de la piedra | A los dos | Sí (sin ellas no se puede seguir al anfitrión) |
+| Recompensa de hito | Orbe de santuario, contenedor de corazón de Bestia, habilidad de campeón | A los dos, una vez por hito | **No** (el invitado conserva lo que tenía) |
+| Coleccionable | Semilla Kolog | A los dos | No |
+| Contenido de cofre | Lo que hubiera dentro | A los dos (elemento E) | No |
+
+`reward_decide(clase, momento) → dar / no dar`, y un **libro de entregas** por perfil (`coop-ledger.txt`: una línea
+por hash de flag ya entregado) consultado antes de cada `give_item`/`give_heart`. La integración sustituye las siete
+líneas de OA:3987-3997 por una llamada a la política.
+
+"Durante la sesión" se distingue de "al unirse" con la línea base del propio jugador: lo que QUESTS trae en el
+primer mensaje tras entrar es "al unirse"; lo que aparece después es "durante la sesión".
+
+### E. Recompensas de cofre y santuario para ambos
+
+**Hoy.** El flag del cofre se comparte (`<mapa>_TBox_<tipo>_<HashId>`, DOC:704-706): se abre en todos los mundos,
+pero el contenido es solo de quien lo abrió. El orbe de santuario ya se entrega por flag (D).
+
+**Diseño.** El juego de quien abre observa qué entra en su bolsa y lo anuncia; el del compañero lo recibe por la
+política D.
+
+- Punto de observación disponible: el parche a la entrada de la función de recogida del juego, que ya existe para
+  el multiplicador de recogida (`runtime/items.c:404-415`, `tools/patches.py:1082-1086` según el mapa 03): ve el
+  nombre y el valor de **toda** recogida.
+- Pregunta del spike T408: ¿cómo distinguir "esto salió de un cofre" de "lo recogí del suelo"? Candidatos sin
+  ingeniería inversa: correlacionar en el tiempo la recogida con el paso a 1 de un flag `*_TBox_*` del juego local
+  (ya se muestrean todos cada 2 s; habría que muestrear los de cofre más a menudo), o con el nombre del evento activo
+  (`framepace_event_name`).
+- Mensaje REWARD (anfitrión → todos, o invitado → anfitrión → todos): hash del flag, nombre del objeto, valor.
+- El receptor valida el nombre contra su lista de objetos y entrega por la cola de `items.c`.
+
+### F. Teletransporte al compañero (CU-08)
+
+**Hoy.** `control_tp_request(x, y, z)` (`runtime/control_tp.c:298`, declarado en `runtime/control.h:92`) deja una
+petición atómica que la máquina de estados `control_tp_frame` atiende una vez por fotograma presentado; la usa la
+pestaña Teleport (`runtime/ui/menu.mm:1748`). Pero `control_tp_frame` **solo se llama en modo desarrollador**
+(`runtime/control_game.c:36-40`). Los saltos largos necesitan el sitio opcional `tp_gate`
+(`tools/game_sites.py:252`, grupo en `:565`). Tras llegar, el daño de caída se anula 4 s (mapa 03 §1.2). La posición
+y el mapa del compañero ya llegan (`OnlinePlayer.pos`, `pose.map`; `same_map`, OA:1484-1486).
+
+**Diseño.**
+
+1. Lógica pura `runtime/coop_tp.c`: máquina de estados por petición (inactiva → pedida → aceptada → viajando →
+   hecha / rechazada / caducada), enfriamiento, y `coop_tp_can(estado de ambos)` con los motivos de rechazo.
+2. "Suelo seguro": cada juego guarda su última posición en la que el AS del cuerpo (canal 0, ya muestreado en
+   `sample_pose`, OA:1493) no era de caída, planeo, nado ni escalada, con su hora. La respuesta de aceptación lleva
+   esa posición, no la instantánea.
+3. Punto de llegada: 1,5 m detrás del compañero y 0,5 m por encima.
+4. Mensajes TP_REQ (dirigido, pasa por el anfitrión, que valida mapa y enfriamiento) y TP_REPLY (aceptado + punto,
+   o rechazado + motivo).
+5. Integración: una función pública `control_tp_allow_coop()` hace que `control_game_frame` avance
+   `control_tp_frame` mientras haya un viaje cooperativo en curso, sin activar el resto del modo desarrollador.
+6. Si `g_site.tp_gate` es 0 (grupo opcional ausente), se limita a distancias cortas (menos de 300 unidades en
+   horizontal, umbral del propio teletransporte según el mapa 03) y se dice por qué.
+7. Bloqueos: evento en curso (`framepace_in_event`), muerto, cargando, en pausa, montado, mapa distinto, PvP activo.
+
+### G–I. Enviar objetos (CU-09)
+
+**Hoy.**
+
+- **Recibir**: `items_request(i, count)` (`runtime/items.c:367`) encola; `rt_item_tick` (`:420`) lo entrega en el
+  hilo del juego llamando a la función de recogida del propio juego (sitios `item_tick`, `pouch_item_get`,
+  `pouch_mgr`, `tools/game_sites.py:437-439`, grupo opcional en `:566`). Solo objetos de la lista (`CanGetPouch`, sin
+  `Important`, sin platos cocinados ni rupias), hasta 32 en cola, solo "en juego", y sin modificador de arma.
+  El PR tiene además `give_item` con direcciones fijas (OA:3751-3759); se prefiere la vía de `items.c` (por patrón).
+- **Soltar**: lo que cae de la bolsa se añade a la lista de botín tras 0,4 s quieto y el otro lo recoge
+  (DOC:528-547). Funciona hoy.
+- **Quitar del inventario**: no existe para materiales ni comida. Solo `pouch_discard` + `pouch_cleanup` para arma,
+  arco y escudo desde el selector rápido (mapa 03 §1.3, solo 1.9.0).
+
+**Diseño.**
+
+1. Transacción pura `runtime/coop_give.c`, con identificador único por envío:
+   `OFERTA(emisor) → ACEPTA|RECHAZA(receptor) → RETIRADO(emisor, tras quitarlo) → ENTREGADO(receptor)`.
+   Reglas: el emisor quita **antes** de que el receptor añada; si el emisor no puede quitar, aborta; si la conexión
+   cae tras RETIRADO, el emisor reintenta ENTREGAR al reconectar y, pasado el plazo, se lo devuelve a sí mismo.
+   Los identificadores ya vistos se ignoran (sin duplicados).
+2. Recepción (T421): validar el nombre contra la lista de `items.c`, encolar, y confirmar con el resultado de la
+   cuenta de entradas de la bolsa (`items.c:352-365`).
+3. Retirada (T422): **depende de la investigación T404.**
+4. Alternativa sin investigación (T423): "soltar para <nombre>": el flujo actual de soltar, más una marca en el
+   overlay sobre lo soltado y un aviso al compañero. No hay duplicación posible porque el objeto pasa por el suelo.
+5. Armas con durabilidad y modificador: **depende de T405**; mientras tanto, las armas solo por el suelo (hoy ya
+   viaja el arma como objeto real, aunque solo con su nombre, mapa 07 §7).
+
+### J. Marcadores, pings, color, formas, chat rápido (CU-10)
+
+**Hoy.** El overlay ya dibuja para cada jugador figura, nombre, distancia y flecha en el borde
+(`runtime/ui/online_ui.mm:181-304`), proyectando con `project` (`:135`) y la matriz que el hilo de render publica con
+`online_camera_set` (`runtime/nvn/vulkan/exec.c:10999-11005`; se descarta si tiene más de 0,5 s, `online_ui.mm:256`).
+Colores: 8 fijos por ranura (`:20-23`). El chat solo se escribe desde el menú. La opción de visión de color del
+proyecto corrige la imagen del juego al presentar, y **no** altera el menú propio (`runtime/colour_vision.h`): el
+overlay debe ser legible por sí mismo.
+
+**Diseño.**
+
+1. `runtime/coop_palette.c` (puro): 8 colores de una paleta pensada para daltonismo y 8 formas (círculo, cuadrado,
+   triángulo, rombo, estrella, cruz, hexágono, anillo); función de contraste mínimo contra fondo claro y oscuro.
+2. El jugador elige color y forma; viajan en STATE (2 bytes). Si dos coinciden, el de ranura mayor recibe la
+   siguiente forma libre.
+3. Ping: mensaje MARK (posición, tipo, emisor), 8 s de vida, máximo 4 por jugador, límite de 2 por segundo.
+   Colocación sin ingeniería inversa: (a) en mi posición; (b) en el enemigo o jugador más cercano al centro de la
+   pantalla (se proyectan los que ya se conocen y se elige el más próximo al centro). "Donde miro" sobre el terreno
+   exige un trazado de rayo contra el mundo: fuera de F4.
+4. Chat rápido: mensaje QCHAT con un número de frase (0-7); cada cliente lo pinta con `tr()` de su idioma.
+5. Avisos: una cola de avisos en pantalla alimentada desde el hilo del juego (por ejemplo "tu compañero está en un
+   pedestal: A en espera", que hoy solo va al registro, OA:5999).
+6. Vida del compañero: STATE añade la vida en cuartos de corazón (el juego local ya lee la suya en `player + 0x848`,
+   DOC:644). El máximo de corazones no se conoce por una vía fiable **[sin verificar]**: se muestran solo los
+   actuales.
+7. Dibujo: todo dentro de `online_overlay_draw` o en un fichero nuevo `runtime/ui/coop_hud.mm` llamado desde ahí.
+   Modelos a copiar: `perf_overlay_draw` (`runtime/ui/menu.mm:1997`) y `photo_overlay_draw` (`:1935`). Como el
+   overlay de Online ya está en el camino de dibujo (`menu.mm:2594`), no hace falta tocar `menu_draws()`.
+8. Entrada: atajos nuevos (ping, chat rápido, aceptar/rechazar) como acciones del sistema de asignaciones
+   (`runtime/hle/bindings.c`, `docs/ACTIONS.md`) **[sin verificar el detalle de cómo se añade una acción: la tarea
+   T436 empieza leyéndolo]**.
+
+### K–L. Revivir (CU-11)
+
+**Hoy.** El parche `has_fairy` hace que "¿tiene un hada?" responda sí mientras hay sesión y la regla `revive` del
+anfitrión está activa (`rt_online_has_fairy`, OA:2825-2831). Es una reanimación instantánea; el compañero no
+interviene. La regla se refresca dentro de `players_collide`, después de un `return` temprano (OA:2837-2839): con
+colisiones apagadas o durante un evento no se actualiza.
+
+**Diseño en dos escalones.**
+
+1. **Sin ingeniería inversa (T431).** `rt_online_has_fairy` consulta la política pura `runtime/coop_revive.c`:
+   responde sí solo si hay un compañero vivo, en el mismo mapa y a menos de la distancia configurada (propuesta:
+   50 m). Si no, deja que el juego siga su curso (fin de partida). De paso, mover el refresco de reglas fuera de
+   `players_collide`.
+2. **Estado caído (T432), tras la investigación T406.** El caído espera en el suelo con cuenta atrás; el compañero
+   lo levanta manteniendo un botón cerca. Mensajes DOWN y REVIVE; el anfitrión valida distancia y tiempo.
+
+### M. PvP por acuerdo, daño validado (CU-12)
+
+**Hoy.** `g_online.pvp` por jugador, apagado por defecto. Al empezar un golpe (la estela del arma), el atacante
+elige al jugador más cercano en alcance y delante, y publica en su STATE `pvp_seq`, `pvp_target`, `pvp_damage` = poder
+de ataque de su arma según `power.txt` (OA:2874-2905). La víctima aplica el daño menos su defensa, o lo bloquea con
+el escudo (OA:2907-2928). Solo se descarta `pvp_damage <= 0`; cualquier valor positivo se acepta. Bombas ajenas a
+menos de 4 m: daño fijo y derribo (OA:2929-2941).
+
+**Diseño.**
+
+1. **Acuerdo.** `runtime/coop_pvp.c` (puro): estado de sesión `apagado → propuesto por X → activo`. Mensaje PVP_CTL
+   (proponer, aceptar, apagar). Solo el anfitrión publica el estado resultante (como las reglas `collide`/`revive`).
+   Apagar es inmediato y unilateral.
+2. **Golpe validado.** El atacante envía PVP_HIT (objetivo, secuencia) **solo al anfitrión**. El juego del anfitrión
+   comprueba: PvP activo; ambos vivos, mismo mapa, no cargando; distancia entre las posiciones que el anfitrión
+   conoce de los dos ≤ alcance + margen por latencia; ritmo ≤ 4 golpes por segundo; y calcula él mismo el daño con
+   `power.txt` a partir del arma que el atacante tiene equipada según su último EQUIP. Emite PVP_DMG (objetivo,
+   daño), que el servidor solo acepta del anfitrión.
+3. La víctima aplica PVP_DMG con su propia defensa y bloqueo, como hoy.
+4. Los campos `pvp_*` de STATE dejan de usarse para daño.
+5. Indicador: icono con forma junto al nombre de quien tiene el PvP activo.
+
+## 2. Ingeniería inversa necesaria (tareas de investigación para el dueño)
+
+Cada una se hace con Ghidra sobre la copia del dueño (`tools/ghidra/README.md`, `tools/ghidra/gq.py`). La respuesta
+se entrega como **sitio por patrón** en `tools/game_sites.py` (receta del mapa 01 §4), nunca como dirección suelta en
+un `.c`, y con una prueba en el juego anotada en bitácora.
+
+| Tarea | Pregunta | Forma de la respuesta |
+|---|---|---|
+| T404 | ¿Qué función del juego resta N unidades de un material o comida de la bolsa (la que usan vender, cocinar o soltar desde el menú) y con qué argumentos? ¿Qué tipos de entrada de bolsa corresponden a material, comida, armadura y objeto clave? | Nombre de sitio nuevo, clase de sitio, firma en palabras (qué es cada argumento), precondiciones (hilo, cerrojo de la bolsa), prueba: quitar 1 manzana y verla desaparecer del menú |
+| T405 | ¿Qué significa el cuarto argumento de la función de recogida (hoy se pasa 0, mapa 03 §1.3) y cómo se lee la durabilidad y el modificador de un arma en la bolsa? | Descripción de los dos valores y de dónde se leen; prueba: dar un arma con durabilidad a la mitad |
+| T406 | Entre "la vida llega a 0" y "pantalla de fin de partida", ¿dónde decide el juego morir o revivir, y se puede retrasar esa decisión N segundos manteniendo a Link en el suelo? | Sitio(s), qué instrucción se envuelve, qué ocurre con la cámara y la música; prueba: Link queda caído 10 s y luego (a) revive o (b) sigue a fin de partida, sin crash |
+
+Todas cambian `tools/patches.py` o `tools/game_sites.py` → cambian `GAMELIB_ID` → los dos jugadores recompilan el
+juego (~15 min). **Se agrupan en una sola entrega.**
+
+## 3. Carriles y propiedad de ficheros
+
+| Carril | Ficheros (dueño único) | Tareas |
+|---|---|---|
+| **Protocolo** | `runtime/online.h`, `PROTOCOL`, cabecera compartida con el bot, tabla de autoridad de F3 | T409 |
+| **Lógica pura** (paralelo) | `runtime/coop_flags.*`, `coop_world.*`, `coop_rewards.*`, `coop_tp.*`, `coop_give.*`, `coop_palette.*`, `coop_revive.*`, `coop_pvp.*` + `tests/test_coop_*.c` | T410, T412, T415, T418, T420, T424, T430, T433 |
+| **Mundo** (serie) | módulo de flags de `online_actors` (`oa_flags` / `oa_gamedata`), guardados (`runtime/save_backup.c`, `runtime/services/save_profiles.*`), parte de `online.c` que guarda los QUEST | T411, T413, T414, T416, T417 |
+| **Reglas** (serie) | módulo de reglas (`oa_rules`), `runtime/control_game.c`, `runtime/control_tp.c`, `runtime/items.c` | T419, T421, T422, T423, T431, T432, T434 |
+| **UI** (serie) | `runtime/ui/online_ui.mm`, `runtime/ui/coop_hud.mm` (nuevo) | T425-T429, T435 |
+| **Entrada** | `runtime/hle/input.c`, `runtime/hle/bindings.c` | T436 |
+| **i18n** | `runtime/ui/i18n/*.inc` | T437 |
+| **Parches** (una entrega) | `tools/patches.py`, `tools/game_sites.py`, `runtime/game_sites.h` | lo que salga de T404-T406 |
+| **Integrador** | orquestador de fotograma (`oa_frame`), `Makefile`, `runtime/launch_flags_table.c` (generado), `runtime/ui/menu.mm` y `runtime/settings.*` solo si hiciera falta | T439 |
+
+Los ajustes nuevos van a `online.ini` (como en F3), no a `savagewind.ini`: así `runtime/settings.*` no se toca.
+
+## 4. Coordinación de la versión de protocolo
+
+- **Un salto de versión para toda F4**, al principio (T409): todos los mensajes y campos de STATE de esta fase se
+  definen de una vez, con manejadores vacíos.
+- Mensajes nuevos: WORLD, REWARD, TP_REQ, TP_REPLY, GIVE, MARK, QCHAT, PVP_CTL, PVP_HIT, PVP_DMG, DOWN, REVIVE.
+  Campos nuevos de STATE: vida, color, forma, indicadores (caído, PvP activo).
+- Mensajes **dirigidos** (a una ranura concreta): el servidor reenvía solo a esa ranura. T409 lo añade a la tabla de
+  autoridad de F3: PVP_DMG, REWARD y WORLD solo del anfitrión; PVP_HIT solo hacia el anfitrión.
+- Si una investigación (T404-T406) obliga a cambiar el cable más tarde, lo agrupa el dueño del protocolo en una
+  segunda ventana única.
+- Cada cambio actualiza a la vez la cabecera compartida, el bot, las aserciones de tamaño y
+  `specs/contratos/protocolo.md`.
+
+## 5. Orden recomendado
+
+1. Decisiones e investigación en marcha desde el primer día: T401 (dueño), T402, T403, T407, T408 (agentes), T404,
+   T405, T406 (dueño con Ghidra).
+2. T409 (protocolo).
+3. En paralelo, toda la lógica pura: T410, T412, T415, T418, T420, T424, T430, T433.
+4. Carril Mundo: T413 → T411 → T414 → T416 → T417.
+5. Carril Reglas: T419 → T421 → T423 → T431 → T434 → (T422, T432 cuando haya respuesta de la investigación).
+6. Carril UI: T425 → T426 → T427 → T428 → T429 → T435; T436 en paralelo.
+7. Cierre: T437 → T438 → T439 → T440 → T441.
