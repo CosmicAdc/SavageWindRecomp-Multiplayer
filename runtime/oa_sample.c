@@ -4,12 +4,12 @@
 #include "online_actors_internal.h"
 
 // OnlinePose's channels: (slot, bank)
-const int k_channel[ONLINE_AS_CHANNELS][2] = {{0, 0}, {1, 0}, {1, 1}, {2, 0}};
+const int oa_k_channel[ONLINE_AS_CHANNELS][2] = {{0, 0}, {1, 0}, {1, 1}, {2, 0}};
 // the bones gear is on (OnlinePose.gear_bone - 1): hands, the back's mounts (Pod_*), ...
-const char *const k_bones[] = {"Weapon_R", "Weapon_L", "Pod_A", "Pod_B", "Pod_C", "Spine_2", "Waist", "Skl_Root"};
+const char *const oa_k_bones[] = {"Weapon_R", "Weapon_L", "Pod_A", "Pod_B", "Pod_C", "Spine_2", "Waist", "Skl_Root"};
 
 // OnlineShots' kinds: the game's actors
-const char *const k_shot_names[ONLINE_K_COUNT] = {
+const char *const oa_k_shot_names[ONLINE_K_COUNT] = {
     "RemoteBomb", "RemoteBombCube", "RemoteBomb2", "RemoteBombCube2", "NormalArrow", "FireArrow", "IceArrow",
     "ElectricArrow", "BombArrow_A", "AncientArrow", "BrightArrow", "PlayerBeam"};
 #define IS_BOMB(kind) ((kind) <= ONLINE_K_REMOTE_BOMB_CUBE2)
@@ -57,9 +57,9 @@ static OnlineFxEvent g_fxev[ONLINE_FX_EVENTS];
 static bool g_kago_wind;  // (the last Champion's effect on the local Link: Revali's Gale's charge, Kago_Wind)
 static uint16_t g_fxev_seq;
 static char g_fx_trail[ONLINE_FX_MAX];  // his weapon's trail now ("" none), and when it started
-uint64_t g_fx_trail_t;
-uint64_t volatile g_rf, g_rf_ui;  // (ReactionField, the actor that plays the ground's reactions, and its ELink)
-Watch g_rf_watch;
+uint64_t oa_g_fx_trail_t;
+uint64_t volatile oa_g_rf, oa_g_rf_ui;  // (ReactionField, the actor that plays the ground's reactions, and its ELink)
+Watch oa_g_rf_watch;
 static struct { uint64_t name; float pos[3]; uint32_t props[16]; } volatile g_rf_ring[64];
 static uint32_t volatile g_rf_props[16];  // (its ELink property values at its last: what it chose to play by)
 static volatile int g_rf_next;
@@ -67,11 +67,11 @@ static int g_rf_taken;
 
 void rt_online_xlink_emit(uint64_t ui, uint64_t loc) {
     if (!online_version_ok(g_game_version) || !VALID(ui)) return;
-    if (ui == g_rf_ui && g_rf_ui && VALID(loc)) {  // (ReactionField's: what and where, its matrix as it plays it)
+    if (ui == oa_g_rf_ui && oa_g_rf_ui && VALID(loc)) {  // (ReactionField's: what and where, its matrix as it plays it)
         uint64_t t = *(uint64_t *)(uintptr_t)(loc + 8), nm = VALID(t) ? *(uint64_t *)(uintptr_t)t : 0;
         if (VALID(nm)) {
             int k = __atomic_fetch_add(&g_rf_next, 1, __ATOMIC_RELAXED) & 63;
-            const float *m = (const float *)(uintptr_t)(g_rf + 0x398);
+            const float *m = (const float *)(uintptr_t)(oa_g_rf + 0x398);
             g_rf_ring[k].name = nm, g_rf_ring[k].pos[0] = m[3], g_rf_ring[k].pos[1] = m[7], g_rf_ring[k].pos[2] = m[11];
             uint64_t pv = *(uint64_t *)(uintptr_t)(ui + 0x70);  // (its 18 words; 16 of them sent)
             if (VALID(pv)) memcpy((void *)g_rf_props, (const void *)(uintptr_t)pv, sizeof g_rf_props);
@@ -130,13 +130,13 @@ static void anim_slots(uint64_t actor, int16_t idx[3], float frame[3]) {
     }
 }
 
-uint64_t slink_ui(uint64_t actor) {  // (an actor's SLink user instance: its +0x568 +0x50)
+uint64_t oa_slink_ui(uint64_t actor) {  // (an actor's SLink user instance: its +0x568 +0x50)
     if (!VALID(actor)) return 0;
     uint64_t h = *(uint64_t *)(uintptr_t)(actor + 0x568);
     return VALID(h) ? *(uint64_t *)(uintptr_t)(h + 0x50) : 0;
 }
 
-uint64_t elink_ui(uint64_t actor) {
+uint64_t oa_elink_ui(uint64_t actor) {
     if (!VALID(actor)) return 0;
     uint64_t h = *(uint64_t *)(uintptr_t)(actor + 0x568);
     return VALID(h) ? *(uint64_t *)(uintptr_t)(h + 0x48) : 0;
@@ -156,7 +156,7 @@ static bool continuous_sound(const char *n) {
         if (!strncmp(n, known[k], strlen(known[k]))) return true;
     static struct { uint32_t h; uint64_t t; bool cont; } seen[64];
     static int next;
-    uint32_t h = crc32_str(n);
+    uint32_t h = oa_crc32_str(n);
     uint64_t now = plat_now_ns();
     for (int k = 0; k < 64; k++) {
         if (seen[k].h != h) continue;
@@ -172,19 +172,19 @@ static bool continuous_sound(const char *n) {
     return false;
 }
 
-void fx_update(uint64_t player) {
+void oa_fx_update(uint64_t player) {
     // the ground's reactions to his steps (ReactionField plays them: his footprints, the dust, the water, the grass):
     // sent as his effects (who 4), the others play them on theirs where his puppet is
     static int rf_tick;
     if (VALID(player)) {
-        if (VALID(g_rf) && !alive(g_rf, g_rf_watch)) g_rf = 0, g_rf_ui = 0;  // (a load: made again)
-        if (rf_tick++ % 300 == 0 || !VALID(g_rf)) {  // (ReactionField: found among the actors)
-            int na = rf_tick % 30 == 1 || rf_tick % 300 == 1 ? all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS) : 0;
+        if (VALID(oa_g_rf) && !oa_alive(oa_g_rf, oa_g_rf_watch)) oa_g_rf = 0, oa_g_rf_ui = 0;  // (a load: made again)
+        if (rf_tick++ % 300 == 0 || !VALID(oa_g_rf)) {  // (ReactionField: found among the actors)
+            int na = rf_tick % 30 == 1 || rf_tick % 300 == 1 ? oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS) : 0;
             for (int k = 0; k < na; k++) {
                 char nm[48];
-                actor_name_of(g_actors[k], nm);
+                oa_actor_name_of(oa_g_actors[k], nm);
                 if (!strcmp(nm, "ReactionField")) {
-                    g_rf = g_actors[k], g_rf_ui = elink_ui(g_actors[k]), g_rf_watch = watch(g_actors[k]);
+                    oa_g_rf = oa_g_actors[k], oa_g_rf_ui = oa_elink_ui(oa_g_actors[k]), oa_g_rf_watch = oa_watch(oa_g_actors[k]);
                     break;
                 }
             }
@@ -223,10 +223,10 @@ void fx_update(uint64_t player) {
             snprintf(e->name, sizeof e->name, "%s", n);
         }
     }
-    g_fx_ui[0] = elink_ui(player);
-    for (int k = 0; k < 3; k++) g_fx_ui[1 + k] = VALID(player) ? elink_ui(linked(player + 0xb98 + 0x18 * k)) : 0;
-    g_fx_ui[4] = slink_ui(player);
-    g_fx_ui[5] = VALID(player) ? slink_ui(linked(player + 0xb98)) : 0;
+    g_fx_ui[0] = oa_elink_ui(player);
+    for (int k = 0; k < 3; k++) g_fx_ui[1 + k] = VALID(player) ? oa_elink_ui(oa_linked(player + 0xb98 + 0x18 * k)) : 0;
+    g_fx_ui[4] = oa_slink_ui(player);
+    g_fx_ui[5] = VALID(player) ? oa_slink_ui(oa_linked(player + 0xb98)) : 0;
     int end = __atomic_load_n(&g_fx_next, __ATOMIC_ACQUIRE);
     if (end - g_fx_taken > FX_RING) g_fx_taken = end - FX_RING;
     static const char *const who[FX_WATCH] = {"Link", "weapon", "shield", "bow", "Link sound", "weapon sound"};
@@ -256,9 +256,9 @@ void fx_update(uint64_t player) {
             snprintf(e->name, sizeof e->name, "%s", n);
         }
         if (w == 1 && !strncmp(n, "Blur", 4) && strlen(n) < ONLINE_FX_MAX)
-            snprintf(g_fx_trail, sizeof g_fx_trail, "%s", n), g_fx_trail_t = plat_now_ns();
+            snprintf(g_fx_trail, sizeof g_fx_trail, "%s", n), oa_g_fx_trail_t = plat_now_ns();
     }
-    if (g_fx_trail[0] && plat_now_ns() - g_fx_trail_t > FX_TRAIL_NS) g_fx_trail[0] = 0;
+    if (g_fx_trail[0] && plat_now_ns() - oa_g_fx_trail_t > FX_TRAIL_NS) g_fx_trail[0] = 0;
 }
 
 // The local Link's element arrows lately: where each was last seen (in flight, or where it went: it hit there), so a
@@ -273,7 +273,7 @@ static uint8_t elem_of_kind(int kind) {
 }
 
 // the element of one of the local Link's arrows seen within r of p in the last half second, else ONLINE_ELEM_NONE
-uint8_t elem_near(const float p[3], float r) {
+uint8_t oa_elem_near(const float p[3], float r) {
     uint64_t now = plat_now_ns();
     for (int k = 0; k < ELEM_SEEN; k++) {
         if (!g_elem_seen[k].elem || now - g_elem_seen[k].t > 500000000ull) continue;
@@ -297,15 +297,15 @@ static void sample_shots(Cpu *c, uint64_t player, const char (*as)[ONLINE_AS_MAX
         if (!held || held == bomb_seen[r]) continue;
         bomb_seen[r] = held;
         char name[48];
-        actor_name_of(held, name);
+        oa_actor_name_of(held, name);
         int kind = -1;
         for (int k = 0; IS_BOMB(k); k++)
-            if (!strcmp(name, k_shot_names[k])) kind = k;
+            if (!strcmp(name, oa_k_shot_names[k])) kind = k;
         bool known = false;
         for (int k = 0; k < ONLINE_SHOTS; k++) known |= tr[k].a == held;
         for (int k = 0; kind >= 0 && !known && k < ONLINE_SHOTS; k++)
             if (!tr[k].a) {
-                tr[k].a = held, tr[k].w = watch(held), tr[k].kind = (uint8_t)kind, tr[k].id = next_id++;
+                tr[k].a = held, tr[k].w = oa_watch(held), tr[k].kind = (uint8_t)kind, tr[k].id = next_id++;
                 LOG("[online] shot %d: %s %llx\n", tr[k].id, name, (unsigned long long)held);
                 if (!next_id) next_id = 1;
                 break;
@@ -341,10 +341,10 @@ static void sample_shots(Cpu *c, uint64_t player, const char (*as)[ONLINE_AS_MAX
         for (int k = 0; k < 64 && !rejected; k++) rejected = not_his[k].a == a && not_his[k].id == aid;
         if (rejected) continue;
         char an[48];
-        actor_name_of(a, an);
+        oa_actor_name_of(a, an);
         int ak = -1;
         for (int k = ONLINE_K_NORMAL_ARROW; k < ONLINE_K_COUNT; k++)
-            if (!strcmp(an, k_shot_names[k])) ak = k;
+            if (!strcmp(an, oa_k_shot_names[k])) ak = k;
         const float *am = (const float *)(uintptr_t)(a + 0x398);
         float dx = am[3] - me[3], dy = am[7] - me[7], dz = am[11] - me[11];
         if (ak >= 0 && getenv("SAVAGEWIND_ONLINE_SHOT_LOG"))
@@ -361,7 +361,7 @@ static void sample_shots(Cpu *c, uint64_t player, const char (*as)[ONLINE_AS_MAX
         if (ak == ONLINE_K_BEAM) LOG("[online] his beam %llx\n", (unsigned long long)a);
         for (int k = 0; k < ONLINE_SHOTS; k++)
             if (!tr[k].a) {
-                tr[k].a = a, tr[k].w = watch(a), tr[k].kind = (uint8_t)ak, tr[k].id = next_id++;
+                tr[k].a = a, tr[k].w = oa_watch(a), tr[k].kind = (uint8_t)ak, tr[k].id = next_id++;
                 if (!next_id) next_id = 1;
                 break;
             }
@@ -369,7 +369,7 @@ static void sample_shots(Cpu *c, uint64_t player, const char (*as)[ONLINE_AS_MAX
     memset(out, 0, sizeof *out);
     for (int k = 0; k < ONLINE_SHOTS; k++) {
         if (!tr[k].a) continue;
-        bool gone = !alive(tr[k].a, tr[k].w);
+        bool gone = !oa_alive(tr[k].a, tr[k].w);
         // a bomb goes off as it starts its AS "Explode" (it goes some frames later)
         if (!gone) memcpy(tr[k].m, (const float *)(uintptr_t)(tr[k].a + 0x398), sizeof tr[k].m);
         if (k < ELEM_SEEN && elem_of_kind(tr[k].kind)) {  // (an element arrow: where it is, or went, as of now)
@@ -377,15 +377,15 @@ static void sample_shots(Cpu *c, uint64_t player, const char (*as)[ONLINE_AS_MAX
             g_elem_seen[k].pos[0] = tr[k].m[3], g_elem_seen[k].pos[1] = tr[k].m[7], g_elem_seen[k].pos[2] = tr[k].m[11];
         }
         // (gone without it: put away, cancelled - no explosion)
-        if (IS_BOMB(tr[k].kind) && !tr[k].boomed && !gone && !strcmp(playing(c, tr[k].a, 0, 0), "Explode")) {
+        if (IS_BOMB(tr[k].kind) && !tr[k].boomed && !gone && !strcmp(oa_playing(c, tr[k].a, 0, 0), "Explode")) {
             memmove(&booms[1], &booms[0], sizeof booms[0] * (ONLINE_BOOMS - 1));
             booms[0].seq = ++boom_seq ? boom_seq : ++boom_seq, booms[0].kind = tr[k].kind, booms[0].frames = 0;
             booms[0].pos[0] = tr[k].m[3], booms[0].pos[1] = tr[k].m[7], booms[0].pos[2] = tr[k].m[11];
             tr[k].boomed = true;
-            LOG("[online] shot %d (%s) went off%s\n", tr[k].id, k_shot_names[tr[k].kind], gone ? " (gone)" : "");
+            LOG("[online] shot %d (%s) went off%s\n", tr[k].id, oa_k_shot_names[tr[k].kind], gone ? " (gone)" : "");
         }
         if (gone) {
-            LOG("[online] shot %d (%s) gone\n", tr[k].id, k_shot_names[tr[k].kind]);
+            LOG("[online] shot %d (%s) gone\n", tr[k].id, oa_k_shot_names[tr[k].kind]);
             memset(&tr[k], 0, sizeof tr[k]);
             continue;
         }
@@ -418,15 +418,15 @@ static void sample_held(uint64_t player, OnlineHeld out[ONLINE_HELD]) {
     memset(out, 0, sizeof(OnlineHeld) * ONLINE_HELD);
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
     if (tick++ % 6 == 0) {
-        int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+        int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         for (int k = 0; k < na; k++) {
-            uint64_t a = g_actors[k];
+            uint64_t a = oa_g_actors[k];
             if (a == player || !*(uint32_t *)(uintptr_t)(a + 0x4d4) || *(uint32_t *)(uintptr_t)(a + ACTOR_HASH_ID)) continue;
             bool known = false;
             for (int t = 0; t < ONLINE_HELD && !known; t++) known = tr[t].a == a;
             if (known) continue;
             char n[48];
-            actor_name_of(a, n);
+            oa_actor_name_of(a, n);
             if (!held_kind(n)) continue;
             const float *m = (const float *)(uintptr_t)(a + 0x398);
             float dx = m[3] - pm[3], dz = m[11] - pm[11];
@@ -434,7 +434,7 @@ static void sample_held(uint64_t player, OnlineHeld out[ONLINE_HELD]) {
             for (int t = 0; t < ONLINE_HELD; t++)
                 if (!tr[t].a) {
                     memset(&tr[t], 0, sizeof tr[t]);
-                    tr[t].a = a, tr[t].w = watch(a);
+                    tr[t].a = a, tr[t].w = oa_watch(a);
                     snprintf(tr[t].name, sizeof tr[t].name, "%s", n);
                     tr[t].stale[0] = m[3], tr[t].stale[1] = m[7], tr[t].stale[2] = m[11];
                     LOG("[online] we hold %s\n", n);
@@ -445,7 +445,7 @@ static void sample_held(uint64_t player, OnlineHeld out[ONLINE_HELD]) {
     uint64_t now = plat_now_ns();
     for (int t = 0; t < ONLINE_HELD; t++) {
         if (!tr[t].a) continue;
-        if (!alive(tr[t].a, tr[t].w)) {  // (eaten, put back, picked up)
+        if (!oa_alive(tr[t].a, tr[t].w)) {  // (eaten, put back, picked up)
             tr[t].a = 0;
             continue;
         }
@@ -477,22 +477,22 @@ static void sample_held(uint64_t player, OnlineHeld out[ONLINE_HELD]) {
         memcpy(out[t].m, m, sizeof out[t].m);
     }
 }
-char g_map[32];
+char oa_g_map[32];
 static void local_map(Cpu *c, char out[32]) {
-    uint64_t t = call(c, FN_MAP_TYPE, 0, 0, 0, 0, 0, 0), n = call(c, FN_MAP_NAME, 0, 0, 0, 0, 0, 0);
+    uint64_t t = oa_call(c, FN_MAP_TYPE, 0, 0, 0, 0, 0, 0), n = oa_call(c, FN_MAP_NAME, 0, 0, 0, 0, 0, 0);
     const char *ts = VALID(t) ? *(const char **)(uintptr_t)(t + 8) : NULL, *ns = VALID(n) ? *(const char **)(uintptr_t)(n + 8) : NULL;
     char m[32];
     snprintf(m, sizeof m, "%s/%s", ts && VALID((uint64_t)(uintptr_t)ts) ? ts : "", ns && VALID((uint64_t)(uintptr_t)ns) && strcmp(ts ? ts : "", "MainField") ? ns : "");
-    if (strcmp(m, g_map)) LOG("[online] map: %s\n", m), snprintf(g_map, sizeof g_map, "%s", m);
-    memcpy(out, g_map, 32);
+    if (strcmp(m, oa_g_map)) LOG("[online] map: %s\n", m), snprintf(oa_g_map, sizeof oa_g_map, "%s", m);
+    memcpy(out, oa_g_map, 32);
 }
 // whether another player is on our map (unknown: as on ours)
-bool same_map(const OnlinePlayer *p) {
-    return !p->pose.map[0] || !g_map[0] || !strcmp(p->pose.map, g_map);
+bool oa_same_map(const OnlinePlayer *p) {
+    return !p->pose.map[0] || !oa_g_map[0] || !strcmp(p->pose.map, oa_g_map);
 }
 // The local Link's pose for the others: his AS on each channel, his heading, and each piece of his gear on the bone
 // nearest to it (the hands while drawn, the back's mounts while put away), as it sits on that bone
-void sample_pose(Cpu *c, uint64_t pinfo) {
+void oa_sample_pose(Cpu *c, uint64_t pinfo) {
     OnlinePose pose;
     memset(&pose, 0, sizeof pose);
     uint64_t player = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
@@ -501,14 +501,14 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
     if (!VALID(mgr)) return;
     int slots = *(int *)(uintptr_t)(mgr + 0xb8);
     for (int ch = 0; ch < ONLINE_AS_CHANNELS; ch++) {
-        int sl = k_channel[ch][0], bank = k_channel[ch][1];
+        int sl = oa_k_channel[ch][0], bank = oa_k_channel[ch][1];
         if (sl >= slots || bank >= *(int *)(uintptr_t)(*(uint64_t *)(uintptr_t)(mgr + 0xc0) + sl * 0x50 + 0x20)) continue;
-        snprintf(pose.as[ch], ONLINE_AS_MAX, "%s", playing(c, player, sl, bank));
+        snprintf(pose.as[ch], ONLINE_AS_MAX, "%s", oa_playing(c, player, sl, bank));
     }
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
     pose.yaw = atan2f(pm[2], pm[10]);
     uint64_t armor[ARMOR], gear[ONLINE_GEAR];
-    equipment(player, armor, gear);
+    oa_equipment(player, armor, gear);
     if (strncmp(pose.as[0], "Para", 4) || !strcmp(pose.as[0], "ParaEquipOff")) gear[5] = 0;  // (his paraglider: open)
     {   // his weapon thrown: it leaves his equipment as it leaves his hand, so it is kept as his while it flies and 0.3 s
         // after it comes to rest; then it lies in his world, and goes on the loot list (loot_update): the others' games
@@ -522,22 +522,22 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         static uint64_t still_since;
         uint64_t now = plat_now_ns();
         uint64_t carried[LINK_CARRIED];
-        link_carried(player, carried);
-        const float *hm = held && alive(held, hw) ? (const float *)(uintptr_t)(held + 0x398) : NULL;
+        oa_link_carried(player, carried);
+        const float *hm = held && oa_alive(held, hw) ? (const float *)(uintptr_t)(held + 0x398) : NULL;
         bool at_hand = hm && (hm[3] - pm[3]) * (hm[3] - pm[3]) + (hm[7] - pm[7]) * (hm[7] - pm[7]) +
                                      (hm[11] - pm[11]) * (hm[11] - pm[11]) < 4.0f * 4.0f;  // (not one put away elsewhere)
-        if (held && gear[0] != held && at_hand && !carries(carried, held)) {  // (let go of: followed from here)
+        if (held && gear[0] != held && at_hand && !oa_carries(carried, held)) {  // (let go of: followed from here)
             const float *m = (const float *)(uintptr_t)(held + 0x398);
             thrown = held, tw = hw, still_since = 0, listed_at = now;
             last[0] = m[3], last[1] = m[7], last[2] = m[11];
             char tn[48];
-            actor_name_of(held, tn);
-            if (!strncmp(tn, "Weapon_", 7)) loot_mine_thrown(held, tn);
+            oa_actor_name_of(held, tn);
+            if (!strncmp(tn, "Weapon_", 7)) oa_loot_mine_thrown(held, tn);
             if (getenv("SAVAGEWIND_ONLINE_GEAR_LOG")) LOG("[online] our weapon left our hand: followed while it flies\n");
         }
-        held = gear[0], hw = gear[0] ? watch(gear[0]) : hw;
-        if (thrown && (thrown == gear[0] || carries(carried, thrown))) thrown = 0;  // (his again)
-        if (thrown && alive(thrown, tw)) {
+        held = gear[0], hw = gear[0] ? oa_watch(gear[0]) : hw;
+        if (thrown && (thrown == gear[0] || oa_carries(carried, thrown))) thrown = 0;  // (his again)
+        if (thrown && oa_alive(thrown, tw)) {
             const float *m = (const float *)(uintptr_t)(thrown + 0x398);
             float dx = m[3] - last[0], dy = m[7] - last[1], dz = m[11] - last[2];
             last[0] = m[3], last[1] = m[7], last[2] = m[11];
@@ -554,16 +554,16 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         uint64_t now = plat_now_ns();
         for (int k = 0; k < 2; k++) {
             uint64_t g2 = gear[1 + k];
-            if (g2 != had[k] && had[k] && alive(had[k], hw2[k])) let_go[k] = had[k], lw[k] = hw2[k], since[k] = now;
-            if (g2) had[k] = g2, hw2[k] = watch(g2);
+            if (g2 != had[k] && had[k] && oa_alive(had[k], hw2[k])) let_go[k] = had[k], lw[k] = hw2[k], since[k] = now;
+            if (g2) had[k] = g2, hw2[k] = oa_watch(g2);
             else had[k] = 0;
             if (let_go[k] && now - since[k] > 500000000ull) {
                 uint64_t carried[LINK_CARRIED];
-                link_carried(player, carried);
+                oa_link_carried(player, carried);
                 char tn[48];
-                if (alive(let_go[k], lw[k]) && !carries(carried, let_go[k])) {
-                    actor_name_of(let_go[k], tn);
-                    if (!strncmp(tn, "Weapon_", 7)) loot_mine_add(let_go[k], tn, 0);
+                if (oa_alive(let_go[k], lw[k]) && !oa_carries(carried, let_go[k])) {
+                    oa_actor_name_of(let_go[k], tn);
+                    if (!strncmp(tn, "Weapon_", 7)) oa_loot_mine_add(let_go[k], tn, 0);
                 }
                 let_go[k] = 0;
             }
@@ -572,15 +572,15 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
     {   // what he wears and carries, for the others (the default pieces are Link's own body: "")
         char an[ARMOR][48] = {{0}}, gn[ONLINE_GEAR][48] = {{0}};
         for (int k = 0; k < ARMOR; k++) {
-            actor_name_of(armor[k], an[k]);
+            oa_actor_name_of(armor[k], an[k]);
             if (!strncmp(an[k], "Armor_Default", 13)) an[k][0] = 0;
         }
-        for (int k = 0; k < ONLINE_GEAR; k++) actor_name_of(gear[k], gn[k]);
+        for (int k = 0; k < ONLINE_GEAR; k++) oa_actor_name_of(gear[k], gn[k]);
         online_set_local_equip((const char (*)[48])an, (const char (*)[48])gn);
     }
     float bm[BONES][12];
     bool have[BONES];
-    for (int b = 0; b < BONES; b++) have[b] = bone_mtx(c, player, k_bones[b], bm[b]);
+    for (int b = 0; b < BONES; b++) have[b] = oa_bone_mtx(c, player, oa_k_bones[b], bm[b]);
     for (int k = 0; k < ONLINE_GEAR; k++) {
         uint64_t a = gear[k];
         if (!a) continue;
@@ -594,8 +594,8 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         for (int b = 0; b < BONES; b++) {
             if (!have[b]) continue;
             float inv[12], *rel = rel_of[b];
-            mtx_inv(bm[b], inv);
-            mtx_mul(inv, w, rel);
+            oa_mtx_inv(bm[b], inv);
+            oa_mtx_mul(inv, w, rel);
             float d = rel[3] * rel[3] + rel[7] * rel[7] + rel[11] * rel[11];
             if (b + 1 == last_bone[k]) kept = d;
             if (d < best) best = d, pose.gear_bone[k] = (uint8_t)(b + 1);
@@ -606,7 +606,7 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         last_bone[k] = pose.gear_bone[k];
         // (on no bone but still his and near him - a weapon he threw, in flight or where it fell: its matrix in the
         // world, ONLINE_GEAR_WORLD. Not the paraglider: closed, it isn't sent at all)
-        if (!pose.gear_bone[k] && k != 5 && a != magne_held()) {
+        if (!pose.gear_bone[k] && k != 5 && a != oa_magne_held()) {
             float dx = w[3] - pm[3], dy = w[7] - pm[7], dz = w[11] - pm[11];
             if (dx * dx + dy * dy + dz * dz < 60 * 60) {
                 pose.gear_bone[k] = ONLINE_GEAR_WORLD;
@@ -657,18 +657,18 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         // the actor held, 0x7000b993e8 checks it so; that part on while its +0x10 bit 0; its actor at +8)
         static uint64_t held;
         static float from[3];
-        uint64_t a = magne_held();
+        uint64_t a = oa_magne_held();
         const float *am = a ? (const float *)(uintptr_t)(a + 0x398) : NULL;
         if (a != held) {
             held = a;
             if (a) from[0] = am[3], from[1] = am[7], from[2] = am[11];
             char n[48] = "";
-            if (a) actor_name_of(a, n);
+            if (a) oa_actor_name_of(a, n);
             LOG("[online] magnesis: %s\n", a ? n : "let go");
         }
         if (a) {
             char n[48];
-            actor_name_of(a, n);
+            oa_actor_name_of(a, n);
             snprintf(pose.grab.name, sizeof pose.grab.name, "%s", n);
             memcpy(pose.grab.from, from, sizeof from);
             memcpy(pose.grab.m, am, sizeof pose.grab.m);
@@ -680,32 +680,32 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         static Watch sw;
         static float from[3];
         static int tick;
-        if (stopped && (!alive(stopped, sw) || !(*(uint32_t *)(uintptr_t)(stopped + 0x710) & 8))) {
+        if (stopped && (!oa_alive(stopped, sw) || !(*(uint32_t *)(uintptr_t)(stopped + 0x710) & 8))) {
             LOG("[online] stasis: over\n");
             stopped = 0;
         }
         if (!stopped && tick++ % 6 == 0) {
-            int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+            int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
             const float *pm = (const float *)(uintptr_t)(player + 0x398);
             for (int k = 0; k < na && !stopped; k++) {
-                uint64_t a = g_actors[k];
+                uint64_t a = oa_g_actors[k];
                 if (a == player || !(*(uint32_t *)(uintptr_t)(a + 0x710) & 8) ||
-                    !VALID(*(uint64_t *)(uintptr_t)(a + 0x4e0)) || !has_body(a))
+                    !VALID(*(uint64_t *)(uintptr_t)(a + 0x4e0)) || !oa_has_body(a))
                     continue;  // (a physical object with a model: no tag; the cheap checks first)
                 bool theirs = false;  // (one another player stopped, shown here: not ours)
-                for (int i = 0; i < ONLINE_MAX && !theirs; i++) theirs = g_act[i].stop == a;
+                for (int i = 0; i < ONLINE_MAX && !theirs; i++) theirs = oa_g_act[i].stop == a;
                 if (theirs) continue;
                 const float *m = (const float *)(uintptr_t)(a + 0x398);
                 if ((m[3] - pm[3]) * (m[3] - pm[3]) + (m[11] - pm[11]) * (m[11] - pm[11]) > 60 * 60) continue;
-                stopped = a, sw = watch(a), from[0] = m[3], from[1] = m[7], from[2] = m[11];
+                stopped = a, sw = oa_watch(a), from[0] = m[3], from[1] = m[7], from[2] = m[11];
                 char n[48];
-                actor_name_of(a, n);
+                oa_actor_name_of(a, n);
                 LOG("[online] stasis: %s\n", n);
             }
         }
         if (stopped) {
             char n[48];
-            actor_name_of(stopped, n);
+            oa_actor_name_of(stopped, n);
             snprintf(pose.stop.name, sizeof pose.stop.name, "%s", n);
             memcpy(pose.stop.from, from, sizeof from);
             memcpy(pose.stop.m, (const float *)(uintptr_t)(stopped + 0x398), sizeof pose.stop.m);
@@ -716,16 +716,16 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         static int n_last, tick;
         if (tick++ % 6 == 0) {
             n_last = 0;
-            int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+            int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
             const float *pm = (const float *)(uintptr_t)(player + 0x398);
             for (int k = 0; k < na && n_last < 3; k++) {
-                uint64_t a = g_actors[k];
+                uint64_t a = oa_g_actors[k];
                 char n[48];
-                actor_name_of(a, n);
+                oa_actor_name_of(a, n);
                 if (strcmp(n, "Obj_IceMakerBlock")) continue;
                 bool theirs = false;
                 for (int i = 0; i < ONLINE_MAX && !theirs; i++)
-                    for (int q = 0; q < 3 && !theirs; q++) theirs = g_act[i].ice[q].p.actor == a;
+                    for (int q = 0; q < 3 && !theirs; q++) theirs = oa_g_act[i].ice[q].p.actor == a;
                 if (theirs) continue;
                 const float *m = (const float *)(uintptr_t)(a + 0x398);
                 if ((m[3] - pm[3]) * (m[3] - pm[3]) + (m[11] - pm[11]) * (m[11] - pm[11]) > 100 * 100) continue;
@@ -736,8 +736,8 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
         memcpy(pose.ice, last, sizeof pose.ice);
     }
     local_map(c, pose.map);
-    boss_sample(c, player, &pose);
-    g_local_dead = !strncmp(pose.as[0], "Dead", 4);
+    oa_boss_sample(c, player, &pose);
+    oa_g_local_dead = !strncmp(pose.as[0], "Dead", 4);
     sample_shots(c, player, pose.as, &pose.shots);
     sample_held(player, pose.held);
     snprintf(pose.fx, sizeof pose.fx, "%s", g_fx_trail);  // (his weapon's swing trail: fx_update)
@@ -746,57 +746,57 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
     pose.collide = g_online.collide;  // (the host's is the session's: players_collide)
     pose.revive = g_online.revive;    // (and rt_online_has_fairy's)
     pose.nopause = g_online.nopause;  // (and menus_no_pause's)
-    {   float *bm = bloody_moon_timer();  // (his Blood Moon timer: bloody_moon_follow)
+    {   float *bm = oa_bloody_moon_timer();  // (his Blood Moon timer: bloody_moon_follow)
         pose.bloody_moon = bm ? *bm : -1;
     }
-    pose.weather = weather_now();  // (the weather where he is: weather_follow)
-    pose.pvp_seq = g_pvp.seq, pose.pvp_target = g_pvp.target, pose.pvp_damage = g_pvp.damage;  // (pvp_update)
-    pose.aggro_id = g_aggro_id, pose.aggro_seq = g_aggro_seq;
-    memcpy(pose.objs, g_objs_out, sizeof pose.objs);  // (objs_update)
-    pose.objs_trunk = g_objs_out_trunk;
-    memcpy(pose.movers, g_movers_out, sizeof pose.movers);  // (movers_update)
-    memcpy(pose.broken, g_broken, sizeof pose.broken);  // (breaks_update)
-    memcpy(pose.trunks_gone, g_trunks_gone, sizeof pose.trunks_gone);
+    pose.weather = oa_weather_now();  // (the weather where he is: weather_follow)
+    pose.pvp_seq = oa_g_pvp.seq, pose.pvp_target = oa_g_pvp.target, pose.pvp_damage = oa_g_pvp.damage;  // (pvp_update)
+    pose.aggro_id = oa_g_aggro_id, pose.aggro_seq = oa_g_aggro_seq;
+    memcpy(pose.objs, oa_g_objs_out, sizeof pose.objs);  // (objs_update)
+    pose.objs_trunk = oa_g_objs_out_trunk;
+    memcpy(pose.movers, oa_g_movers_out, sizeof pose.movers);  // (movers_update)
+    memcpy(pose.broken, oa_g_broken, sizeof pose.broken);  // (breaks_update)
+    memcpy(pose.trunks_gone, oa_g_trunks_gone, sizeof pose.trunks_gone);
     {   // the horse he rides: while his AS is a horse's (Horse*), the player's horse (GameRomHorse*) nearest him, looked
         // for among the actors a few times a second
         static uint64_t horse, tack[2];
         static Watch hw, tw[2];
         static int tick;
-        const char *body = playing(c, player, 0, 0);
+        const char *body = oa_playing(c, player, 0, 0);
         bool riding = strstr(body, "Horse") != NULL || strstr(body, "Motorcycle") != NULL;  // (a horse, the Master Cycle)
         if (!riding) horse = 0, tack[0] = tack[1] = 0;
-        else if (!horse || !alive(horse, hw) || tick++ % 20 == 0) {
+        else if (!horse || !oa_alive(horse, hw) || tick++ % 20 == 0) {
             const float *pm = (const float *)(uintptr_t)(player + 0x398);
-            int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+            int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
             float bd = 3.0f;
             uint64_t best = 0;
             for (int k = 0; k < na; k++) {
                 char nm[48];
-                actor_name_of(g_actors[k], nm);
+                oa_actor_name_of(oa_g_actors[k], nm);
                 if ((strncmp(nm, "GameRomHorse", 12) && strcmp(nm, "GameROMMotorcycle")) || strstr(nm, "Reins") ||
                     strstr(nm, "Saddle")) continue;
-                const float *m = (const float *)(uintptr_t)(g_actors[k] + 0x398);
+                const float *m = (const float *)(uintptr_t)(oa_g_actors[k] + 0x398);
                 float dx = m[3] - pm[3], dy = m[7] - pm[7], dz = m[11] - pm[11], d = sqrtf(dx * dx + dy * dy + dz * dz);
-                if (d < bd) bd = d, best = g_actors[k];
+                if (d < bd) bd = d, best = oa_g_actors[k];
             }
             tack[0] = tack[1] = 0;  // (its saddle and reins: the nearest to it)
             float td[2] = {1.5f, 1.5f};
             const float *hm0 = best ? (const float *)(uintptr_t)(best + 0x398) : NULL;
             for (int k = 0; hm0 && k < na; k++) {
                 char nm[48];
-                actor_name_of(g_actors[k], nm);
+                oa_actor_name_of(oa_g_actors[k], nm);
                 int which = !strncmp(nm, "GameRomHorseSaddle_", 19) ? 0 : !strncmp(nm, "GameRomHorseReins_", 18) ? 1 : -1;
                 if (which < 0) continue;
-                const float *m = (const float *)(uintptr_t)(g_actors[k] + 0x398);
+                const float *m = (const float *)(uintptr_t)(oa_g_actors[k] + 0x398);
                 float dx = m[3] - hm0[3], dy = m[7] - hm0[7], dz = m[11] - hm0[11], d = sqrtf(dx * dx + dy * dy + dz * dz);
-                if (d < td[which]) td[which] = d, tack[which] = g_actors[k], tw[which] = watch(g_actors[k]);
+                if (d < td[which]) td[which] = d, tack[which] = oa_g_actors[k], tw[which] = oa_watch(oa_g_actors[k]);
             }
             if (best != horse && best) {
                 char nm[48];
-                actor_name_of(best, nm);
+                oa_actor_name_of(best, nm);
                 LOG("[online] riding %s\n", nm);
             }
-            horse = best, hw = best ? watch(best) : hw;
+            horse = best, hw = best ? oa_watch(best) : hw;
         }
         const char *ht = getenv("SAVAGEWIND_ONLINE_HORSE_TEST");  // (test: that horse beside him, standing)
         if (ht && *ht && !horse) {
@@ -806,15 +806,15 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
             memcpy(pose.horse_m, hm, sizeof hm);
             snprintf(pose.horse_as, sizeof pose.horse_as, "Wait");
         }
-        if (horse && alive(horse, hw)) {
+        if (horse && oa_alive(horse, hw)) {
             char nm[48];
-            actor_name_of(horse, nm);
+            oa_actor_name_of(horse, nm);
             snprintf(pose.horse, sizeof pose.horse, "%s", nm);
             memcpy(pose.horse_m, (const float *)(uintptr_t)(horse + 0x398), sizeof pose.horse_m);
-            snprintf(pose.horse_as, sizeof pose.horse_as, "%s", playing(c, horse, 0, 0));
+            snprintf(pose.horse_as, sizeof pose.horse_as, "%s", oa_playing(c, horse, 0, 0));
             for (int k = 0; k < 2; k++)
-                if (tack[k] && alive(tack[k], tw[k])) {
-                    actor_name_of(tack[k], nm);
+                if (tack[k] && oa_alive(tack[k], tw[k])) {
+                    oa_actor_name_of(tack[k], nm);
                     snprintf(pose.tack[k], sizeof pose.tack[k], "%s", nm);
                     memcpy(pose.tack_m[k], (const float *)(uintptr_t)(tack[k] + 0x398), sizeof pose.tack_m[k]);
                 }
@@ -827,7 +827,7 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
     }
     {   // his Link's ELink property values (its user instance +0x70, ONLINE_FX_PROPS words: the player's ELink,
         // Player_GameRom, has that many; its containers choose what to play by them, a charge's level and the like)
-        uint64_t ui = elink_ui(player), pv = VALID(ui) ? *(uint64_t *)(uintptr_t)(ui + 0x70) : 0;
+        uint64_t ui = oa_elink_ui(player), pv = VALID(ui) ? *(uint64_t *)(uintptr_t)(ui + 0x70) : 0;
         if (VALID(pv)) memcpy(pose.fx_props, (const void *)(uintptr_t)pv, sizeof pose.fx_props);
     }
     for (int k = 0; k < 3; k++) pose.fx_anim[k] = -1;
@@ -843,25 +843,25 @@ void sample_pose(Cpu *c, uint64_t pinfo) {
 }
 
 // The local Link's skeleton for the others: each bone's local rotation and translation, as his animation left them
-void sample_skeleton(Cpu *c, uint64_t pinfo) {
+void oa_sample_skeleton(Cpu *c, uint64_t pinfo) {
     uint64_t player = *(uint64_t *)(uintptr_t)(pinfo + 0x60);
     int n = 0;
-    uint64_t unit = VALID(player) ? skel_unit(c, player, &n) : 0;
+    uint64_t unit = VALID(player) ? oa_skel_unit(c, player, &n) : 0;
     if (!unit || n <= 0) return;
     if (n > ONLINE_BONES) n = ONLINE_BONES;
     // and his bow's, after his
-    uint64_t bow = linked(player + 0xb98 + 0x18 * 2);
+    uint64_t bow = oa_linked(player + 0xb98 + 0x18 * 2);
     int nbow = 0;
-    uint64_t bow_unit = VALID(bow) ? first_unit(bow, &nbow) : 0;
+    uint64_t bow_unit = VALID(bow) ? oa_first_unit(bow, &nbow) : 0;
     if (!bow_unit || nbow < 0) nbow = 0;
     if (nbow > ONLINE_BOW_BONES) nbow = ONLINE_BOW_BONES;
     if (n > ONLINE_BONES - nbow) n = ONLINE_BONES - nbow;
     static float q[ONLINE_BONES][4], t[ONLINE_BONES][3];
     for (int b = 0; b < n + nbow; b++) {
         float m[12], sc[3];
-        call(c, FN_BONE_LOCAL_GET, b < n ? unit : bow_unit, (uint64_t)(uintptr_t)m, (uint64_t)(uintptr_t)sc, b < n ? b : b - n,
+        oa_call(c, FN_BONE_LOCAL_GET, b < n ? unit : bow_unit, (uint64_t)(uintptr_t)m, (uint64_t)(uintptr_t)sc, b < n ? b : b - n,
              0, 0);
-        mtx_to_quat(m, q[b]);
+        oa_mtx_to_quat(m, q[b]);
         t[b][0] = m[3], t[b][1] = m[7], t[b][2] = m[11];
     }
     online_set_local_skeleton(n, nbow, (const float (*)[4])q, (const float (*)[3])t);

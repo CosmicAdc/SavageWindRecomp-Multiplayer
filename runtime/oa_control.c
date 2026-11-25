@@ -18,16 +18,16 @@ static struct {
 // games take it like any flag this player gets (their quests' ones, with what comes with them)
 static struct { volatile int state; char name[64]; int found, set; uint32_t word; } g_flagq;
 
-void flag_query(Cpu *c) {
+void oa_flag_query(Cpu *c) {
     if (__atomic_load_n(&g_flagq.state, __ATOMIC_ACQUIRE) != 1) return;
     if (!online_version_ok(g_game_version)) {  // (its setter is at a 1.9.0 address: answered, with nothing)
         g_flagq.found = 0, g_flagq.word = 0;
         __atomic_store_n(&g_flagq.state, 2, __ATOMIC_RELEASE);
         return;
     }
-    uint32_t h = crc32_str(g_flagq.name);
-    uint32_t *v = bool_flag(h);
-    if (v && g_flagq.set && !(*v & 1) && !set_bool_flag(c, h)) *v |= 1;
+    uint32_t h = oa_crc32_str(g_flagq.name);
+    uint32_t *v = oa_bool_flag(h);
+    if (v && g_flagq.set && !(*v & 1) && !oa_set_bool_flag(c, h)) *v |= 1;
     g_flagq.found = v != NULL, g_flagq.word = v ? *v : 0;
     __atomic_store_n(&g_flagq.state, 2, __ATOMIC_RELEASE);
 }
@@ -62,7 +62,7 @@ static void cmd_leave(int argc, char **argv, ControlReply *r) {  // (`leave`: th
 }
 static void cmd_bloodmoon(int argc, char **argv, ControlReply *r) {
     (void)argc, (void)argv;
-    __atomic_store_n(&g_fake_blood_moon, 1, __ATOMIC_RELEASE);
+    __atomic_store_n(&oa_g_fake_blood_moon, 1, __ATOMIC_RELEASE);
     control_text(r, "The world's shared flags (items, chests) are cleared here on the next check");
 }
 
@@ -70,12 +70,12 @@ static void cmd_bloodmoon(int argc, char **argv, ControlReply *r) {
 // (start_event), on the frame loop; for tests that need a story step without playing up to it
 static struct { volatile int state; char flow[64], entry[64]; int ok; } g_eventq;
 
-void event_query(Cpu *c, uint64_t pinfo) {
+void oa_event_query(Cpu *c, uint64_t pinfo) {
     if (__atomic_load_n(&g_eventq.state, __ATOMIC_ACQUIRE) != 1) return;
     uint64_t player = pinfo ? *(uint64_t *)(uintptr_t)(pinfo + 0x60) : 0;
     // (the event manager and its calls are at 1.9.0 addresses: on another version, answered as not started)
     g_eventq.ok = online_version_ok(g_game_version) && VALID(player) &&
-                  start_event(c, player, g_eventq.flow, g_eventq.entry);
+                  oa_start_event(c, player, g_eventq.flow, g_eventq.entry);
     __atomic_store_n(&g_eventq.state, 2, __ATOMIC_RELEASE);
 }
 
@@ -98,23 +98,23 @@ static void cmd_event(int argc, char **argv, ControlReply *r) {
     __atomic_store_n(&g_eventq.state, 0, __ATOMIC_RELEASE);
 }
 
-void find_actors(uint64_t pinfo) {
+void oa_find_actors(uint64_t pinfo) {
     if (__atomic_load_n(&g_find.state, __ATOMIC_ACQUIRE) != 1) return;
     g_find.n = 0;
     uint64_t player = pinfo ? *(uint64_t *)(uintptr_t)(pinfo + 0x60) : 0;
     if (VALID(player)) {
         const float *pm = (const float *)(uintptr_t)(player + 0x398);
-        int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+        int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         for (int k = 0; k < na && g_find.n < FIND_MAX; k++) {
             char name[48];
-            actor_name_of(g_actors[k], name);
+            oa_actor_name_of(oa_g_actors[k], name);
             if (!strstr(name, g_find.text)) continue;
-            const float *m = (const float *)(uintptr_t)(g_actors[k] + 0x398);
+            const float *m = (const float *)(uintptr_t)(oa_g_actors[k] + 0x398);
             float dx = m[3] - pm[3], dy = m[7] - pm[7], dz = m[11] - pm[11];
             snprintf(g_find.hit[g_find.n].name, sizeof g_find.hit[0].name, "%s", name);
             g_find.hit[g_find.n].pos[0] = m[3], g_find.hit[g_find.n].pos[1] = m[7], g_find.hit[g_find.n].pos[2] = m[11];
             g_find.hit[g_find.n].dist = sqrtf(dx * dx + dy * dy + dz * dz);
-            g_find.hit[g_find.n].actor = g_actors[k];
+            g_find.hit[g_find.n].actor = oa_g_actors[k];
             g_find.n++;
         }
     }

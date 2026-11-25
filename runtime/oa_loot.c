@@ -8,14 +8,14 @@
 // up. One picked up anywhere (gone from where it was with a Link next to it) is taken off the list, and goes in every
 // game, ours too
 // (not the Sheikah Slate on his hip nor the rune's glove: the player's own, Item_* actors too)
-bool players_own_item(const char *n) {
+bool oa_players_own_item(const char *n) {
     return !strcmp(n, "Item_Conductor") || !strncmp(n, "Item_Magnetglove", 16);
 }
 static bool is_loot(const char *n) {
-    return (!strncmp(n, "Item_", 5) || !strncmp(n, "Weapon_", 7) || !strncmp(n, "PutRupee", 8)) && !players_own_item(n);
+    return (!strncmp(n, "Item_", 5) || !strncmp(n, "Weapon_", 7) || !strncmp(n, "PutRupee", 8)) && !oa_players_own_item(n);
 }
 // loot named by another game (a field of cap bytes as it came): on its kind's list, and not the player's own
-static bool loot_name_ok(const char *n, size_t cap) { return loot_name_listed(n, cap) && !players_own_item(n); }
+static bool loot_name_ok(const char *n, size_t cap) { return oa_loot_name_listed(n, cap) && !oa_players_own_item(n); }
 
 #define DEATHS 8
 static struct { float pos[3]; int frames; uint32_t before[48]; int nbefore; } g_death[DEATHS];  // (frames: watched)
@@ -23,7 +23,7 @@ static struct { float pos[3]; int frames; uint32_t before[48]; int nbefore; } g_
 // (picked: in this Link's hand now, taken off the list once it is on it)
 // (thrown: his weapon thrown, on the list as it left his hand; gone (broken on a blow) it is taken off wherever it is)
 static struct { uint32_t lid; uint64_t actor; Watch w; char name[40]; bool sent, listed, picked, thrown; uint32_t gid; float pos[3]; } g_mine[MINE];
-uint64_t g_carried_now[LINK_CARRIED];  // (this Link's, as loot_update saw them last)
+uint64_t oa_g_carried_now[LINK_CARRIED];  // (this Link's, as loot_update saw them last)
 static OnlineLoot g_loot_list[ONLINE_LOOT];  // (the host's game: the list)
 static int g_nloot_list;
 static uint32_t g_next_gid = 1;
@@ -38,16 +38,16 @@ static uint32_t g_next_gid = 1;
 #define DROP_HUSH_NS 5000000000ull
 static struct { uint32_t id; uint64_t t; float pos[3]; } g_drop_seen[DROP_SEEN];  // (t: since it lay still there)
 static struct { float pos[3]; uint64_t until; } g_drop_hush[8];
-void drop_hush(const float p[3]) {
+void oa_drop_hush(const float p[3]) {
     int k = 0;
     for (int q = 1; q < 8; q++)
         if (g_drop_hush[q].until < g_drop_hush[k].until) k = q;
     memcpy(g_drop_hush[k].pos, p, 12), g_drop_hush[k].until = plat_now_ns() + DROP_HUSH_NS;
 }
 
-void loot_forget(void) {
-    for (int k = 0; k < THEIRS; k++) orphan(&g_theirs[k].p);
-    memset(g_death, 0, sizeof g_death), memset(g_mine, 0, sizeof g_mine), memset(g_theirs, 0, sizeof g_theirs);
+void oa_loot_forget(void) {
+    for (int k = 0; k < THEIRS; k++) oa_orphan(&oa_g_theirs[k].p);
+    memset(g_death, 0, sizeof g_death), memset(g_mine, 0, sizeof g_mine), memset(oa_g_theirs, 0, sizeof oa_g_theirs);
     g_nloot_list = 0;
 }
 
@@ -60,8 +60,8 @@ static void loot_death(const float pos[3], int na) {
     g_death[d].frames = 300, g_death[d].nbefore = 0;  // (10 s)
     for (int k = 0; k < na && g_death[d].nbefore < 48; k++) {
         char n[48];
-        uint64_t a = g_actors[k];
-        actor_name_of(a, n);
+        uint64_t a = oa_g_actors[k];
+        oa_actor_name_of(a, n);
         if (!is_loot(n)) continue;
         const float *m = (const float *)(uintptr_t)(a + 0x398);
         float dx = m[3] - pos[0], dy = m[7] - pos[1], dz = m[11] - pos[2];
@@ -69,14 +69,14 @@ static void loot_death(const float pos[3], int na) {
     }
 }
 
-void loot_mine_add(uint64_t a, const char *n, int me) {
+void oa_loot_mine_add(uint64_t a, const char *n, int me) {
     uint32_t id = *(uint32_t *)(uintptr_t)(a + 0x60);
     for (int k = 0; k < MINE; k++)
         if (g_mine[k].actor && g_mine[k].lid == id) return;
     for (int k = 0; k < MINE; k++)
         if (!g_mine[k].actor) {
             memset(&g_mine[k], 0, sizeof g_mine[k]);
-            g_mine[k].lid = id, g_mine[k].actor = a, g_mine[k].w = watch(a);
+            g_mine[k].lid = id, g_mine[k].actor = a, g_mine[k].w = oa_watch(a);
             snprintf(g_mine[k].name, sizeof g_mine[k].name, "%s", n);
             LOG("[online] loot of ours: %s %u\n", n, id);
             (void)me;
@@ -84,8 +84,8 @@ void loot_mine_add(uint64_t a, const char *n, int me) {
         }
 }
 
-void loot_mine_thrown(uint64_t a, const char *n) {
-    loot_mine_add(a, n, 0);
+void oa_loot_mine_thrown(uint64_t a, const char *n) {
+    oa_loot_mine_add(a, n, 0);
     uint32_t id = *(uint32_t *)(uintptr_t)(a + 0x60);
     for (int k = 0; k < MINE; k++)
         if (g_mine[k].actor == a && g_mine[k].lid == id) g_mine[k].thrown = true;
@@ -99,13 +99,13 @@ static bool near_link(const float link[3], const float p[3], float r) {
 // What the local Link carries: his weapon, shield and bow (+0xb98, +0xbb0, +0xbc8) and the weapon's and bow's sheath
 // and quiver (+0x958 of each). A weapon picked up into a free hand is the same actor that lay there, not deleted:
 // a pickup is also one that comes to be in this list
-void link_carried(uint64_t player, uint64_t out[LINK_CARRIED]) {
+void oa_link_carried(uint64_t player, uint64_t out[LINK_CARRIED]) {
     memset(out, 0, LINK_CARRIED * sizeof *out);
-    for (int k = 0; k < 3; k++) out[k] = linked(player + 0xb98 + 0x18 * k);
-    out[3] = out[0] ? linked(out[0] + 0x958) : 0, out[4] = out[2] ? linked(out[2] + 0x958) : 0;
+    for (int k = 0; k < 3; k++) out[k] = oa_linked(player + 0xb98 + 0x18 * k);
+    out[3] = out[0] ? oa_linked(out[0] + 0x958) : 0, out[4] = out[2] ? oa_linked(out[2] + 0x958) : 0;
 }
 
-bool carries(const uint64_t carried[LINK_CARRIED], uint64_t a) {
+bool oa_carries(const uint64_t carried[LINK_CARRIED], uint64_t a) {
     for (int k = 0; a && k < LINK_CARRIED; k++)
         if (carried[k] == a) return true;
     return false;
@@ -123,7 +123,7 @@ static void loot_host_take(uint32_t gid) {
 
 static void loot_host_add(const OnlineLoot *l) {
     if (!loot_name_ok(l->name, sizeof l->name)) {  // (on no one's list: an item, a weapon or a rupee of the lists only)
-        name_refused(&g_refused_loot, "loot", l->name);
+        oa_name_refused(&oa_g_refused_loot, "loot", l->name);
         return;
     }
     for (int k = 0; k < g_nloot_list; k++)
@@ -135,19 +135,19 @@ static void loot_host_add(const OnlineLoot *l) {
 }
 
 static bool loot_actor(uint64_t a);
-void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host) {
+void oa_loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host) {
     static int tick;
     if (tick++ % 3) return;
     uint64_t carried[LINK_CARRIED];
-    link_carried(player, carried);
-    memcpy(g_carried_now, carried, sizeof g_carried_now);
+    oa_link_carried(player, carried);
+    memcpy(oa_g_carried_now, carried, sizeof oa_g_carried_now);
     // our owned enemies dying: watched for what they drop
     int na = 0;
     bool scanned = false;
     for (int k = 0; k < OWNS; k++) {
-        Own *o = &g_own[k];
+        Own *o = &oa_g_own[k];
         if (o->state != OWN_HAVE) continue;
-        bool there = alive(o->actor, o->w);
+        bool there = oa_alive(o->actor, o->w);
         int32_t life = there ? *(int32_t *)(uintptr_t)(o->actor + ENEMY_LIFE) : 0;
         if (there) {
             const float *am = (const float *)(uintptr_t)(o->actor + 0x398);
@@ -155,20 +155,20 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
         }
         for (int h = 0; there && life > 0 && h < 2; h++) {  // (what it holds now: dropped as it dies, unlinked then)
             char n[48];
-            uint64_t g2 = linked(o->actor + 0xb98 + 0x18 * h);
-            actor_name_of(g2, n);
-            if (!strncmp(n, "Weapon_", 7) && g2 != o->held[h]) o->held[h] = g2, o->held_w[h] = watch(g2);
+            uint64_t g2 = oa_linked(o->actor + 0xb98 + 0x18 * h);
+            oa_actor_name_of(g2, n);
+            if (!strncmp(n, "Weapon_", 7) && g2 != o->held[h]) o->held[h] = g2, o->held_w[h] = oa_watch(g2);
         }
         // (died: seen with no life left, its body there for seconds; gone without that, the game removed it alive)
         if (o->died || !there || life > 0) continue;
         o->died = true;
-        if (!scanned) na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS), scanned = true;
+        if (!scanned) na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS), scanned = true;
         loot_death(o->last_pos, na);
         for (int h = 0; h < 2; h++) {  // (its weapon and shield: they fall)
             char n[48];
-            if (!o->held[h] || !alive(o->held[h], o->held_w[h])) continue;
-            actor_name_of(o->held[h], n);
-            if (!strncmp(n, "Weapon_", 7)) loot_mine_add(o->held[h], n, me);
+            if (!o->held[h] || !oa_alive(o->held[h], o->held_w[h])) continue;
+            oa_actor_name_of(o->held[h], n);
+            if (!strncmp(n, "Weapon_", 7)) oa_loot_mine_add(o->held[h], n, me);
         }
         LOG("[online] %u died here: its loot watched\n", o->gid);
     }
@@ -176,11 +176,11 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
     bool watching = false;
     for (int d = 0; d < DEATHS; d++) watching |= g_death[d].frames > 0;
     if (watching) {
-        if (!scanned) na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+        if (!scanned) na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         for (int k = 0; k < na; k++) {
             char n[48];
-            uint64_t a = g_actors[k];
-            actor_name_of(a, n);
+            uint64_t a = oa_g_actors[k];
+            oa_actor_name_of(a, n);
             // (one being deleted, state 3, is still in the list: taken again it went and came every few frames)
             if (!is_loot(n) || *(uint8_t *)(uintptr_t)(a + 0x64) == 3) continue;
             uint32_t id = *(uint32_t *)(uintptr_t)(a + 0x60);
@@ -191,8 +191,8 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
                 bool old = false;
                 for (int b = 0; b < g_death[d].nbefore && !old; b++) old = g_death[d].before[b] == id;
                 bool theirs = false;  // (one of the others' we made: not ours)
-                for (int t = 0; t < THEIRS && !theirs; t++) theirs = g_theirs[t].p.actor == a;
-                if (!old && !theirs) loot_mine_add(a, n, me);
+                for (int t = 0; t < THEIRS && !theirs; t++) theirs = oa_g_theirs[t].p.actor == a;
+                if (!old && !theirs) oa_loot_mine_add(a, n, me);
                 break;
             }
         }
@@ -207,17 +207,17 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
             float jx = link[0] - was[0], jz = link[2] - was[2];
             if (jx * jx + jz * jz > 30.0f * 30.0f) base = false, memset(g_drop_seen, 0, sizeof g_drop_seen);
             memcpy(was, link, sizeof was);
-            if (!scanned) na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS), scanned = true;
+            if (!scanned) na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS), scanned = true;
             uint64_t now = plat_now_ns();
             for (int k = 0; k < na; k++) {
-                uint64_t a = g_actors[k];
+                uint64_t a = oa_g_actors[k];
                 if (*(uint32_t *)(uintptr_t)(a + ACTOR_HASH_ID) || *(uint8_t *)(uintptr_t)(a + 0x64) == 3) continue;
                 const float *m = (const float *)(uintptr_t)(a + 0x398);
                 float p[3] = {m[3], m[7], m[11]};
                 if (!near_link(link, p, 15)) continue;
                 char n[48];
-                actor_name_of(a, n);
-                if (!is_loot(n) || carries(carried, a) || loot_actor(a)) continue;
+                oa_actor_name_of(a, n);
+                if (!is_loot(n) || oa_carries(carried, a) || loot_actor(a)) continue;
                 // (one in his hands - materials he holds from his pouch, over him - isn't on the ground: before, the
                 // others saw what he held lying at his feet. It is linked to him then: +0x4d4 0x72, as the slate on
                 // his hip; 0 on the ground)
@@ -237,7 +237,7 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
                     for (int h = 0; h < 8 && !hushed; h++) hushed = now < g_drop_hush[h].until && near_link(g_drop_hush[h].pos, p, 5);
                     if (base && hushed) {
                         LOG("[online] %s dropped here by what we broke for another: taken away (his comes)\n", n);
-                        call(c, FN_DELETE, a, 0, 0, 0, 0, 0);
+                        oa_call(c, FN_DELETE, a, 0, 0, 0, 0, 0);
                         g_drop_seen[old].t = 1;
                     }
                     continue;
@@ -253,7 +253,7 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
                 if (now - g_drop_seen[f].t < DROP_SETTLE_NS) continue;
                 g_drop_seen[f].t = 1;  // (once)
                 LOG("[online] %s fell to the ground here: everyone's\n", n);
-                loot_mine_add(a, n, me);
+                oa_loot_mine_add(a, n, me);
             }
             base = true;
         }
@@ -273,7 +273,7 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
     // taken off; off the list after being on it: picked up elsewhere, gone here
     for (int k = 0; k < MINE; k++) {
         if (!g_mine[k].actor) continue;
-        bool there = alive(g_mine[k].actor, g_mine[k].w);
+        bool there = oa_alive(g_mine[k].actor, g_mine[k].w);
         if (there) {
             const float *am = (const float *)(uintptr_t)(g_mine[k].actor + 0x398);
             g_mine[k].pos[0] = am[3], g_mine[k].pos[1] = am[7], g_mine[k].pos[2] = am[11];
@@ -292,7 +292,7 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
             else online_send_loot_add(&l);
             g_mine[k].sent = true;
         }
-        if (there && carries(carried, g_mine[k].actor)) g_mine[k].picked = true;  // (into his free hand: the same actor)
+        if (there && oa_carries(carried, g_mine[k].actor)) g_mine[k].picked = true;  // (into his free hand: the same actor)
         if (g_mine[k].picked) {
             if (!g_mine[k].listed) continue;
             LOG("[online] loot of ours %s picked up here, into his hand\n", g_mine[k].name);
@@ -322,8 +322,8 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
         if (on) g_mine[k].listed = true;
         else if (g_mine[k].listed) {  // (picked up by another)
             LOG("[online] loot of ours %s picked up elsewhere\n", g_mine[k].name);
-            if (alive(g_mine[k].actor, g_mine[k].w) && !carries(carried, g_mine[k].actor))  // (never out of his hand)
-                call(c, FN_DELETE, g_mine[k].actor, 0, 0, 0, 0, 0);
+            if (oa_alive(g_mine[k].actor, g_mine[k].w) && !oa_carries(carried, g_mine[k].actor))  // (never out of his hand)
+                oa_call(c, FN_DELETE, g_mine[k].actor, 0, 0, 0, 0, 0);
             g_mine[k].actor = 0;
         }
     }
@@ -332,63 +332,63 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
         if (list[j].origin == me) continue;
         int t = -1, free_t = -1;
         for (int k = 0; k < THEIRS; k++) {
-            if (g_theirs[k].gid == list[j].gid) t = k;
-            if (!g_theirs[k].gid && free_t < 0) free_t = k;
+            if (oa_g_theirs[k].gid == list[j].gid) t = k;
+            if (!oa_g_theirs[k].gid && free_t < 0) free_t = k;
         }
         if (t < 0) {
             if (free_t < 0 || !near_link(link, list[j].pos, 150)) continue;
             t = free_t;
-            memset(&g_theirs[t], 0, sizeof g_theirs[t]);
-            g_theirs[t].gid = list[j].gid;
-            memcpy(g_theirs[t].pos, list[j].pos, 12);
-            g_theirs[t].origin = list[j].origin;
+            memset(&oa_g_theirs[t], 0, sizeof oa_g_theirs[t]);
+            oa_g_theirs[t].gid = list[j].gid;
+            memcpy(oa_g_theirs[t].pos, list[j].pos, 12);
+            oa_g_theirs[t].origin = list[j].origin;
         }
-        if (g_theirs[t].gone) continue;
-        Piece *pc = &g_theirs[t].p;
+        if (oa_g_theirs[t].gone) continue;
+        Piece *pc = &oa_g_theirs[t].p;
         bool had = pc->actor != 0;
-        bool in_hand = had && alive(pc->actor, pc->w) && carries(carried, pc->actor);  // (into his free hand)
+        bool in_hand = had && oa_alive(pc->actor, pc->w) && oa_carries(carried, pc->actor);  // (into his free hand)
         // (gone the moment it was made - made where our Link stood, it was lost at once - isn't picked up: made again)
-        if (had && !in_hand && !alive(pc->actor, pc->w) && plat_now_ns() - g_theirs[t].made_t < 1500000000ull &&
-            ++g_theirs[t].tries < 5) {
+        if (had && !in_hand && !oa_alive(pc->actor, pc->w) && plat_now_ns() - oa_g_theirs[t].made_t < 1500000000ull &&
+            ++oa_g_theirs[t].tries < 5) {
             LOG("[online] loot %u (%s) lost as it was made here: made again\n", list[j].gid, list[j].name);
             memset(pc, 0, sizeof *pc);
-            g_theirs[t].retry_t = plat_now_ns() + 300000000ull;
+            oa_g_theirs[t].retry_t = plat_now_ns() + 300000000ull;
             continue;
         }
-        if (had && (in_hand || !alive(pc->actor, pc->w))) {  // (gone here, or his now)
-            if (in_hand || near_link(link, g_theirs[t].pos, 4)) {  // (picked up here: gone for everyone)
+        if (had && (in_hand || !oa_alive(pc->actor, pc->w))) {  // (gone here, or his now)
+            if (in_hand || near_link(link, oa_g_theirs[t].pos, 4)) {  // (picked up here: gone for everyone)
                 LOG("[online] loot %u (%s) picked up here%s\n", list[j].gid, list[j].name, in_hand ? ", into his hand" : "");
                 if (host) loot_host_take(list[j].gid);
                 else online_send_loot_take(list[j].gid);
             } else
                 LOG("[online] loot %u (%s) gone here, %.1f m from Link\n", list[j].gid, list[j].name,
-                    sqrtf((g_theirs[t].pos[0] - link[0]) * (g_theirs[t].pos[0] - link[0]) +
-                          (g_theirs[t].pos[1] - link[1]) * (g_theirs[t].pos[1] - link[1]) +
-                          (g_theirs[t].pos[2] - link[2]) * (g_theirs[t].pos[2] - link[2])));
-            g_theirs[t].gone = true;
+                    sqrtf((oa_g_theirs[t].pos[0] - link[0]) * (oa_g_theirs[t].pos[0] - link[0]) +
+                          (oa_g_theirs[t].pos[1] - link[1]) * (oa_g_theirs[t].pos[1] - link[1]) +
+                          (oa_g_theirs[t].pos[2] - link[2]) * (oa_g_theirs[t].pos[2] - link[2])));
+            oa_g_theirs[t].gone = true;
             memset(pc, 0, sizeof *pc);  // (forgotten, not deleted: in his hand it is his)
             continue;
         }
         if (!had) {
             if (!pc->pending && !pc->name[0]) {  // (asked for; one the game didn't make is asked for again, 5 times)
                 if (!loot_name_ok(list[j].name, sizeof list[j].name)) {  // (as it came: one on no list is never made)
-                    name_refused(&g_refused_loot, "loot", list[j].name);
-                    g_theirs[t].gone = true;
+                    oa_name_refused(&oa_g_refused_loot, "loot", list[j].name);
+                    oa_g_theirs[t].gone = true;
                     continue;
                 }
-                if (plat_now_ns() < g_theirs[t].retry_t) continue;
-                pc->handle = new_handle();
-                if (request(c, list[j].name, pc->handle)) pc->pending = true, snprintf(pc->name, sizeof pc->name, "%s", list[j].name);
-                else if (++g_theirs[t].tries >= 5) { g_theirs[t].gone = true; continue; }
-                else { g_theirs[t].retry_t = plat_now_ns() + 1000000000ull; continue; }
+                if (plat_now_ns() < oa_g_theirs[t].retry_t) continue;
+                pc->handle = oa_new_handle();
+                if (oa_request(c, list[j].name, pc->handle)) pc->pending = true, snprintf(pc->name, sizeof pc->name, "%s", list[j].name);
+                else if (++oa_g_theirs[t].tries >= 5) { oa_g_theirs[t].gone = true; continue; }
+                else { oa_g_theirs[t].retry_t = plat_now_ns() + 1000000000ull; continue; }
             }
             int *unit = (int *)(uintptr_t)pc->handle->unit;
             if (unit && *unit == 2) {
                 pc->pending = false;
-                pc->actor = call(c, FN_HANDLE_TAKE, (uint64_t)(uintptr_t)pc->handle, 0, 0, 0, 0, 0);
+                pc->actor = oa_call(c, FN_HANDLE_TAKE, (uint64_t)(uintptr_t)pc->handle, 0, 0, 0, 0, 0);
                 if (pc->actor) {
-                    pc->w = watch(pc->actor);
-                    g_theirs[t].made_t = plat_now_ns();
+                    pc->w = oa_watch(pc->actor);
+                    oa_g_theirs[t].made_t = plat_now_ns();
                     // (as it lies in his game: its rotation with it; upright and a little above, without)
                     float m[12] = {1, 0, 0, list[j].pos[0], 0, 1, 0, list[j].pos[1] + 0.2f, 0, 0, 1, list[j].pos[2]};
                     bool rot = false;
@@ -397,31 +397,31 @@ void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host
                         for (int q = 0; q < 3; q++) m[4 * r + q] = list[j].rot[3 * r + q];
                         m[4 * r + 3] = list[j].pos[r] + (r == 1 ? 0.02f : 0);
                     }
-                    call(c, FN_SET_MTX, pc->actor, (uint64_t)(uintptr_t)m, 0, 0, 0, 0);
+                    oa_call(c, FN_SET_MTX, pc->actor, (uint64_t)(uintptr_t)m, 0, 0, 0, 0);
                     LOG("[online] loot %u (%s) made here at %.2f %.2f %.2f (actor %llx)\n", list[j].gid, list[j].name,
                         list[j].pos[0], list[j].pos[1], list[j].pos[2], (unsigned long long)pc->actor);
                 }
             } else if (unit && (*unit == 3 || *unit == 5)) {
-                call(c, FN_HANDLE_RELEASE, (uint64_t)(uintptr_t)pc->handle, 0, 0, 0, 0, 0);
+                oa_call(c, FN_HANDLE_RELEASE, (uint64_t)(uintptr_t)pc->handle, 0, 0, 0, 0, 0);
                 pc->pending = false, pc->name[0] = 0;
-                if (++g_theirs[t].tries >= 5) g_theirs[t].gone = true;
-                else g_theirs[t].retry_t = plat_now_ns() + 1000000000ull;
+                if (++oa_g_theirs[t].tries >= 5) oa_g_theirs[t].gone = true;
+                else oa_g_theirs[t].retry_t = plat_now_ns() + 1000000000ull;
             }
         } else {  // (where it is now: if it was picked up a moment from now, near it)
             const float *m = (const float *)(uintptr_t)(pc->actor + 0x398);
-            g_theirs[t].pos[0] = m[3], g_theirs[t].pos[1] = m[7], g_theirs[t].pos[2] = m[11];
+            oa_g_theirs[t].pos[0] = m[3], oa_g_theirs[t].pos[1] = m[7], oa_g_theirs[t].pos[2] = m[11];
         }
     }
     for (int k = 0; k < THEIRS; k++) {
-        if (!g_theirs[k].gid) continue;
+        if (!oa_g_theirs[k].gid) continue;
         bool on = false;
-        for (int j = 0; j < nl && !on; j++) on = list[j].gid == g_theirs[k].gid;
+        for (int j = 0; j < nl && !on; j++) on = list[j].gid == oa_g_theirs[k].gid;
         if (on) continue;
-        if (g_theirs[k].p.actor && alive(g_theirs[k].p.actor, g_theirs[k].p.w) && !carries(carried, g_theirs[k].p.actor)) {
-            LOG("[online] loot %u picked up elsewhere\n", g_theirs[k].gid);
-            call(c, FN_DELETE, g_theirs[k].p.actor, 0, 0, 0, 0, 0);
-        } else if (g_theirs[k].p.pending) orphan(&g_theirs[k].p);
-        memset(&g_theirs[k], 0, sizeof g_theirs[k]);
+        if (oa_g_theirs[k].p.actor && oa_alive(oa_g_theirs[k].p.actor, oa_g_theirs[k].p.w) && !oa_carries(carried, oa_g_theirs[k].p.actor)) {
+            LOG("[online] loot %u picked up elsewhere\n", oa_g_theirs[k].gid);
+            oa_call(c, FN_DELETE, oa_g_theirs[k].p.actor, 0, 0, 0, 0, 0);
+        } else if (oa_g_theirs[k].p.pending) oa_orphan(&oa_g_theirs[k].p);
+        memset(&oa_g_theirs[k], 0, sizeof oa_g_theirs[k]);
     }
 }
 
@@ -437,31 +437,31 @@ static bool loot_actor(uint64_t a) {
     for (int k = 0; k < MINE; k++)
         if (g_mine[k].actor == a) return true;
     for (int k = 0; k < THEIRS; k++)
-        if (g_theirs[k].p.actor == a) return true;
+        if (oa_g_theirs[k].p.actor == a) return true;
     return false;
 }
 
-void ground_update(Cpu *c, uint64_t player, const float link[3]) {
+void oa_ground_update(Cpu *c, uint64_t player, const float link[3]) {
     static int tick;
     if (tick++ % 6) return;
     // the others' picks: gone here too
     char pn[16][40];
     float pp[16][3];
     int np = online_take_picks(pn, pp, 16);
-    int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+    int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
     uint64_t carried[LINK_CARRIED];
-    link_carried(player, carried);
+    oa_link_carried(player, carried);
     for (int q = 0; q < np; q++)
         for (int k = 0; k < na; k++) {
             char n[48];
-            uint64_t a = g_actors[k];
-            actor_name_of(a, n);
-            if (strcmp(n, pn[q]) || carries(carried, a) || loot_actor(a)) continue;  // (not his, nor the loot's)
+            uint64_t a = oa_g_actors[k];
+            oa_actor_name_of(a, n);
+            if (strcmp(n, pn[q]) || oa_carries(carried, a) || loot_actor(a)) continue;  // (not his, nor the loot's)
             const float *m = (const float *)(uintptr_t)(a + 0x398);
             float p[3] = {m[3], m[7], m[11]};
             if (!near_link(pp[q], p, 2)) continue;
             LOG("[online] %s picked up by another: gone here\n", n);
-            call(c, FN_DELETE, a, 0, 0, 0, 0, 0);
+            oa_call(c, FN_DELETE, a, 0, 0, 0, 0, 0);
             break;
         }
     // ours, watched: picked up (gone, this Link next to where it lay; or in his hand now, the same actor)
@@ -469,8 +469,8 @@ void ground_update(Cpu *c, uint64_t player, const float link[3]) {
     if (getenv("SAVAGEWIND_ONLINE_WEAPONS_LOG") && wlog++ % 50 == 0)
         for (int k = 0; k < na; k++) {
             char n[48];
-            uint64_t a = g_actors[k];
-            actor_name_of(a, n);
+            uint64_t a = oa_g_actors[k];
+            oa_actor_name_of(a, n);
             const float *m = (const float *)(uintptr_t)(a + 0x398);
             float p[3] = {m[3], m[7], m[11]};
             if (strncmp(n, "Weapon_", 7) || !near_link(link, p, 10)) continue;
@@ -484,15 +484,15 @@ void ground_update(Cpu *c, uint64_t player, const float link[3]) {
     const float *ours_at[OWNS];
     int nh = 0, no = 0;
     for (int k = 0; k < OWNS; k++) {
-        if (g_own[k].state != OWN_HAVE || !alive(g_own[k].actor, g_own[k].w)) continue;
-        for (int h = 0; h < 3; h++) theirs_held[nh++] = linked(g_own[k].actor + 0xb98 + 0x18 * h);
-        const float *em = (const float *)(uintptr_t)(g_own[k].actor + 0x398);
+        if (oa_g_own[k].state != OWN_HAVE || !oa_alive(oa_g_own[k].actor, oa_g_own[k].w)) continue;
+        for (int h = 0; h < 3; h++) theirs_held[nh++] = oa_linked(oa_g_own[k].actor + 0xb98 + 0x18 * h);
+        const float *em = (const float *)(uintptr_t)(oa_g_own[k].actor + 0x398);
         at[no][0] = em[3], at[no][1] = em[7], at[no][2] = em[11];
         ours_at[no] = at[no], no++;
     }
     for (int g = 0; g < GROUND; g++) {
         if (!g_ground[g].actor) continue;
-        if (alive(g_ground[g].actor, g_ground[g].w)) {
+        if (oa_alive(g_ground[g].actor, g_ground[g].w)) {
             bool enemy_has = false;
             for (int k = 0; k < nh && !enemy_has; k++) enemy_has = theirs_held[k] == g_ground[g].actor;
             if (enemy_has) {  // (where it lay: the others delete theirs there)
@@ -501,7 +501,7 @@ void ground_update(Cpu *c, uint64_t player, const float link[3]) {
                 g_ground[g].actor = 0;
                 continue;
             }
-            if (carries(carried, g_ground[g].actor)) {  // (picked up into a free hand: the game keeps the same actor)
+            if (oa_carries(carried, g_ground[g].actor)) {  // (picked up into a free hand: the game keeps the same actor)
                 LOG("[online] %s picked up here, into his hand\n", g_ground[g].name);
                 online_send_pick(g_ground[g].name, g_ground[g].pos);
                 g_ground[g].actor = 0;
@@ -522,8 +522,8 @@ void ground_update(Cpu *c, uint64_t player, const float link[3]) {
     }
     for (int k = 0; k < na; k++) {
         char n[48];
-        uint64_t a = g_actors[k];
-        actor_name_of(a, n);
+        uint64_t a = oa_g_actors[k];
+        oa_actor_name_of(a, n);
         if (strncmp(n, "Weapon_", 7)) continue;
         const float *m = (const float *)(uintptr_t)(a + 0x398);
         float p[3] = {m[3], m[7], m[11]};
@@ -531,13 +531,13 @@ void ground_update(Cpu *c, uint64_t player, const float link[3]) {
         for (int j = 0; j < no && !near; j++) near = near_link(ours_at[j], p, 6);
         if (!near) continue;
         if (loot_actor(a)) continue;
-        bool known = false, held = carries(carried, a);
+        bool known = false, held = oa_carries(carried, a);
         for (int g = 0; g < GROUND && !known; g++) known = g_ground[g].actor == a;
         for (int j = 0; j < nh; j++) held |= theirs_held[j] == a;
         if (known || held) continue;
         for (int g = 0; g < GROUND; g++)
             if (!g_ground[g].actor) {
-                g_ground[g].actor = a, g_ground[g].w = watch(a);
+                g_ground[g].actor = a, g_ground[g].w = oa_watch(a);
                 snprintf(g_ground[g].name, sizeof g_ground[g].name, "%s", n);
                 memcpy(g_ground[g].pos, p, 12);
                 break;

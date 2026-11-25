@@ -117,7 +117,7 @@ typedef struct { uint64_t vt, pad; int16_t n, used; uint8_t data[0xc0]; } InstPa
 
 // ---- oa_sample.c
 
-#define BONES (int)(sizeof k_bones / sizeof *k_bones)
+#define BONES (int)(sizeof oa_k_bones / sizeof *oa_k_bones)
 // His Link's and his weapon's other effects (a spin attack's charge and its spin, a heavy blow on the ground, ...): each one
 // as it is played goes to the others as an event (OnlinePose.fxev, the last ONLINE_FX_EVENTS by number), and they play
 // it by its name on his puppet or the weapon in its hand (its ELink is the player's / the weapon's), ended after
@@ -284,169 +284,169 @@ uint64_t test_warp_gdt_mgr(void);
 // ---- What a module keeps or does for the others, by module
 
 // runtime/online_actors.c
-bool weapon_name_listed(const char *name, size_t cap);
-bool loot_name_listed(const char *name, size_t cap);
+bool oa_weapon_name_listed(const char *name, size_t cap);
+bool oa_loot_name_listed(const char *name, size_t cap);
 
 // runtime/oa_core.c
-bool has_body(uint64_t a);
-Watch watch(uint64_t actor);
-bool alive(uint64_t actor, Watch w);
-bool alive_rewatch(uint64_t actor, Watch *w);
-Handle *new_handle(void);
-extern OaAct g_act[ONLINE_MAX];
-extern bool g_local_dead;
-extern uint32_t g_aggro_id;
-extern uint16_t g_aggro_seq;
-extern OnlineObj g_objs_out[ONLINE_OBJS];
-extern uint8_t g_objs_out_trunk;
-extern OnlineMover g_movers_out[ONLINE_MOVERS];
-extern uint32_t g_broken[8], g_trunks_gone[4];
-extern volatile bool g_online_actor[ONLINE_MAX];
-const char *actor_name(void);
-bool is_online_player(void);
+bool oa_has_body(uint64_t a);
+Watch oa_watch(uint64_t actor);
+bool oa_alive(uint64_t actor, Watch w);
+bool oa_alive_rewatch(uint64_t actor, Watch *w);
+Handle *oa_new_handle(void);
+extern OaAct oa_g_act[ONLINE_MAX];
+extern bool oa_g_local_dead;
+extern uint32_t oa_g_aggro_id;
+extern uint16_t oa_g_aggro_seq;
+extern OnlineObj oa_g_objs_out[ONLINE_OBJS];
+extern uint8_t oa_g_objs_out_trunk;
+extern OnlineMover oa_g_movers_out[ONLINE_MOVERS];
+extern uint32_t oa_g_broken[8], oa_g_trunks_gone[4];
+extern volatile bool oa_g_online_actor[ONLINE_MAX];
+const char *oa_actor_name(void);
+bool oa_is_online_player(void);
 bool online_actors_on(void);
-uint64_t call_f(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, float s0);
-void call_sret(Cpu *c, uint64_t fn, uint64_t out, uint64_t a0, uint64_t a1);
-uint64_t call(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5);
-const char *playing(Cpu *c, uint64_t actor, int slot, int bank);
-bool play_as(Cpu *c, uint64_t actor, const char *name, int slot, int bank, float blend, bool again);
-extern Piece g_pool[ONLINE_MAX][POOL];
-void orphan(Piece *p);
-void orphans_update(Cpu *c);
-void delete_piece(Cpu *c, Piece *p);
-void model_visible(Cpu *c, uint64_t actor, bool visible);
-extern float g_pool_at[3];
-void pool_update(Cpu *c);
-void drop(Cpu *c, int i, bool left);
-const char *gear_actor(const char *piece);
-int map_load(const char *file, MapLine **out);
-const char *map_find(MapLine *m, int n, const char *key);
-const char *armor_actor(const char *piece);
-const uint8_t *armor_bones(const char *actor, int u, int *len);
-uint64_t create(Cpu *c, const char *name);
-bool request(Cpu *c, const char *name, Handle *handle);
-bool request_p(Cpu *c, const char *name, Handle *handle, uint64_t params);
-void inst_params_s32(InstParams *p, const char *key, int32_t value);
-void inst_params_string(InstParams *p, const char *key, const char *value);
-extern float g_dist;
-extern OaPvp g_pvp;
-extern InstParams *g_piece_params;
-bool piece_update(Cpu *c, int i, Piece *p, const char *want, const char *who);
-bool running(uint64_t actor);
-uint64_t skel_unit(Cpu *c, uint64_t actor, int *bones);
-uint64_t linked(uint64_t at);
-void equipment(uint64_t player, uint64_t armor[ARMOR], uint64_t gear[ONLINE_GEAR]);
-void actor_name_of(uint64_t a, char out[48]);
-uint64_t first_unit(uint64_t actor, int *bones);
-bool bone_mtx(Cpu *c, uint64_t actor, const char *bone, float out[12]);
-void mtx_mul(const float a[12], const float b[12], float out[12]);
-void mtx_inv(const float a[12], float out[12]);
-extern uint64_t g_actors[MAX_ACTORS];
-void mtx_to_quat(const float m[12], float q[4]);
-void quat_to_mtx(const float q[4], float m[12]);
-int all_actors(uint64_t from, uint64_t *out, int max);
-extern OaTheirs g_theirs[THEIRS];
+uint64_t oa_call_f(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, float s0);
+void oa_call_sret(Cpu *c, uint64_t fn, uint64_t out, uint64_t a0, uint64_t a1);
+uint64_t oa_call(Cpu *c, uint64_t fn, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5);
+const char *oa_playing(Cpu *c, uint64_t actor, int slot, int bank);
+bool oa_play_as(Cpu *c, uint64_t actor, const char *name, int slot, int bank, float blend, bool again);
+extern Piece oa_g_pool[ONLINE_MAX][POOL];
+void oa_orphan(Piece *p);
+void oa_orphans_update(Cpu *c);
+void oa_delete_piece(Cpu *c, Piece *p);
+void oa_model_visible(Cpu *c, uint64_t actor, bool visible);
+extern float oa_g_pool_at[3];
+void oa_pool_update(Cpu *c);
+void oa_drop(Cpu *c, int i, bool left);
+const char *oa_gear_actor(const char *piece);
+int oa_map_load(const char *file, MapLine **out);
+const char *oa_map_find(MapLine *m, int n, const char *key);
+const char *oa_armor_actor(const char *piece);
+const uint8_t *oa_armor_bones(const char *actor, int u, int *len);
+uint64_t oa_create(Cpu *c, const char *name);
+bool oa_request(Cpu *c, const char *name, Handle *handle);
+bool oa_request_p(Cpu *c, const char *name, Handle *handle, uint64_t params);
+void oa_inst_params_s32(InstParams *p, const char *key, int32_t value);
+void oa_inst_params_string(InstParams *p, const char *key, const char *value);
+extern float oa_g_dist;
+extern OaPvp oa_g_pvp;
+extern InstParams *oa_g_piece_params;
+bool oa_piece_update(Cpu *c, int i, Piece *p, const char *want, const char *who);
+bool oa_running(uint64_t actor);
+uint64_t oa_skel_unit(Cpu *c, uint64_t actor, int *bones);
+uint64_t oa_linked(uint64_t at);
+void oa_equipment(uint64_t player, uint64_t armor[ARMOR], uint64_t gear[ONLINE_GEAR]);
+void oa_actor_name_of(uint64_t a, char out[48]);
+uint64_t oa_first_unit(uint64_t actor, int *bones);
+bool oa_bone_mtx(Cpu *c, uint64_t actor, const char *bone, float out[12]);
+void oa_mtx_mul(const float a[12], const float b[12], float out[12]);
+void oa_mtx_inv(const float a[12], float out[12]);
+extern uint64_t oa_g_actors[MAX_ACTORS];
+void oa_mtx_to_quat(const float m[12], float q[4]);
+void oa_quat_to_mtx(const float q[4], float m[12]);
+int oa_all_actors(uint64_t from, uint64_t *out, int max);
+extern OaTheirs oa_g_theirs[THEIRS];
 
 // runtime/oa_gamedata.c
-uint32_t crc32_str(const char *s);
-uint32_t *bool_flag(uint32_t h);
-uint32_t *gdt_value(int off, uint32_t h);
-bool start_event(Cpu *c, uint64_t actor, const char *flow, const char *entry);
-void give_item(Cpu *c, const char *name, int count);
-void give_heart(Cpu *c);
-bool set_bool_flag(Cpu *c, uint32_t h);
+uint32_t oa_crc32_str(const char *s);
+uint32_t *oa_bool_flag(uint32_t h);
+uint32_t *oa_gdt_value(int off, uint32_t h);
+bool oa_start_event(Cpu *c, uint64_t actor, const char *flow, const char *entry);
+void oa_give_item(Cpu *c, const char *name, int count);
+void oa_give_heart(Cpu *c);
+bool oa_set_bool_flag(Cpu *c, uint32_t h);
 
 // runtime/oa_sample.c
-extern const int k_channel[ONLINE_AS_CHANNELS][2];
-extern const char *const k_bones[8];
-extern const char *const k_shot_names[ONLINE_K_COUNT];
-extern uint64_t g_fx_trail_t;
-extern uint64_t volatile g_rf, g_rf_ui;
-extern Watch g_rf_watch;
-uint64_t slink_ui(uint64_t actor);
-uint64_t elink_ui(uint64_t actor);
-void fx_update(uint64_t player);
-uint8_t elem_near(const float p[3], float r);
-extern char g_map[32];
-bool same_map(const OnlinePlayer *p);
-void sample_pose(Cpu *c, uint64_t pinfo);
-void sample_skeleton(Cpu *c, uint64_t pinfo);
+extern const int oa_k_channel[ONLINE_AS_CHANNELS][2];
+extern const char *const oa_k_bones[8];
+extern const char *const oa_k_shot_names[ONLINE_K_COUNT];
+extern uint64_t oa_g_fx_trail_t;
+extern uint64_t volatile oa_g_rf, oa_g_rf_ui;
+extern Watch oa_g_rf_watch;
+uint64_t oa_slink_ui(uint64_t actor);
+uint64_t oa_elink_ui(uint64_t actor);
+void oa_fx_update(uint64_t player);
+uint8_t oa_elem_near(const float p[3], float r);
+extern char oa_g_map[32];
+bool oa_same_map(const OnlinePlayer *p);
+void oa_sample_pose(Cpu *c, uint64_t pinfo);
+void oa_sample_skeleton(Cpu *c, uint64_t pinfo);
 
 // runtime/oa_puppet.c
-uint64_t link_live(int i);
-extern OaBlast g_blast[4];
-void cover(Cpu *c, int i);
-extern OaBlur volatile g_blur[ONLINE_MAX];
-void boom_start(Cpu *c, const char *name, const float pos[3]);
-void booms_forget(void);
-void booms_update(Cpu *c, uint64_t player);
-void pose_link(Cpu *c, int i, const OnlinePlayer *p);
-void pose_armor(Cpu *c, const Piece *p);
+uint64_t oa_link_live(int i);
+extern OaBlast oa_g_blast[4];
+void oa_cover(Cpu *c, int i);
+extern OaBlur volatile oa_g_blur[ONLINE_MAX];
+void oa_boom_start(Cpu *c, const char *name, const float pos[3]);
+void oa_booms_forget(void);
+void oa_booms_update(Cpu *c, uint64_t player);
+void oa_pose_link(Cpu *c, int i, const OnlinePlayer *p);
+void oa_pose_armor(Cpu *c, const Piece *p);
 
 // runtime/oa_runes.c
-uint64_t magne_held(void);
-void stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
-void ice_update(Cpu *c, const OnlinePlayer *pl, int me);
-void grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
+uint64_t oa_magne_held(void);
+void oa_stop_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
+void oa_ice_update(Cpu *c, const OnlinePlayer *pl, int me);
+void oa_grab_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
 
 // runtime/oa_enemies.c
-extern Refused g_refused_enemy, g_refused_weapon, g_refused_loot;
-void name_refused(Refused *r, const char *what, const char *name);
-void enemy_state(Cpu *c, uint64_t a, OnlineEnemy *e);
-extern Own g_own[OWNS];
-void owns_left(Cpu *c);
-void own_guard(uint64_t player);
-extern OnlineEnemy g_reg_out[ONLINE_ENEMIES];
-extern int g_reg_n;
-void owns_forget(void);
-void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
-int attack_power(const char *name);
-int our_defense(uint64_t player);
-void strike(Cpu *c, uint64_t player, const OnlineEnemy *e);
-void puppets_forget(void);
-void enemies_client(Cpu *c, uint64_t player, int me);
-void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, const float centre[3], int me, bool suppress);
-void boss_sample(Cpu *c, uint64_t player, OnlinePose *pose);
-void boss_update(Cpu *c, const OnlinePlayer *pl, int me);
+extern Refused oa_g_refused_enemy, oa_g_refused_weapon, oa_g_refused_loot;
+void oa_name_refused(Refused *r, const char *what, const char *name);
+void oa_enemy_state(Cpu *c, uint64_t a, OnlineEnemy *e);
+extern Own oa_g_own[OWNS];
+void oa_owns_left(Cpu *c);
+void oa_own_guard(uint64_t player);
+extern OnlineEnemy oa_g_reg_out[ONLINE_ENEMIES];
+extern int oa_g_reg_n;
+void oa_owns_forget(void);
+void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
+int oa_attack_power(const char *name);
+int oa_our_defense(uint64_t player);
+void oa_strike(Cpu *c, uint64_t player, const OnlineEnemy *e);
+void oa_puppets_forget(void);
+void oa_enemies_client(Cpu *c, uint64_t player, int me);
+void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, const float centre[3], int me, bool suppress);
+void oa_boss_sample(Cpu *c, uint64_t player, OnlinePose *pose);
+void oa_boss_update(Cpu *c, const OnlinePlayer *pl, int me);
 
 // runtime/oa_loot.c
-bool players_own_item(const char *n);
-extern uint64_t g_carried_now[LINK_CARRIED];
-void drop_hush(const float p[3]);
-void loot_forget(void);
-void loot_mine_add(uint64_t a, const char *n, int me);
-void loot_mine_thrown(uint64_t a, const char *n);
-void link_carried(uint64_t player, uint64_t out[LINK_CARRIED]);
-bool carries(const uint64_t carried[LINK_CARRIED], uint64_t a);
-void loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host);
-void ground_update(Cpu *c, uint64_t player, const float link[3]);
+bool oa_players_own_item(const char *n);
+extern uint64_t oa_g_carried_now[LINK_CARRIED];
+void oa_drop_hush(const float p[3]);
+void oa_loot_forget(void);
+void oa_loot_mine_add(uint64_t a, const char *n, int me);
+void oa_loot_mine_thrown(uint64_t a, const char *n);
+void oa_link_carried(uint64_t player, uint64_t out[LINK_CARRIED]);
+bool oa_carries(const uint64_t carried[LINK_CARRIED], uint64_t a);
+void oa_loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host);
+void oa_ground_update(Cpu *c, uint64_t player, const float link[3]);
 
 // runtime/oa_world.c
-void objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
-void movers_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
-void movers_forget(void);
-void breaks_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
+void oa_objs_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
+void oa_movers_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
+void oa_movers_forget(void);
+void oa_breaks_update(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me);
 
 // runtime/oa_flags.c
-uint8_t weather_now(void);
-float *bloody_moon_timer(void);
-void bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me);
-void weather_follow(const OnlinePlayer *pl, int me, const float at[3]);
-bool slate_event(Cpu *c, uint64_t player);
-extern volatile int g_fake_blood_moon;
-void quests_update(Cpu *c, uint64_t player, bool host);
+uint8_t oa_weather_now(void);
+float *oa_bloody_moon_timer(void);
+void oa_bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me);
+void oa_weather_follow(const OnlinePlayer *pl, int me, const float at[3]);
+bool oa_slate_event(Cpu *c, uint64_t player);
+extern volatile int oa_g_fake_blood_moon;
+void oa_quests_update(Cpu *c, uint64_t player, bool host);
 
 // runtime/oa_rules.c
-extern volatile int g_nopause_now;
-extern volatile int g_nopause_frames;
-void own_strikes_in_menu(Cpu *c, uint64_t player);
-extern volatile int g_nopause_rule;
-void players_collide(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
-void pvp_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
+extern volatile int oa_g_nopause_now;
+extern volatile int oa_g_nopause_frames;
+void oa_own_strikes_in_menu(Cpu *c, uint64_t player);
+extern volatile int oa_g_nopause_rule;
+void oa_players_collide(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
+void oa_pvp_update(Cpu *c, uint64_t player, const OnlinePlayer *pl, int me);
 extern volatile int g_online_block_a;
 extern volatile uint64_t g_game_buttons;
 
 // runtime/oa_control.c
-void flag_query(Cpu *c);
-void event_query(Cpu *c, uint64_t pinfo);
-void find_actors(uint64_t pinfo);
+void oa_flag_query(Cpu *c);
+void oa_event_query(Cpu *c, uint64_t pinfo);
+void oa_find_actors(uint64_t pinfo);

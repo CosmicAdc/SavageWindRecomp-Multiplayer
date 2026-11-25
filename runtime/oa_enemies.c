@@ -11,8 +11,8 @@
 static const char *enemy_actor(const char *name) {
     static MapLine *m;
     static int n = -1;
-    if (n < 0) n = map_load("enemies.txt", &m), LOG("[online] %d enemies for the other players\n", n);
-    return map_find(m, n, name);
+    if (n < 0) n = oa_map_load("enemies.txt", &m), LOG("[online] %d enemies for the other players\n", n);
+    return oa_map_find(m, n, name);
 }
 
 // the bosses: each game keeps its own (their fights are the game's events and phases); their life is everyone's
@@ -22,12 +22,12 @@ static bool is_boss(const char *n) {
 }
 
 static bool is_enemy(uint64_t a, char name[48]) {
-    actor_name_of(a, name);
+    oa_actor_name_of(a, name);
     return !strncmp(name, "Enemy_", 6) && !is_boss(name) && enemy_actor(name);
 }
 
-Refused g_refused_enemy, g_refused_weapon, g_refused_loot;
-void name_refused(Refused *r, const char *what, const char *name) {
+Refused oa_g_refused_enemy, oa_g_refused_weapon, oa_g_refused_loot;
+void oa_name_refused(Refused *r, const char *what, const char *name) {
     r->n++;
     uint64_t now = plat_now_ns();
     if (r->last && now - r->last < 1000000000ull) return;
@@ -46,16 +46,16 @@ static uint64_t enemy_weapon(uint64_t a) {
     static int off = -1, miss;
     char n[48];
     if (off >= 0) {
-        uint64_t w = linked(a + off);
-        actor_name_of(w, n);
+        uint64_t w = oa_linked(a + off);
+        oa_actor_name_of(w, n);
         return !strncmp(n, "Weapon_", 7) ? w : 0;
     }
     if (miss++ % 30) return 0;
     for (int o = 0x100; o < 0x4000; o += 8) {
         uint64_t u = *(uint64_t *)(uintptr_t)(a + o);
         if (!VALID(u) || (u & 7)) continue;
-        uint64_t w = linked(a + o);
-        actor_name_of(w, n);
+        uint64_t w = oa_linked(a + o);
+        oa_actor_name_of(w, n);
         if (strncmp(n, "Weapon_", 7)) continue;
         off = o;
         LOG("[online] an enemy's weapon: enemy +0x%x\n", o);
@@ -81,7 +81,7 @@ static uint64_t enemy_weapon(uint64_t a) {
 static const char *const k_hands[2] = {"Weapon_R", "Weapon_L"};
 static void enemy_held(Cpu *c, uint64_t a, uint64_t g, char name[40], float m[12], uint8_t *bone) {
     char n[48];
-    actor_name_of(g, n);
+    oa_actor_name_of(g, n);
     name[0] = 0, *bone = 0;
     if (strncmp(n, "Weapon_", 7)) return;
     const float *w = (const float *)(uintptr_t)(g + 0x398), *am = (const float *)(uintptr_t)(a + 0x398);
@@ -91,9 +91,9 @@ static void enemy_held(Cpu *c, uint64_t a, uint64_t g, char name[40], float m[12
     memcpy(m, w, 48);
     for (int h = 0; h < 2; h++) {
         float bm[12], inv[12], rel[12];
-        if (!bone_mtx(c, a, k_hands[h], bm)) continue;
-        mtx_inv(bm, inv);
-        mtx_mul(inv, w, rel);
+        if (!oa_bone_mtx(c, a, k_hands[h], bm)) continue;
+        oa_mtx_inv(bm, inv);
+        oa_mtx_mul(inv, w, rel);
         if (rel[3] * rel[3] + rel[7] * rel[7] + rel[11] * rel[11] > 0.6f * 0.6f) continue;
         memcpy(m, rel, 48), *bone = (uint8_t)(h + 1);
         return;
@@ -102,49 +102,49 @@ static void enemy_held(Cpu *c, uint64_t a, uint64_t g, char name[40], float m[12
 
 // an enemy as it is here, for the others
 static void own_guarded_life(uint64_t a, int32_t *life);
-void enemy_state(Cpu *c, uint64_t a, OnlineEnemy *e) {
-    actor_name_of(a, e->name);
+void oa_enemy_state(Cpu *c, uint64_t a, OnlineEnemy *e) {
+    oa_actor_name_of(a, e->name);
     memcpy(e->m, (const float *)(uintptr_t)(a + 0x398), sizeof e->m);
-    snprintf(e->as, sizeof e->as, "%s", playing(c, a, 0, 0));
+    snprintf(e->as, sizeof e->as, "%s", oa_playing(c, a, 0, 0));
     e->life = *(int32_t *)(uintptr_t)(a + ENEMY_LIFE);
     own_guarded_life(a, &e->life);  // (one guarded: its real life, not the guard's)
     uint32_t h = *(uint32_t *)(uintptr_t)(a + ACTOR_HASH_ID);  // (one made by us has none: the one it was keeps its)
     if (h) e->hash = h;
-    enemy_held(c, a, linked(a + 0xb98), e->weapon, e->wm, &e->wbone);
-    enemy_held(c, a, linked(a + 0xbb0), e->shield, e->sm, &e->sbone);
+    enemy_held(c, a, oa_linked(a + 0xb98), e->weapon, e->wm, &e->wbone);
+    enemy_held(c, a, oa_linked(a + 0xbb0), e->shield, e->sm, &e->sbone);
 }
 
 #define GUARD_LIFE 1000  // (own_guard)
-Own g_own[OWNS];
+Own oa_g_own[OWNS];
 static struct { uint64_t actor; Watch w; } g_own_left[OWNS];
 
 static Own *own_find(uint32_t gid) {
     for (int k = 0; k < OWNS; k++)
-        if (g_own[k].state && g_own[k].gid == gid) return &g_own[k];
+        if (oa_g_own[k].state && oa_g_own[k].gid == gid) return &oa_g_own[k];
     return NULL;
 }
 
 static void enemy_delete(Cpu *c, uint64_t a);
 
-void owns_left(Cpu *c) {
+void oa_owns_left(Cpu *c) {
     for (int k = 0; k < OWNS; k++) {
-        if (g_own_left[k].actor && alive(g_own_left[k].actor, g_own_left[k].w)) enemy_delete(c, g_own_left[k].actor);
+        if (g_own_left[k].actor && oa_alive(g_own_left[k].actor, g_own_left[k].w)) enemy_delete(c, g_own_left[k].actor);
         g_own_left[k].actor = 0;
     }
 }
 
 static bool own_is(uint64_t a) {
     for (int k = 0; k < OWNS; k++)
-        if (g_own[k].state == OWN_HAVE && g_own[k].actor == a) return true;
+        if (oa_g_own[k].state == OWN_HAVE && oa_g_own[k].actor == a) return true;
     return false;
 }
 
 static Own *own_add(uint32_t gid) {
     for (int k = 0; k < OWNS; k++)
-        if (!g_own[k].state) {
-            memset(&g_own[k], 0, sizeof g_own[k]);
-            g_own[k].gid = gid, g_own[k].state = OWN_MAKING;
-            return &g_own[k];
+        if (!oa_g_own[k].state) {
+            memset(&oa_g_own[k], 0, sizeof oa_g_own[k]);
+            oa_g_own[k].gid = gid, oa_g_own[k].state = OWN_MAKING;
+            return &oa_g_own[k];
         }
     return NULL;
 }
@@ -152,19 +152,19 @@ static Own *own_add(uint32_t gid) {
 // an enemy deleted with what it holds (else its weapon stays on the ground: one more each time it changes hands)
 static void enemy_delete(Cpu *c, uint64_t a) {
     uint64_t w = enemy_weapon(a);
-    if (w) call(c, FN_DELETE, w, 0, 0, 0, 0, 0);
+    if (w) oa_call(c, FN_DELETE, w, 0, 0, 0, 0, 0);
     for (int k = 1; k < 3; k++) {  // (its shield and bow: linked as the player links his, after the weapon)
         char n[48];
-        uint64_t g2 = linked(a + 0xb98 + 0x18 * k);
-        actor_name_of(g2, n);
-        if (!strncmp(n, "Weapon_", 7)) call(c, FN_DELETE, g2, 0, 0, 0, 0, 0);
+        uint64_t g2 = oa_linked(a + 0xb98 + 0x18 * k);
+        oa_actor_name_of(g2, n);
+        if (!strncmp(n, "Weapon_", 7)) oa_call(c, FN_DELETE, g2, 0, 0, 0, 0, 0);
     }
-    call(c, FN_DELETE, a, 0, 0, 0, 0, 0);
+    oa_call(c, FN_DELETE, a, 0, 0, 0, 0, 0);
 }
 
 static void own_drop(Cpu *c, Own *o) {
-    if (o->state == OWN_HAVE && alive(o->actor, o->w)) enemy_delete(c, o->actor);
-    delete_piece(c, &o->made);
+    if (o->state == OWN_HAVE && oa_alive(o->actor, o->w)) enemy_delete(c, o->actor);
+    oa_delete_piece(c, &o->made);
     memset(o, 0, sizeof *o);
 }
 
@@ -175,23 +175,23 @@ static void own_drop(Cpu *c, Own *o) {
 // when it is more than twice that; at 0 it dies as any
 static void own_guarded_life(uint64_t a, int32_t *life) {
     for (int k = 0; k < OWNS; k++)
-        if (g_own[k].guard_until && g_own[k].actor == a) *life = g_own[k].real_life;
+        if (oa_g_own[k].guard_until && oa_g_own[k].actor == a) *life = oa_g_own[k].real_life;
 }
-void own_guard(uint64_t player) {
+void oa_own_guard(uint64_t player) {
     uint64_t now = plat_now_ns();
     for (int k = 0; k < OWNS; k++) {
-        Own *o = &g_own[k];
-        if (!o->guard_until || o->state != OWN_HAVE || !alive(o->actor, o->w)) { o->guard_until = 0; continue; }
+        Own *o = &oa_g_own[k];
+        if (!o->guard_until || o->state != OWN_HAVE || !oa_alive(o->actor, o->w)) { o->guard_until = 0; continue; }
         int32_t *life = (int32_t *)(uintptr_t)(o->actor + ENEMY_LIFE);
         int32_t dmg = o->real_life + GUARD_LIFE - *life;
         // (its first half second: the game sets its life up as it starts; ours is put back, nothing taken)
         if (o->guard_until - now > 7500000000ull) dmg = 0;
         if (dmg > 0) {
             uint64_t ar[ARMOR], gr[ONLINE_GEAR];
-            equipment(player, ar, gr);
+            oa_equipment(player, ar, gr);
             char wn[48] = "";
-            if (gr[0]) actor_name_of(gr[0], wn);
-            int pw = wn[0] ? attack_power(wn) : 0;
+            if (gr[0]) oa_actor_name_of(gr[0], wn);
+            int pw = wn[0] ? oa_attack_power(wn) : 0;
             if (pw > 0 && dmg > pw * 2) {
                 LOG("[online] a blow of %d on our %u, just ours: %d, as without a sneak strike\n", dmg, o->gid, pw);
                 dmg = pw;
@@ -209,29 +209,29 @@ static bool own_ready(Cpu *c, Own *o, const OnlineEnemy *e) {
     if (o->state == OWN_HAVE) return true;
     if (o->state == OWN_GONE) return false;
     if (!enemy_name_ok(e->name)) {  // (not asked for, here nor by piece_update: a name not an enemy's makes nothing)
-        name_refused(&g_refused_enemy, "enemy", e->name);
+        oa_name_refused(&oa_g_refused_enemy, "enemy", e->name);
         return false;
     }
     if (!o->made.pending && !o->made.actor && !o->made.name[0]) {  // (asked for with the weapon it holds)
         memset(&o->params, 0, sizeof o->params);
         // (what it holds only if weapons.txt has it: a shield is on it too)
-        if (e->weapon[0] && !weapon_name_listed(e->weapon, sizeof e->weapon))
-            name_refused(&g_refused_weapon, "enemy weapon", e->weapon);
-        else if (e->weapon[0]) inst_params_string(&o->params, "EquipItem1", e->weapon);
-        if (e->shield[0] && !weapon_name_listed(e->shield, sizeof e->shield))
-            name_refused(&g_refused_weapon, "enemy shield", e->shield);
-        else if (e->shield[0]) inst_params_string(&o->params, "EquipItem2", e->shield);
-        o->made.handle = new_handle();
-        if (request_p(c, e->name, o->made.handle, o->params.n ? (uint64_t)(uintptr_t)&o->params : 0)) {
+        if (e->weapon[0] && !oa_weapon_name_listed(e->weapon, sizeof e->weapon))
+            oa_name_refused(&oa_g_refused_weapon, "enemy weapon", e->weapon);
+        else if (e->weapon[0]) oa_inst_params_string(&o->params, "EquipItem1", e->weapon);
+        if (e->shield[0] && !oa_weapon_name_listed(e->shield, sizeof e->shield))
+            oa_name_refused(&oa_g_refused_weapon, "enemy shield", e->shield);
+        else if (e->shield[0]) oa_inst_params_string(&o->params, "EquipItem2", e->shield);
+        o->made.handle = oa_new_handle();
+        if (oa_request_p(c, e->name, o->made.handle, o->params.n ? (uint64_t)(uintptr_t)&o->params : 0)) {
             o->made.pending = true;
             snprintf(o->made.name, sizeof o->made.name, "%s", e->name);
         }
     }
-    piece_update(c, 0, &o->made, e->name, "own");
+    oa_piece_update(c, 0, &o->made, e->name, "own");
     if (!o->made.actor) return false;
     o->actor = o->made.actor, o->w = o->made.w, o->state = OWN_HAVE, o->remade = true;
     memset(&o->made, 0, sizeof o->made);
-    call(c, FN_SET_MTX, o->actor, (uint64_t)(uintptr_t)e->m, 0, 0, 0, 0);
+    oa_call(c, FN_SET_MTX, o->actor, (uint64_t)(uintptr_t)e->m, 0, 0, 0, 0);
     if (e->life > 0) *(int32_t *)(uintptr_t)(o->actor + ENEMY_LIFE) = e->life;
     // (it was another's, fighting there: made here it is unaware, and our first blow would be a sneak strike, eight
     // times; guarded a while: own_guard)
@@ -270,18 +270,18 @@ static void elem_update(Cpu *c) {
     for (int k = 0; k < ELEM_SOURCES; k++) {
         if (!g_esrc[k].gid) continue;
         Own *o = own_find(g_esrc[k].gid);
-        bool there = o && o->state == OWN_HAVE && alive(o->actor, o->w);
+        bool there = o && o->state == OWN_HAVE && oa_alive(o->actor, o->w);
         if (!there || now > g_esrc[k].until) {
-            delete_piece(c, &g_esrc[k].p);
+            oa_delete_piece(c, &g_esrc[k].p);
             memset(&g_esrc[k], 0, sizeof g_esrc[k]);
             continue;
         }
         if (!g_esrc[k].made) {
-            piece_update(c, 0, &g_esrc[k].p, k_elem_source[g_esrc[k].elem], "element");
+            oa_piece_update(c, 0, &g_esrc[k].p, k_elem_source[g_esrc[k].elem], "element");
             if (!g_esrc[k].p.actor) continue;
             const float *m = (const float *)(uintptr_t)(o->actor + 0x398);
             float sm[12] = {1, 0, 0, m[3], 0, 1, 0, m[7] + 1.0f, 0, 0, 1, m[11]};
-            call(c, FN_SET_MTX, g_esrc[k].p.actor, (uint64_t)(uintptr_t)sm, 0, 0, 0, 0);
+            oa_call(c, FN_SET_MTX, g_esrc[k].p.actor, (uint64_t)(uintptr_t)sm, 0, 0, 0, 0);
             g_esrc[k].made = now;
             LOG("[online] %s on our %u\n", k_elem_source[g_esrc[k].elem], g_esrc[k].gid);
             continue;
@@ -299,7 +299,7 @@ static void own_hits(Cpu *c) {
     int nh = online_take_hits(hid, hd, he, 64);
     for (int h = 0; h < nh; h++) {
         Own *o = own_find(hid[h]);
-        if (!o || o->state != OWN_HAVE || !alive(o->actor, o->w)) continue;
+        if (!o || o->state != OWN_HAVE || !oa_alive(o->actor, o->w)) continue;
         int32_t *life = (int32_t *)(uintptr_t)(o->actor + ENEMY_LIFE);
         LOG("[online] a hit on our %u: %d of its %d%s\n", hid[h], hd[h], *life,
             he[h] == ONLINE_ELEM_FIRE ? " (fire)" : he[h] == ONLINE_ELEM_ICE ? " (ice)"
@@ -315,35 +315,35 @@ static void own_hits(Cpu *c) {
 // (nearer: ticks another has been much nearer; aggro: ticks before a blow may hand it to its striker again)
 // (striker: the slot it turned on, struck by him: his while he is within 45 m of it, whoever is nearer; -1 none)
 static struct { OnlineEnemy e; int hold, nearer, aggro, striker; bool used; } g_reg[REG];
-OnlineEnemy g_reg_out[ONLINE_ENEMIES];  // (the list sent last: the others' are shown here from it each frame)
-int g_reg_n;
+OnlineEnemy oa_g_reg_out[ONLINE_ENEMIES];  // (the list sent last: the others' are shown here from it each frame)
+int oa_g_reg_n;
 
 // (a load: the game removed them all; when it didn't (a long jump that was no load), those still there are deleted
 // on the next frame, not left in the world for no one)
-void owns_forget(void) {
+void oa_owns_forget(void) {
     for (int k = 0; k < OWNS; k++) {
-        orphan(&g_own[k].made);
-        if (g_own[k].state == OWN_HAVE) g_own_left[k].actor = g_own[k].actor, g_own_left[k].w = g_own[k].w;
+        oa_orphan(&oa_g_own[k].made);
+        if (oa_g_own[k].state == OWN_HAVE) g_own_left[k].actor = oa_g_own[k].actor, g_own_left[k].w = oa_g_own[k].w;
     }
-    memset(g_own, 0, sizeof g_own);
+    memset(oa_g_own, 0, sizeof oa_g_own);
     memset(g_reg, 0, sizeof g_reg);
-    g_reg_n = 0;
+    oa_g_reg_n = 0;
 }
 
 // An enemy that died in another game: its dead flag here (<map>_<actor>_<HashId>, the flag the game sets when one of
 // its map's enemies dies: the game doesn't make it again until a Blood Moon, and what waits for its group to be
 // beaten, a camp's chest, sees it beaten)
-uint32_t crc32_str(const char *s);
+uint32_t oa_crc32_str(const char *s);
 static void mark_dead(Cpu *c, const char *name, uint32_t hash) {
     if (!hash || !name[0]) return;
     static const char *const maps[] = {"MainField", "AocField", "MainFieldDungeon", "CDungeon"};
     for (int k = 0; k < 4; k++) {
         char f[128];
         snprintf(f, sizeof f, "%s_%s_%u", maps[k], name, hash);
-        uint32_t h = crc32_str(f);
-        uint32_t *v = bool_flag(h);
+        uint32_t h = oa_crc32_str(f);
+        uint32_t *v = oa_bool_flag(h);
         if (!v) continue;
-        if (!(*v & 1) && !set_bool_flag(c, h)) *v |= 1;
+        if (!(*v & 1) && !oa_set_bool_flag(c, h)) *v |= 1;
         LOG("[online] %s: dead here too\n", f);
         return;
     }
@@ -360,10 +360,10 @@ static float dist3(const float m[12], const float q[3]) {
 // (dead, his game stops at its game over, and what it has stops with it; trying again, his world goes)
 static bool can_own(const OnlinePlayer *p, int i, int me) {
     return p->used && i != me && !(p->flags & ONLINE_F_LOADING) && p->pose.valid && strncmp(p->pose.as[0], "Dead", 4) &&
-           same_map(p);
+           oa_same_map(p);
 }
 
-void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
+void oa_enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlayer *pl, int me) {
     own_hits(c);
     // the owners' states of theirs
     static OnlineEnemy st[64];
@@ -404,8 +404,8 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
         if (kt && !t0) t0 = plat_now_ns();  // (seconds from the first time here: it was counted in calls, whose rate varies)
         if (kt && !done && plat_now_ns() - t0 >= (uint64_t)(atof(kt) * 1e9) && (done = true))
             for (int k = 0; k < OWNS; k++)
-                if (g_own[k].state == OWN_HAVE && alive(g_own[k].actor, g_own[k].w))
-                    *(int32_t *)(uintptr_t)(g_own[k].actor + ENEMY_LIFE) = 0, LOG("[online] kill test: %u\n", g_own[k].gid);
+                if (oa_g_own[k].state == OWN_HAVE && oa_alive(oa_g_own[k].actor, oa_g_own[k].w))
+                    *(int32_t *)(uintptr_t)(oa_g_own[k].actor + ENEMY_LIFE) = 0, LOG("[online] kill test: %u\n", oa_g_own[k].gid);
     }
     {   // (test: SAVAGEWIND_ONLINE_ELEMENT_TEST=<actor>[|<actor>...],<s>: that many seconds in, each actor (an element's
         // source: a rod's bullet, a field, an arrow) made at another enemy we have for real, 8 s apart, its life and AS
@@ -428,39 +428,39 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
                 while (*e && *e != '|' && *e != ',') e++;
                 snprintf(name, sizeof name, "%.*s", (int)(e - s), s);
                 for (int k = 0; k < OWNS && who < 0; k++)
-                    if (g_own[k].state == OWN_HAVE && !used[k] && alive(g_own[k].actor, g_own[k].w)) who = k, used[k] = 1;
+                    if (oa_g_own[k].state == OWN_HAVE && !used[k] && oa_alive(oa_g_own[k].actor, oa_g_own[k].w)) who = k, used[k] = 1;
             }
         }
         if (until && plat_now_ns() >= until) {  // (this one done: the next in 8 s)
-            delete_piece(c, &src);
+            oa_delete_piece(c, &src);
             who = -1, until = 0, turn++, next = plat_now_ns() + 2000000000ull;
         }
         if (who >= 0 && !until) {
-            piece_update(c, 0, &src, name, "element test");
-            if (src.actor && alive(g_own[who].actor, g_own[who].w)) {
-                const float *m = (const float *)(uintptr_t)(g_own[who].actor + 0x398);
+            oa_piece_update(c, 0, &src, name, "element test");
+            if (src.actor && oa_alive(oa_g_own[who].actor, oa_g_own[who].w)) {
+                const float *m = (const float *)(uintptr_t)(oa_g_own[who].actor + 0x398);
                 float sm[12] = {1, 0, 0, m[3], 0, 1, 0, m[7] + 1.0f, 0, 0, 1, m[11]};
-                call(c, FN_SET_MTX, src.actor, (uint64_t)(uintptr_t)sm, 0, 0, 0, 0);
+                oa_call(c, FN_SET_MTX, src.actor, (uint64_t)(uintptr_t)sm, 0, 0, 0, 0);
                 until = plat_now_ns() + 6000000000ull;
-                last_life = *(int32_t *)(uintptr_t)(g_own[who].actor + ENEMY_LIFE);
-                LOG("[online] element test: %s at our %u (life %d)\n", name, g_own[who].gid, last_life);
+                last_life = *(int32_t *)(uintptr_t)(oa_g_own[who].actor + ENEMY_LIFE);
+                LOG("[online] element test: %s at our %u (life %d)\n", name, oa_g_own[who].gid, last_life);
             }
         }
-        if (until && plat_now_ns() < until && alive(g_own[who].actor, g_own[who].w)) {
-            int life = *(int32_t *)(uintptr_t)(g_own[who].actor + ENEMY_LIFE);
-            const char *as = playing(c, g_own[who].actor, 0, 0);
+        if (until && plat_now_ns() < until && oa_alive(oa_g_own[who].actor, oa_g_own[who].w)) {
+            int life = *(int32_t *)(uintptr_t)(oa_g_own[who].actor + ENEMY_LIFE);
+            const char *as = oa_playing(c, oa_g_own[who].actor, 0, 0);
             if (life != last_life || strcmp(as, last_as))
-                LOG("[online] element test: %u life %d, AS %s\n", g_own[who].gid, life, as);
+                LOG("[online] element test: %u life %d, AS %s\n", oa_g_own[who].gid, life, as);
             last_life = life, snprintf(last_as, sizeof last_as, "%s", as);
         }
     }
     // ours: their state; gone (died, or the game removed them): gone for everyone
     for (int k = 0; k < OWNS; k++) {
-        Own *o = &g_own[k];
+        Own *o = &oa_g_own[k];
         if (o->state != OWN_HAVE) continue;
         int r = 0;
         while (r < REG && !(g_reg[r].used && g_reg[r].e.id == o->gid)) r++;
-        if (!alive(o->actor, o->w)) {
+        if (!oa_alive(o->actor, o->w)) {
             // (one made here, gone alive: the game removed it, far from the camera; the map's own was deleted when it
             // went to another, so it is kept, no one's, not dropped. The map's own, removed or dead: off the list)
             if (r < REG && o->remade && g_reg[r].e.life > 0) {
@@ -470,22 +470,22 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
             memset(o, 0, sizeof *o);
             continue;
         }
-        if (r < REG) enemy_state(c, o->actor, &g_reg[r].e), g_reg[r].e.owner = (uint8_t)me;
+        if (r < REG) oa_enemy_state(c, o->actor, &g_reg[r].e), g_reg[r].e.owner = (uint8_t)me;
         // (died here: its dead flag, by the map's HashId the list keeps; one made again, after it was another's, has
         // none of its own, and without it the camp it belongs to wasn't cleared in this game, its chest shut)
         if (r < REG && g_reg[r].e.life <= 0 && !o->marked) mark_dead(c, g_reg[r].e.name, g_reg[r].e.hash), o->marked = true;
     }
     // ours in the world, newly near a player: everyone's from now on (ours to start with)
-    int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+    int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
     for (int k = 0; k < na; k++) {
         char name[48];
-        uint64_t a = g_actors[k];
-        if (!running(a) || !is_enemy(a, name) || own_is(a)) continue;
+        uint64_t a = oa_g_actors[k];
+        if (!oa_running(a) || !is_enemy(a, name) || own_is(a)) continue;
         const float *m = (const float *)(uintptr_t)(a + 0x398);
         bool near = false;
         for (int i = -1; i < ONLINE_MAX && !near; i++) {
             const float *q = i < 0 ? link : pl[i].pos;
-            if (i >= 0 && (!pl[i].used || i == me || (pl[i].flags & ONLINE_F_LOADING) || !same_map(&pl[i]))) continue;
+            if (i >= 0 && (!pl[i].used || i == me || (pl[i].flags & ONLINE_F_LOADING) || !oa_same_map(&pl[i]))) continue;
             float dx = m[3] - q[0], dz = m[11] - q[2];
             near = dx * dx + dz * dz < ENEMY_NEAR * ENEMY_NEAR;
         }
@@ -497,11 +497,11 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
         if (r < REG || free_r < 0) continue;
         Own *o = own_add(id);
         if (!o) continue;
-        o->state = OWN_HAVE, o->actor = a, o->w = watch(a);
+        o->state = OWN_HAVE, o->actor = a, o->w = oa_watch(a);
         memset(&g_reg[free_r], 0, sizeof g_reg[free_r]);
         g_reg[free_r].used = true, g_reg[free_r].striker = 0, g_reg[free_r].aggro = 0;
         g_reg[free_r].e.id = id;
-        enemy_state(c, a, &g_reg[free_r].e);
+        oa_enemy_state(c, a, &g_reg[free_r].e);
         g_reg[free_r].e.owner = (uint8_t)me;
     }
     // (each player's can-own changes, with why: a flicker here hands his enemies back and forth)
@@ -511,7 +511,7 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
         int8_t now = (int8_t)(can_own(&pl[i], i, me) ? 1 : 0);
         if (now != could[i] && pl[i].used)
             LOG("[online] slot %d %s enemies (loading %d, pose %d, as %.12s, same map %d)\n", i, now ? "can own" : "can't own",
-                !!(pl[i].flags & ONLINE_F_LOADING), pl[i].pose.valid, pl[i].pose.as[0], same_map(&pl[i]));
+                !!(pl[i].flags & ONLINE_F_LOADING), pl[i].pose.valid, pl[i].pose.as[0], oa_same_map(&pl[i]));
         could[i] = now;
     }
     // (blows: a player who hits one another's game has gets it, so it turns on him, as an enemy turns on whoever
@@ -520,8 +520,8 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
     static bool aggro_init[ONLINE_MAX];
     uint32_t aggro_of[ONLINE_MAX] = {0};
     for (int i = 0; i < ONLINE_MAX; i++) {
-        uint16_t s = i == me ? g_aggro_seq : pl[i].used && pl[i].pose.valid ? pl[i].pose.aggro_seq : 0;
-        uint32_t id = i == me ? g_aggro_id : pl[i].pose.aggro_id;
+        uint16_t s = i == me ? oa_g_aggro_seq : pl[i].used && pl[i].pose.valid ? pl[i].pose.aggro_seq : 0;
+        uint32_t id = i == me ? oa_g_aggro_id : pl[i].pose.aggro_id;
         if (!aggro_init[i]) aggro_seen[i] = s, aggro_init[i] = true;
         if (s != aggro_seen[i]) {
             aggro_of[i] = id, aggro_seen[i] = s;
@@ -542,7 +542,7 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
                     g_reg[r].aggro, i == me || can_own(&pl[i], i, me), dist3(e->m, i == me ? link : pl[i].pos));
             if (e->owner == OWNER_NONE || g_reg[r].aggro || i == e->owner) continue;
             if (i != me && !can_own(&pl[i], i, me)) continue;
-            if (i == me && g_local_dead) continue;
+            if (i == me && oa_g_local_dead) continue;
             if (dist3(e->m, i == me ? link : pl[i].pos) > OWN_SAFE) continue;  // (an arrow from afar too)
             striker = i;
         }
@@ -565,13 +565,13 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
             const float *q = i < 0 ? link : pl[i].pos;
             if (i >= 0 && !can_own(&pl[i], i, me)) continue;
             float dx = e->m[3] - q[0], dz = e->m[11] - q[2], d = sqrtf(dx * dx + dz * dz);
-            if (i < 0 && g_local_dead) d += 1e6f;  // (we're dead: the others' first)
+            if (i < 0 && oa_g_local_dead) d += 1e6f;  // (we're dead: the others' first)
             if (d < best) best = d, nearest = slot, best3 = dist3(e->m, q);
             if (slot == e->owner) cur = d;
         }
-        if (e->owner == me && g_local_dead && best < 1e6f) cur = 1e30f;  // (we died: another has it now)
+        if (e->owner == me && oa_g_local_dead && best < 1e6f) cur = 1e30f;  // (we died: another has it now)
         if (e->owner == OWNER_NONE) {  // (no one's: the nearest one's once he is near enough; no one near: off the list)
-            if (best3 <= OWN_SAFE && !(nearest == me && g_local_dead)) {
+            if (best3 <= OWN_SAFE && !(nearest == me && oa_g_local_dead)) {
                 LOG("[online] %s %u: slot %d's now (was no one's)\n", e->name, e->id, nearest);
                 if (nearest == me) own_add(e->id);
                 e->owner = (uint8_t)nearest;
@@ -627,9 +627,9 @@ void enemies_host(Cpu *c, uint64_t player, const float link[3], const OnlinePlay
     // everyone's
     int n = 0;
     for (int r = 0; r < REG && n < ONLINE_ENEMIES; r++)
-        if (g_reg[r].used) g_reg_out[n++] = g_reg[r].e;
-    g_reg_n = n;
-    online_set_local_enemies(link, g_reg_out, n);
+        if (g_reg[r].used) oa_g_reg_out[n++] = g_reg[r].e;
+    oa_g_reg_n = n;
+    online_set_local_enemies(link, oa_g_reg_out, n);
 }
 
 // the others: his enemies' actors here
@@ -650,8 +650,8 @@ static struct {
 static float weapon_scale(const char *enemy, const char *weapon) {
     static MapLine *m;
     static int n = -1;
-    if (n < 0) n = map_load("wscale.txt", &m);
-    const char *v = map_find(m, n, enemy);
+    if (n < 0) n = oa_map_load("wscale.txt", &m);
+    const char *v = oa_map_find(m, n, enemy);
     float s[5] = {1, 1, 1, 1, 1};
     if (!v || sscanf(v, "%f,%f,%f,%f,%f", &s[0], &s[1], &s[2], &s[3], &s[4]) != 5) return 1;
     return strstr(weapon, "_Lsword_") ? s[1] : strstr(weapon, "_Spear_") ? s[2] : strstr(weapon, "_Bow_") ? s[3]
@@ -659,34 +659,34 @@ static float weapon_scale(const char *enemy, const char *weapon) {
 }
 
 // an enemy's or a weapon's attack power (online_mod/power.txt), 0 unknown
-int attack_power(const char *name) {
+int oa_attack_power(const char *name) {
     static MapLine *m;
     static int n = -1;
-    if (n < 0) n = map_load("power.txt", &m);
-    const char *v = map_find(m, n, name);
+    if (n < 0) n = oa_map_load("power.txt", &m);
+    const char *v = oa_map_find(m, n, name);
     return v ? atoi(v) : 0;
 }
 
 // the local Link's defence: his armour's (online_mod/defense.txt: each piece's armorDefenceAddLevel, the defence the game
 // shows for it), the pieces he wears
-int our_defense(uint64_t player) {
+int oa_our_defense(uint64_t player) {
     static MapLine *m;
     static int n = -1;
-    if (n < 0) n = map_load("defense.txt", &m);
+    if (n < 0) n = oa_map_load("defense.txt", &m);
     uint64_t armor[ARMOR], gear[ONLINE_GEAR];
-    equipment(player, armor, gear);
+    oa_equipment(player, armor, gear);
     int d = 0;
     for (int k = 0; k < ARMOR; k++) {
         char an[48];
         if (!armor[k]) continue;
-        actor_name_of(armor[k], an);
-        const char *v = an[0] ? map_find(m, n, an) : NULL;
+        oa_actor_name_of(armor[k], an);
+        const char *v = an[0] ? oa_map_find(m, n, an) : NULL;
         if (v) d += atoi(v);
     }
     return d;
 }
 
-void strike(Cpu *c, uint64_t player, const OnlineEnemy *e) {
+void oa_strike(Cpu *c, uint64_t player, const OnlineEnemy *e) {
     int32_t *life = (int32_t *)(uintptr_t)(player + ENEMY_LIFE);
     if (*life <= 0) return;
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
@@ -697,15 +697,15 @@ void strike(Cpu *c, uint64_t player, const OnlineEnemy *e) {
     float reach = (big ? 3.5f : 2.2f) + (strstr(e->weapon, "Spear") || strstr(e->weapon, "Lsword") ? 1.5f : e->weapon[0] ? 0.8f : 0);
     if (d > reach || dy > 2.5f || dy < -2.5f) return;
     if (d > 0.8f && fl > 0 && (dx * fx + dz * fz) / (d * fl) < 0.3f) return;  // (behind it, or to its side)
-    const char *up = playing(c, player, 1, 0), *body = playing(c, player, 0, 0);
+    const char *up = oa_playing(c, player, 1, 0), *body = oa_playing(c, player, 0, 0);
     if (strstr(up, "Guard") || strstr(body, "Guard")) {
         LOG("[online] the host's %s: blocked\n", e->name);
         return;
     }
-    int power = e->weapon[0] ? attack_power(e->weapon) : 0;
-    if (!power) power = attack_power(e->name);
+    int power = e->weapon[0] ? oa_attack_power(e->weapon) : 0;
+    if (!power) power = oa_attack_power(e->name);
     if (power <= 0) return;
-    int def = our_defense(player);
+    int def = oa_our_defense(player);
     power = power > def ? power - def : 1;  // (his armour's defence off it, a quarter heart at least: the game's own way)
     *life = *life > power ? *life - power : 0;
     // a heavy blow (a kick, a big or jumping attack, any of a big one's) shakes him: OnlineShock (an enemy's shock wave,
@@ -714,18 +714,18 @@ void strike(Cpu *c, uint64_t player, const OnlineEnemy *e) {
     bool heavy = big || strstr(e->as, "Kick") || strstr(e->as, "Large") || strstr(e->as, "Jump");
     if (heavy && *life > 0 && d > 0.01f) {
         float at[3] = {pm[3] - dx / d, pm[7] + 0.3f, pm[11] - dz / d};
-        boom_start(c, getenv("SAVAGEWIND_ONLINE_KNOCK") ? getenv("SAVAGEWIND_ONLINE_KNOCK") : "OnlineShock", at);
+        oa_boom_start(c, getenv("SAVAGEWIND_ONLINE_KNOCK") ? getenv("SAVAGEWIND_ONLINE_KNOCK") : "OnlineShock", at);
     }
     LOG("[online] %s hit us: %d (life %d)%s\n", e->name, power, *life, heavy ? ", knocked down" : "");
 }
 
-void puppets_forget(void) {
-    for (int k = 0; k < PUPPETS; k++) orphan(&g_puppet[k].p), orphan(&g_puppet[k].w), orphan(&g_puppet[k].sh);
+void oa_puppets_forget(void) {
+    for (int k = 0; k < PUPPETS; k++) oa_orphan(&g_puppet[k].p), oa_orphan(&g_puppet[k].w), oa_orphan(&g_puppet[k].sh);
     memset(g_puppet, 0, sizeof g_puppet);
 }
 
 // a game not the host's: the host's enemies, each ours for real or shown
-void enemies_client(Cpu *c, uint64_t player, int me) {
+void oa_enemies_client(Cpu *c, uint64_t player, int me) {
     static OnlineEnemy e[ONLINE_ENEMIES];
     float centre[3];
     uint64_t age;
@@ -742,10 +742,10 @@ void enemies_client(Cpu *c, uint64_t player, int me) {
                 if (o) own_ready(c, o, &e[k]);
             }
         for (int k2 = 0; k2 < OWNS; k2++) {
-            if (!g_own[k2].state) continue;
+            if (!oa_g_own[k2].state) continue;
             bool mine = false;
-            for (int k = 0; k < n && !mine; k++) mine = e[k].id == g_own[k2].gid && e[k].owner == me;
-            if (!mine) LOG("[online] %u is not ours now\n", g_own[k2].gid), own_drop(c, &g_own[k2]);
+            for (int k = 0; k < n && !mine; k++) mine = e[k].id == oa_g_own[k2].gid && e[k].owner == me;
+            if (!mine) LOG("[online] %u is not ours now\n", oa_g_own[k2].gid), own_drop(c, &oa_g_own[k2]);
         }
         // and their state, for the host's game (gone: died here)
         static int tick;
@@ -753,11 +753,11 @@ void enemies_client(Cpu *c, uint64_t player, int me) {
             static OnlineEnemy st[ONLINE_ENEMIES];
             int ns = 0;
             for (int k2 = 0; k2 < OWNS && ns < ONLINE_ENEMIES; k2++) {
-                Own *o = &g_own[k2];
+                Own *o = &oa_g_own[k2];
                 if (o->state != OWN_HAVE) continue;
                 memset(&st[ns], 0, sizeof st[ns]);
                 st[ns].id = o->gid;
-                if (alive(o->actor, o->w)) enemy_state(c, o->actor, &st[ns]);
+                if (oa_alive(o->actor, o->w)) oa_enemy_state(c, o->actor, &st[ns]);
                 else {  // (kept as gone: his list has it ours a while longer, and it isn't to be made again)
                     uint32_t gid = o->gid;
                     st[ns].life = -1, memset(o, 0, sizeof *o);
@@ -768,18 +768,18 @@ void enemies_client(Cpu *c, uint64_t player, int me) {
             if (ns) online_send_estates(st, ns);
         }
     }
-    enemies_show(c, player, e, n, fresh, centre, me, true);
+    oa_enemies_show(c, player, e, n, fresh, centre, me, true);
 }
 
-void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, const float centre[3], int me,
+void oa_enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, const float centre[3], int me,
                          bool suppress) {
     // his area: our own enemies go (each frame: those the game makes there go as they come), but those we have for
     // everyone
-    int na = suppress ? all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS) : 0, gone = 0;
+    int na = suppress ? oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS) : 0, gone = 0;
     for (int k = 0; k < na; k++) {
         char name[48];
-        uint64_t a = g_actors[k];
-        if (!running(a) || !is_enemy(a, name) || own_is(a)) continue;  // (one going already: not again)
+        uint64_t a = oa_g_actors[k];
+        if (!oa_running(a) || !is_enemy(a, name) || own_is(a)) continue;  // (one going already: not again)
         const float *m = (const float *)(uintptr_t)(a + 0x398);
         float dx = m[3] - centre[0], dz = m[11] - centre[2];
         if (dx * dx + dz * dz > ENEMY_AREA * ENEMY_AREA) continue;
@@ -814,12 +814,12 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
         // plays its own Die, drops its weapon, and goes 2.5 s later with the game's "Dead" effect
         if (e[k].life <= 0 && p->actor) {
             g_puppet[s2].dying = 75;
-            delete_piece(c, &g_puppet[s2].w), delete_piece(c, &g_puppet[s2].sh);
-            play_as(c, p->actor, "Die", 0, 0, -1, true);
+            oa_delete_piece(c, &g_puppet[s2].w), oa_delete_piece(c, &g_puppet[s2].sh);
+            oa_play_as(c, p->actor, "Die", 0, 0, -1, true);
             LOG("[online] the host's %s %u died\n", e[k].name, e[k].id);
             continue;
         }
-        if (piece_update(c, 0, p, pa ? pa : "", "host")) {
+        if (oa_piece_update(c, 0, p, pa ? pa : "", "host")) {
             g_puppet[s2].as[0] = 0;
             g_puppet[s2].life = 0;  // (a new actor: what it has is its own life, no hit)
             LOG("[online] the host's %s %u at %.1f %.1f %.1f, AS %s\n", e[k].name, e[k].id, e[k].m[3], e[k].m[7], e[k].m[11], e[k].as);
@@ -830,10 +830,10 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
             const char *gn = h ? e[k].shield : e[k].weapon;
             const float *gm = h ? e[k].sm : e[k].wm;
             int bone = h ? e[k].sbone : e[k].wbone;
-            const char *ga = gn[0] ? gear_actor(gn) : NULL;
+            const char *ga = gn[0] ? oa_gear_actor(gn) : NULL;
             Piece *w = h ? &g_puppet[s2].sh : &g_puppet[s2].w;
-            if (w->name[0] && strcmp(w->name, ga ? ga : "")) delete_piece(c, w);
-            piece_update(c, 0, w, ga ? ga : "", "host");
+            if (w->name[0] && strcmp(w->name, ga ? ga : "")) oa_delete_piece(c, w);
+            oa_piece_update(c, 0, w, ga ? ga : "", "host");
             if (!w->actor) continue;
             static int slog2;
             if (getenv("SAVAGEWIND_ONLINE_SCALE_LOG") && slog2++ % 300 == 0) {
@@ -842,17 +842,17 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
                     sqrtf(am[0] * am[0] + am[4] * am[4] + am[8] * am[8]));
             }
             float wm[12], bm[12], sc = weapon_scale(e[k].name, gn);
-            if (bone >= 1 && bone <= 2 && p->actor && bone_mtx(c, p->actor, k_hands[bone - 1], bm)) mtx_mul(bm, gm, wm);
+            if (bone >= 1 && bone <= 2 && p->actor && oa_bone_mtx(c, p->actor, k_hands[bone - 1], bm)) oa_mtx_mul(bm, gm, wm);
             else if (bone) continue;  // (its hand not there yet)
             else memcpy(wm, gm, sizeof wm);
-            call(c, FN_SET_MTX, w->actor, (uint64_t)(uintptr_t)wm, 0, 0, 0, 0);
+            oa_call(c, FN_SET_MTX, w->actor, (uint64_t)(uintptr_t)wm, 0, 0, 0, 0);
             // (its size: its model's root bone scaled; a scale in its matrix isn't drawn)
             int nb = 0;
-            uint64_t unit = sc != 1 ? first_unit(w->actor, &nb) : 0;
+            uint64_t unit = sc != 1 ? oa_first_unit(w->actor, &nb) : 0;
             if (unit && nb > 0) {
                 float lm[12], lsc[3], ssc[3] = {sc, sc, sc};
-                call(c, FN_BONE_LOCAL_GET, unit, (uint64_t)(uintptr_t)lm, (uint64_t)(uintptr_t)lsc, 0, 0, 0);
-                call(c, FN_BONE_LOCAL_SET, unit, (uint64_t)(uintptr_t)lm, (uint64_t)(uintptr_t)ssc, 0, 0, 0);
+                oa_call(c, FN_BONE_LOCAL_GET, unit, (uint64_t)(uintptr_t)lm, (uint64_t)(uintptr_t)lsc, 0, 0, 0);
+                oa_call(c, FN_BONE_LOCAL_SET, unit, (uint64_t)(uintptr_t)lm, (uint64_t)(uintptr_t)ssc, 0, 0, 0);
             }
         }
         if (!p->actor) continue;
@@ -862,20 +862,20 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
             LOG("[online] puppet %s: his at %.1f %.1f %.1f, ours at %.1f %.1f %.1f\n", e[k].name, e[k].m[3], e[k].m[7],
                 e[k].m[11], am[3], am[7], am[11]);
         }
-        call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)e[k].m, 0, 0, 0, 0);
+        oa_call(c, FN_SET_MTX, p->actor, (uint64_t)(uintptr_t)e[k].m, 0, 0, 0, 0);
         // its attacks on us
         if (strcmp(e[k].as, g_puppet[s2].seen)) {
             snprintf(g_puppet[s2].seen, sizeof g_puppet[s2].seen, "%s", e[k].as);
             if (getenv("SAVAGEWIND_ONLINE_ENEMY_AS_LOG")) LOG("[online] the host's %s %u: %s\n", e[k].name, e[k].id, e[k].as);
             if (strstr(e[k].as, "Attack") || strstr(e[k].as, "Kick")) g_puppet[s2].strike = STRIKE_FRAMES;
         }
-        if (g_puppet[s2].strike > 0 && --g_puppet[s2].strike == 0) strike(c, player, &e[k]);
+        if (g_puppet[s2].strike > 0 && --g_puppet[s2].strike == 0) oa_strike(c, player, &e[k]);
         // hit here: what it lost since it was set goes to his game; its life is his (never 0 here: his dies there)
         int32_t *life = (int32_t *)(uintptr_t)(p->actor + ENEMY_LIFE);
         if (e[k].life > 0 && g_puppet[s2].life > 0 && *life < g_puppet[s2].life) {  // (dead in his game: no more)
             const float *pm = (const float *)(uintptr_t)(p->actor + 0x398);
             float at[3] = {pm[3], pm[7], pm[11]};
-            uint8_t elem = elem_near(at, 2.5f);  // (one of our element arrows there: its element goes with it)
+            uint8_t elem = oa_elem_near(at, 2.5f);  // (one of our element arrows there: its element goes with it)
             int32_t dmg = g_puppet[s2].life - *life;
             // (a sneak strike: a copy here has no senses, the game takes it as unaware and its blow from behind does
             // eight times its damage; one that is fighting in its owner's game - not waiting, asleep, sat, talking,
@@ -886,10 +886,10 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
                            strstr(eas, "Eat") || strstr(eas, "Dance") || !strncmp(eas, "Look", 4) || !eas[0];
             if (!unaware) {
                 uint64_t ar[ARMOR], gr[ONLINE_GEAR];
-                equipment(player, ar, gr);
+                oa_equipment(player, ar, gr);
                 char wn[48] = "";
-                if (gr[0]) actor_name_of(gr[0], wn);
-                int pw = wn[0] ? attack_power(wn) : 0;
+                if (gr[0]) oa_actor_name_of(gr[0], wn);
+                int pw = wn[0] ? oa_attack_power(wn) : 0;
                 if (pw > 0 && dmg > pw * 2) {
                     LOG("[online] a blow of %d on the host's %s %u (%s, fighting): %d, as without a sneak strike\n", dmg,
                         e[k].name, e[k].id, eas, pw);
@@ -897,16 +897,16 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
                 }
             }
             online_send_hit(e[k].id, dmg, elem);
-            g_aggro_id = e[k].id;
-            if (!++g_aggro_seq) g_aggro_seq = 1;
+            oa_g_aggro_id = e[k].id;
+            if (!++oa_g_aggro_seq) oa_g_aggro_seq = 1;
             LOG("[online] we hit the host's %s %u: %d%s\n", e[k].name, e[k].id, dmg,
                 elem == ONLINE_ELEM_FIRE ? " (fire)" : elem == ONLINE_ELEM_ICE ? " (ice)"
                 : elem == ONLINE_ELEM_ELECTRIC ? " (electric)" : "");
         }
         *life = g_puppet[s2].life = e[k].life > 1 ? e[k].life : 1;
         // (again each frame until it plays: a just made actor can't yet; given up after a second)
-        if (e[k].as[0] && strcmp(e[k].as, g_puppet[s2].as) && running(p->actor)) {
-            if (play_as(c, p->actor, e[k].as, 0, 0, -1, false) || ++g_puppet[s2].tries > 30) {
+        if (e[k].as[0] && strcmp(e[k].as, g_puppet[s2].as) && oa_running(p->actor)) {
+            if (oa_play_as(c, p->actor, e[k].as, 0, 0, -1, false) || ++g_puppet[s2].tries > 30) {
                 if (g_puppet[s2].tries > 30) LOG("[online] the host's %s: no AS %s\n", e[k].name, e[k].as);
                 snprintf(g_puppet[s2].as, sizeof g_puppet[s2].as, "%s", e[k].as);
                 g_puppet[s2].tries = 0;
@@ -919,14 +919,14 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
         if (!g_puppet[j].id || !g_puppet[j].dying) continue;
         int d = --g_puppet[j].dying;
         uint64_t a = g_puppet[j].p.actor;
-        bool there = a && alive(a, g_puppet[j].p.w);
+        bool there = a && oa_alive(a, g_puppet[j].p.w);
         if (d == 30 && there) {
             uint64_t out[4] = {0, 0, 0, 0};
-            call(c, FN_XLINK_EMIT, a, (uint64_t)(uintptr_t)"Disappear", 2, (uint64_t)(uintptr_t)out, 0, 0);
+            oa_call(c, FN_XLINK_EMIT, a, (uint64_t)(uintptr_t)"Disappear", 2, (uint64_t)(uintptr_t)out, 0, 0);
         }
-        if (d == 20 && there) model_visible(c, a, false);
+        if (d == 20 && there) oa_model_visible(c, a, false);
         if (d > 0) continue;
-        delete_piece(c, &g_puppet[j].p), delete_piece(c, &g_puppet[j].w), delete_piece(c, &g_puppet[j].sh);
+        oa_delete_piece(c, &g_puppet[j].p), oa_delete_piece(c, &g_puppet[j].w), oa_delete_piece(c, &g_puppet[j].sh);
         g_puppet[j].id = 0;
     }
     {   // (test: SAVAGEWIND_ONLINE_ELEM_HIT_TEST=<s>: that many seconds after the first copy here, a hit of 1 with fire,
@@ -965,8 +965,8 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
                 if (k < 0) break;
                 uint8_t elem = (uint8_t)(ONLINE_ELEM_FIRE + turn);
                 online_send_hit(e[k].id, 1, elem);
-                g_aggro_id = e[k].id;
-                if (!++g_aggro_seq) g_aggro_seq = 1;
+                oa_g_aggro_id = e[k].id;
+                if (!++oa_g_aggro_seq) oa_g_aggro_seq = 1;
                 LOG("[online] element hit test: %u, element %d\n", e[k].id, elem);
                 done_ids[turn++] = e[k].id;
                 break;
@@ -985,12 +985,12 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
                 for (int j = 0; j < PUPPETS && at < 0; j++)
                     if (g_puppet[j].id && !g_puppet[j].dying && g_puppet[j].p.actor) at = j, t0 = plat_now_ns();
             if (at >= 0 && plat_now_ns() - t0 >= (uint64_t)(atof(ft) * 1e9)) {
-                piece_update(c, 0, &fire, "FireWood", "fire test");
+                oa_piece_update(c, 0, &fire, "FireWood", "fire test");
                 uint64_t a = g_puppet[at].p.actor;
-                if (fire.actor && a && alive(a, g_puppet[at].p.w)) {
+                if (fire.actor && a && oa_alive(a, g_puppet[at].p.w)) {
                     const float *m = (const float *)(uintptr_t)(a + 0x398);
                     float fm[12] = {1, 0, 0, m[3], 0, 1, 0, m[7], 0, 0, 1, m[11]};
-                    call(c, FN_SET_MTX, fire.actor, (uint64_t)(uintptr_t)fm, 0, 0, 0, 0);
+                    oa_call(c, FN_SET_MTX, fire.actor, (uint64_t)(uintptr_t)fm, 0, 0, 0, 0);
                     placed = true;
                     LOG("[online] fire test: FireWood under the copy of %u at %.1f %.1f %.1f\n", g_puppet[at].id, m[3],
                         m[7], m[11]);
@@ -1008,7 +1008,7 @@ void enemies_show(Cpu *c, uint64_t player, OnlineEnemy *e, int n, bool fresh, co
                     !(e[k].owner == me && ours && (ours->state == OWN_HAVE || ours->state == OWN_GONE));
         }
         if (!there && !g_puppet[j].dying)
-            delete_piece(c, &g_puppet[j].p), delete_piece(c, &g_puppet[j].w), delete_piece(c, &g_puppet[j].sh), g_puppet[j].id = 0;
+            oa_delete_piece(c, &g_puppet[j].p), oa_delete_piece(c, &g_puppet[j].w), oa_delete_piece(c, &g_puppet[j].sh), g_puppet[j].id = 0;
     }
 }
 
@@ -1029,29 +1029,29 @@ static int btrack(uint64_t a, uint32_t hash, int32_t life) {
     return k;
 }
 
-void boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
+void oa_boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
     static int tick;
     if (tick++ % 6 == 0) {
         memset(g_boss, 0, sizeof g_boss);
         float best[ONLINE_BOSSES] = {500.0f * 500.0f, 500.0f * 500.0f};
-        int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+        int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
         const float *pm = (const float *)(uintptr_t)(player + 0x398);
         for (int k = 0; k < na; k++) {
             char n[48];
-            actor_name_of(g_actors[k], n);
+            oa_actor_name_of(oa_g_actors[k], n);
             // (only the map's bosses, with a HashId, the one their damage is shared by: a Blight's drones,
             // Enemy_SiteBoss_*_ChildDev, have none, and nearer than it they took both places, so the Blight's own damage
             // wasn't shared while they flew)
-            if (!is_boss(n) || !*(uint32_t *)(uintptr_t)(g_actors[k] + ACTOR_HASH_ID)) continue;
-            if (*(int32_t *)(uintptr_t)(g_actors[k] + ENEMY_LIFE) <= 0) continue;  // (beaten: nothing more to share)
-            const float *m = (const float *)(uintptr_t)(g_actors[k] + 0x398);
+            if (!is_boss(n) || !*(uint32_t *)(uintptr_t)(oa_g_actors[k] + ACTOR_HASH_ID)) continue;
+            if (*(int32_t *)(uintptr_t)(oa_g_actors[k] + ENEMY_LIFE) <= 0) continue;  // (beaten: nothing more to share)
+            const float *m = (const float *)(uintptr_t)(oa_g_actors[k] + 0x398);
             float d = (m[3] - pm[3]) * (m[3] - pm[3]) + (m[7] - pm[7]) * (m[7] - pm[7]) + (m[11] - pm[11]) * (m[11] - pm[11]);
             int slot = d < best[0] ? 0 : d < best[1] ? 1 : -1;
             if (slot < 0) continue;
             if (slot == 0) g_boss[1] = g_boss[0], best[1] = best[0];
             best[slot] = d;
-            g_boss[slot].a = g_actors[k], g_boss[slot].w = watch(g_actors[k]);
-            g_boss[slot].hash = *(uint32_t *)(uintptr_t)(g_actors[k] + ACTOR_HASH_ID);
+            g_boss[slot].a = oa_g_actors[k], g_boss[slot].w = oa_watch(oa_g_actors[k]);
+            g_boss[slot].hash = *(uint32_t *)(uintptr_t)(oa_g_actors[k] + ACTOR_HASH_ID);
             snprintf(g_boss[slot].name, sizeof g_boss[slot].name, "%s", n);
         }
         // (the tracks of bosses no longer here go: kept, after four bosses (the castle's Blights) the next one, Ganon,
@@ -1068,7 +1068,7 @@ void boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
         static char last[28];
         if (g_boss[0].a && strcmp(last, g_boss[0].name)) t = 0, snprintf(last, sizeof last, "%s", g_boss[0].name);
         const char *bk = getenv("SAVAGEWIND_ONLINE_BOSS_KILL"), *bh = getenv("SAVAGEWIND_ONLINE_BOSS_HIT");
-        bool here = g_boss[0].a && alive(g_boss[0].a, g_boss[0].w);
+        bool here = g_boss[0].a && oa_alive(g_boss[0].a, g_boss[0].w);
         if (here && (bk || bh)) t++;
         int32_t *l = here ? (int32_t *)(uintptr_t)(g_boss[0].a + ENEMY_LIFE) : NULL;
         if (bk && here && t % (atoi(bk) * 30) == 0 && *l > 0) *l = 0, LOG("[online] boss kill test: %s\n", g_boss[0].name);
@@ -1079,13 +1079,13 @@ void boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
     }
     static int logt;
     for (int k = 0; getenv("SAVAGEWIND_ONLINE_BOSS_LOG") && logt++ % 60 == 0 && k < ONLINE_BOSSES; k++)
-        if (g_boss[k].a && alive(g_boss[k].a, g_boss[k].w)) {
+        if (g_boss[k].a && oa_alive(g_boss[k].a, g_boss[k].w)) {
             const float *m = (const float *)(uintptr_t)(g_boss[k].a + 0x398);
             LOG("[online] boss %s %u: life %d at %.0f %.0f %.0f\n", g_boss[k].name, g_boss[k].hash,
                 *(int32_t *)(uintptr_t)(g_boss[k].a + ENEMY_LIFE), m[3], m[7], m[11]);
         }
     for (int k = 0; k < ONLINE_BOSSES; k++) {
-        if (!g_boss[k].a || !alive(g_boss[k].a, g_boss[k].w)) continue;
+        if (!g_boss[k].a || !oa_alive(g_boss[k].a, g_boss[k].w)) continue;
         int32_t life = *(int32_t *)(uintptr_t)(g_boss[k].a + ENEMY_LIFE);
         int t = btrack(g_boss[k].a, g_boss[k].hash, life);
         if (life < g_btrack[t].last) {  // (lost: ours, but for what the others took)
@@ -1099,7 +1099,7 @@ void boss_sample(Cpu *c, uint64_t player, OnlinePose *pose) {
     }
 }
 
-void boss_update(Cpu *c, const OnlinePlayer *pl, int me) {
+void oa_boss_update(Cpu *c, const OnlinePlayer *pl, int me) {
     // (each player's damage as last seen, of the bosses he sends now only: the others' places free, else after four
     // bosses the next shared the last place with another, seen anew each time, its damage never taken)
     for (int i = 0; i < ONLINE_MAX; i++)
@@ -1110,11 +1110,11 @@ void boss_update(Cpu *c, const OnlinePlayer *pl, int me) {
             if (!sent) g_bseen[i][s].hash = 0, g_bseen[i][s].seen = 0;
         }
     for (int k = 0; k < ONLINE_BOSSES; k++) {
-        if (!g_boss[k].a || !alive(g_boss[k].a, g_boss[k].w)) continue;
+        if (!g_boss[k].a || !oa_alive(g_boss[k].a, g_boss[k].w)) continue;
         int32_t *life = (int32_t *)(uintptr_t)(g_boss[k].a + ENEMY_LIFE);
         int t = btrack(g_boss[k].a, g_boss[k].hash, *life);
         for (int i = 0; i < ONLINE_MAX; i++) {
-            if (i == me || !pl[i].used || !pl[i].pose.valid || !same_map(&pl[i])) continue;
+            if (i == me || !pl[i].used || !pl[i].pose.valid || !oa_same_map(&pl[i])) continue;
             for (int q = 0; q < ONLINE_BOSSES; q++) {
                 const char *rn = pl[i].pose.boss[q].name;
                 if (!rn[0] || strcmp(rn, g_boss[k].name) || pl[i].pose.boss[q].hash != g_boss[k].hash) continue;

@@ -741,6 +741,10 @@ def selftest_modules():
          0 if rename_text('a.suma = suma(x); // suma\n"suma"; s->suma; s-> suma; suma2; /* suma */ 1.suma',
                           ren) == 'a.suma = oa_suma(x); // suma\n"suma"; s->suma; s-> suma; suma2; /* suma */ 1.suma'
          else 1, 0),
+        ("renombrado: un campo de struct que se llama como la funcion",
+         0 if rename_text("static struct { int suma; struct { int g_a; } in; } t[2] = {{0}};\nint f(void) { return suma(t[0].suma); }",
+                          ren) == "static struct { int suma; struct { int g_a; } in; } t[2] = {{0}};\n"
+                                 "int f(void) { return oa_suma(t[0].suma); }" else 1, 0),
     ]
     rc = 0
     for name, got, want in cases:
@@ -1001,10 +1005,16 @@ def parse_names(path):
 
 
 def rename_text(text, table):
-    """Sustitucion por palabra completa en el codigo: no en comentarios, cadenas ni caracteres, ni tras . o ->."""
+    """Sustitucion por palabra completa en el codigo: no en comentarios, cadenas ni caracteres, ni tras . o ->, ni
+    dentro del cuerpo de un struct o union (ahi solo hay campos: uno que se llame como una funcion no cambia)."""
     out, i, n = [], 0, len(text)
+    braces = []  # por cada { abierta: si es el cuerpo de un struct/union
     while i < n:
         c = text[i]
+        if c == "{":
+            braces.append(bool(re.search(r"\b(struct|union)\s*([A-Za-z_]\w*\s*)?$", text[max(0, i - 200):i])))
+        elif c == "}" and braces:
+            braces.pop()
         if text.startswith("//", i):
             j = text.find("\n", i)
             j = n if j < 0 else j
@@ -1025,7 +1035,7 @@ def rename_text(text, table):
             while k >= 0 and text[k] in " \t\r\n":
                 k -= 1
             member = k >= 0 and (text[k] == "." or (text[k] == ">" and k > 0 and text[k - 1] == "-"))
-            out.append(table[w] if w in table and not member else w)
+            out.append(table[w] if w in table and not member and not any(braces) else w)
             i = j
             continue
         else:

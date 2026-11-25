@@ -7,7 +7,7 @@
 // runtime/weather.c holds it (its timer +0x794 at 4: taken up), not in a cutscene (+0x7d6: its own) nor while the
 // player holds one himself (Cheats > Weather)
 #define WEATHER_NEAR 500.0f
-uint8_t weather_now(void) {
+uint8_t oa_weather_now(void) {
     uint64_t wm = g_site.world_mgr ? *(uint64_t *)(uintptr_t)g_site.world_mgr : 0;
     if (!VALID(wm) || !*(uint32_t *)(uintptr_t)(wm + 0x5c0)) return 255;
     uint8_t w = *(volatile uint8_t *)(uintptr_t)(wm + 0x7d1);
@@ -18,7 +18,7 @@ uint8_t weather_now(void) {
 // (360 a day; the time of day at +0xb8), from WM_BloodyMoonTimer at load; past 2520 (7 days), at midnight, there is
 // one (1.9.0 0x7001425fa8), and it starts again at 0. The others keep the host's (his time of day is theirs already),
 // so the Blood Moon comes for everyone the same night, and the world's items taken (quests.txt) come back for all
-float *bloody_moon_timer(void) {
+float *oa_bloody_moon_timer(void) {
     uint64_t wm = g_site.world_mgr ? *(uint64_t *)(uintptr_t)g_site.world_mgr : 0;
     if (!VALID(wm) || !*(uint32_t *)(uintptr_t)(wm + 0x5c0)) return NULL;
     uint64_t mgrs = *(uint64_t *)(uintptr_t)(wm + 0x5c8), tm = VALID(mgrs) ? *(uint64_t *)(uintptr_t)mgrs : 0;
@@ -26,23 +26,23 @@ float *bloody_moon_timer(void) {
 }
 
 static void bloody_moon_set(Cpu *c, float v) {
-    float *bm = bloody_moon_timer();
+    float *bm = oa_bloody_moon_timer();
     uint64_t mgr = test_warp_gdt_mgr();
     if (!bm || !VALID(mgr)) return;
     uint32_t handle = *(uint32_t *)(uintptr_t)((uint64_t)(uintptr_t)bm - 0xc8 + 0x120);
-    if (handle != 0xffffffffu) call_f(c, FN_GDT_SET_F32, mgr, handle, 0, 0, 0, 0, 0, v);
+    if (handle != 0xffffffffu) oa_call_f(c, FN_GDT_SET_F32, mgr, handle, 0, 0, 0, 0, 0, v);
     *bm = v;
 }
 
-void bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me) {
+void oa_bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me) {
     const char *test = getenv("SAVAGEWIND_ONLINE_BM_TEST");  // (test: the host's timer set to that once, in the world)
     static bool tested;
-    if (test && me == 0 && !tested && bloody_moon_timer()) {
+    if (test && me == 0 && !tested && oa_bloody_moon_timer()) {
         static int wait;
         if (++wait > 300) bloody_moon_set(c, strtof(test, NULL)), tested = true, LOG("[online] Blood Moon test: %s\n", test);
     }
     const OnlinePlayer *h = &pl[0];  // (the host: slot 0)
-    float *bm = bloody_moon_timer();
+    float *bm = oa_bloody_moon_timer();
     if (me <= 0 || !bm || !h->used || !h->pose.valid || h->pose.bloody_moon < 0 || h->pose.bloody_moon > 4000 ||
         (h->flags & ONLINE_F_LOADING))
         return;
@@ -53,7 +53,7 @@ void bloody_moon_follow(Cpu *c, const OnlinePlayer *pl, int me) {
     bloody_moon_set(c, h->pose.bloody_moon);
 }
 
-void weather_follow(const OnlinePlayer *pl, int me, const float at[3]) {
+void oa_weather_follow(const OnlinePlayer *pl, int me, const float at[3]) {
     if (g_settings.weather > 0) return;
     uint64_t wm = g_site.world_mgr ? *(uint64_t *)(uintptr_t)g_site.world_mgr : 0;
     if (!VALID(wm) || !*(uint32_t *)(uintptr_t)(wm + 0x5c0) || *(volatile uint8_t *)(uintptr_t)(wm + 0x7d6)) return;
@@ -62,7 +62,7 @@ void weather_follow(const OnlinePlayer *pl, int me, const float at[3]) {
     const OnlinePlayer *h = NULL;
     for (int i = 0; i < me && !h; i++) {
         const OnlinePlayer *p = &pl[i];
-        if (!p->used || !p->pose.valid || p->pose.weather > 8 || (p->flags & ONLINE_F_LOADING) || !same_map(p)) continue;
+        if (!p->used || !p->pose.valid || p->pose.weather > 8 || (p->flags & ONLINE_F_LOADING) || !oa_same_map(p)) continue;
         float dx = p->pos[0] - at[0], dy = p->pos[1] - at[1], dz = p->pos[2] - at[2];
         if (dx * dx + dy * dy + dz * dz <= WEATHER_NEAR * WEATHER_NEAR) h = p;
     }
@@ -78,7 +78,7 @@ void weather_follow(const OnlinePlayer *pl, int me, const float at[3]) {
 // the Sheikah Slate, another player having taken it: its pedestal's own event here (Obj_DRStone_A_01<Talk>: the
 // cutscene Demo700_0, which sets its flags, gives the slate, wakes the HUD and opens the first door), when this Link is
 // near its pedestal and in no event; true once started (its flags are then left to it)
-bool slate_event(Cpu *c, uint64_t player) {
+bool oa_slate_event(Cpu *c, uint64_t player) {
     static int tries, wait;
     if (wait > 0) { wait--; return false; }
     extern bool framepace_in_event(void);
@@ -86,15 +86,15 @@ bool slate_event(Cpu *c, uint64_t player) {
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
     float dx = pm[3] + 1125.0f, dz = pm[11] - 1903.2f;
     if (dx * dx + dz * dz > 40 * 40) return false;  // (not in the Shrine of Resurrection: the flags alone)
-    int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+    int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
     uint64_t stone = 0;
     for (int k = 0; k < na && !stone; k++) {
         char n[48];
-        actor_name_of(g_actors[k], n);
-        if (!strcmp(n, "Obj_DRStone_A_01")) stone = g_actors[k];
+        oa_actor_name_of(oa_g_actors[k], n);
+        if (!strcmp(n, "Obj_DRStone_A_01")) stone = oa_g_actors[k];
     }
     tries++, wait = 90;
-    return start_event(c, stone ? stone : player, "Obj_DRStone_A_01", "Talk");
+    return oa_start_event(c, stone ? stone : player, "Obj_DRStone_A_01", "Talk");
 }
 
 static bool slate_group(const char *n) {
@@ -127,20 +127,20 @@ static int korok_event(Cpu *c, uint64_t player, const char *flag) {
     const char *want = fly ? "Npc_HiddenKorokFly" : "Npc_HiddenKorokGround";
     uint32_t id = (uint32_t)strtoul(strrchr(flag, '_') + 1, NULL, 10);  // (its map object's HashId)
     const float *pm = (const float *)(uintptr_t)(player + 0x398);
-    int na = all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), g_actors, MAX_ACTORS);
+    int na = oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS);
     uint64_t found = 0;
     for (int k = 0; k < na && !found; k++) {
         char n[48];
-        actor_name_of(g_actors[k], n);
+        oa_actor_name_of(oa_g_actors[k], n);
         if (strcmp(n, want)) continue;
-        const float *m = (const float *)(uintptr_t)(g_actors[k] + 0x398);
+        const float *m = (const float *)(uintptr_t)(oa_g_actors[k] + 0x398);
         float d = (m[3] - pm[3]) * (m[3] - pm[3]) + (m[7] - pm[7]) * (m[7] - pm[7]) + (m[11] - pm[11]) * (m[11] - pm[11]);
         if (d > 60 * 60) continue;
         static int off = -1;  // (where an actor keeps its HashId: looked for once)
         if (off < 0)
             for (int o = 0x100; o < 0x900 && off < 0; o += 4)
-                if (*(uint32_t *)(uintptr_t)(g_actors[k] + o) == id) off = o, LOG("[online] an actor's HashId is at +%#x\n", o);
-        if (off >= 0 && *(uint32_t *)(uintptr_t)(g_actors[k] + off) == id) found = g_actors[k];
+                if (*(uint32_t *)(uintptr_t)(oa_g_actors[k] + o) == id) off = o, LOG("[online] an actor's HashId is at +%#x\n", o);
+        if (off >= 0 && *(uint32_t *)(uintptr_t)(oa_g_actors[k] + off) == id) found = oa_g_actors[k];
     }
     if (!found) return 0;
     if (framepace_in_event()) return -1;  // (an event plays: later)
@@ -149,18 +149,18 @@ static int korok_event(Cpu *c, uint64_t player, const char *flag) {
     if (!VALID(mgr)) return 0;
     static uint8_t meta[0x200] __attribute__((aligned(16)));
     memset(meta, 0, sizeof meta);
-    call(c, FN_EVT_META_INIT, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
-    call(c, FN_EVT_META_NAME, (uint64_t)(uintptr_t)meta, (uint64_t)(uintptr_t)"Demo017_0",
+    oa_call(c, FN_EVT_META_INIT, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
+    oa_call(c, FN_EVT_META_NAME, (uint64_t)(uintptr_t)meta, (uint64_t)(uintptr_t)"Demo017_0",
          (uint64_t)(uintptr_t)(fly ? "HiddenKorok_Air" : "HiddenKorok_Ground"), (uint64_t)(uintptr_t)"", 0, 0);
-    bool ok = call(c, FN_EVT_START, mgr, (uint64_t)(uintptr_t)meta, found, 0, 0, 0) & 1;
-    call(c, FN_EVT_META_FREE, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
+    bool ok = oa_call(c, FN_EVT_START, mgr, (uint64_t)(uintptr_t)meta, found, 0, 0, 0) & 1;
+    oa_call(c, FN_EVT_META_FREE, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
     LOG("[online] Demo017_0 for it: %d\n", ok);
     return ok ? 1 : -1;
 }
 
-volatile int g_fake_blood_moon;  // (`bloodmoon`, developer mode: the world's flags cleared here, as one does)
+volatile int oa_g_fake_blood_moon;  // (`bloodmoon`, developer mode: the world's flags cleared here, as one does)
 
-void quests_update(Cpu *c, uint64_t player, bool host) {
+void oa_quests_update(Cpu *c, uint64_t player, bool host) {
     static MapLine *m;
     static char names[ONLINE_QUEST_BYTES * 8][48];
     static uint32_t hash[ONLINE_QUEST_BYTES * 8];
@@ -183,7 +183,7 @@ void quests_update(Cpu *c, uint64_t player, bool host) {
                                                 "_TreasureSpot", "_FldObj", "_TwnObj", "_DgnObj", "_PutRupee", "_Necklace"};
             for (size_t q = 0; q < sizeof kinds / sizeof *kinds; q++)
                 if (strstr(line, kinds[q])) revival[n >> 3] |= (uint8_t)(1 << (n & 7));
-            hash[n] = crc32_str(line), n++;
+            hash[n] = oa_crc32_str(line), n++;
         }
         if (f) fclose(f);
         LOG("[online] %d quest flags shared\n", n);
@@ -194,32 +194,32 @@ void quests_update(Cpu *c, uint64_t player, bool host) {
     if (!counted && test_warp_gdt_mgr()) {  // (how many aren't bool flags)
         int miss = 0;
         for (int k = 0; k < n; k++)
-            if (!bool_flag(hash[k])) {
+            if (!oa_bool_flag(hash[k])) {
                 if (miss < 5) LOG("[online] quest flag %s: no bool flag\n", names[k]);
                 miss++;
             }
         LOG("[online] %d of the quest flags aren't bool flags\n", miss);
         if (getenv("SAVAGEWIND_ONLINE_GDT_PROBE"))  // (test: where MaxHeartValue is)
             for (int off = 0xb80; off < 0xc40; off += 8) {
-                uint32_t *v = gdt_value(off, crc32_str("MaxHeartValue"));
+                uint32_t *v = oa_gdt_value(off, oa_crc32_str("MaxHeartValue"));
                 if (v) LOG("[online] MaxHeartValue at mgr+%#x: %d\n", off, (int)*v);
             }
         const char *ql = getenv("SAVAGEWIND_ONLINE_QUEST_LOG");
         for (int k = 0; ql && k < n; k++)
             if (strstr(names[k], ql)) {
-                uint32_t *v = bool_flag(hash[k]);
+                uint32_t *v = oa_bool_flag(hash[k]);
                 LOG("[online] quest flag %s = %d\n", names[k], v ? (int)*v : -1);
             }
         counted = true;
     }
     uint8_t mine[ONLINE_QUEST_BYTES] = {0}, all[ONLINE_QUEST_BYTES];
-    if (__atomic_exchange_n(&g_fake_blood_moon, 0, __ATOMIC_ACQ_REL))
+    if (__atomic_exchange_n(&oa_g_fake_blood_moon, 0, __ATOMIC_ACQ_REL))
         for (int k = 0; k < n; k++) {
-            uint32_t *v = revival[k >> 3] >> (k & 7) & 1 ? bool_flag(hash[k]) : NULL;
+            uint32_t *v = revival[k >> 3] >> (k & 7) & 1 ? oa_bool_flag(hash[k]) : NULL;
             if (v) *v &= ~1u;
         }
     for (int k = 0; k < n; k++) {
-        uint32_t *v = bool_flag(hash[k]);
+        uint32_t *v = oa_bool_flag(hash[k]);
         if (v && (*v & 1)) mine[k >> 3] |= (uint8_t)(1 << (k & 7));
     }
     {   // a Blood Moon here: many of the revival flags this game had are clear at once
@@ -257,7 +257,7 @@ void quests_update(Cpu *c, uint64_t player, bool host) {
         const float *pm = (const float *)(uintptr_t)(player + 0x398);
         float dx = pm[3] + 1125.0f, dz = pm[11] - 1903.2f;
         if (dx * dx + dz * dz < 40 * 40 && getenv("SAVAGEWIND_ONLINE_SLATE_EVENT")) by_event = true;
-        if (by_event && !slate_started && (all[k >> 3] >> (k & 7) & 1) && slate_event(c, player)) slate_started = true;
+        if (by_event && !slate_started && (all[k >> 3] >> (k & 7) & 1) && oa_slate_event(c, player)) slate_started = true;
     }
     extern bool framepace_in_event(void);
     bool korok_started = false;
@@ -268,7 +268,7 @@ void quests_update(Cpu *c, uint64_t player, bool host) {
         if (by_event && (!strcmp(names[k], "IsGet_PortableUnit") || !strcmp(names[k], "PortableUnit_PowerOn") ||
                          !strcmp(names[k], "OP_DRC") || !strcmp(names[k], "Open_FirstDoor") ||
                          !strcmp(names[k], "IsPlayed_Demo700_0"))) continue;
-        uint32_t *v = bool_flag(hash[k]);
+        uint32_t *v = oa_bool_flag(hash[k]);
         if (!v) continue;
         // (the slate's flags once his cutscene is over: its last one, IsPlayed_Demo700_0, has come)
         if (slate_group(names[k]) && !union_has(all, names, n, "IsPlayed_Demo700_0")) continue;
@@ -295,18 +295,18 @@ void quests_update(Cpu *c, uint64_t player, bool host) {
             }
         }
         if (korok && played && framepace_in_event()) continue;  // (its cutscene playing: its flag comes from it)
-        if (!set_bool_flag(c, hash[k])) *v |= 1;  // (the game's setter; else in memory)
-        if (!strcmp(names[k], "IsGet_PortableUnit")) give_item(c, "Obj_DRStone_Get", 1);  // (the slate in his key items)
-        if (slate_rune(names[k])) give_item(c, names[k] + 6, 1);  // (a rune: the slate's runes as the game gives it)
+        if (!oa_set_bool_flag(c, hash[k])) *v |= 1;  // (the game's setter; else in memory)
+        if (!strcmp(names[k], "IsGet_PortableUnit")) oa_give_item(c, "Obj_DRStone_Get", 1);  // (the slate in his key items)
+        if (slate_rune(names[k])) oa_give_item(c, names[k] + 6, 1);  // (a rune: the slate's runes as the game gives it)
         // (the Great Plateau done: the king's paraglider, which he gives at that step. Without it a player who wasn't
         // there had the quest finished and no way down from the plateau. Its IsGet_PlayerStole2 flag is no sign: the
         // game has it set long before, in both games, the paraglider or not)
-        if (!strcmp(names[k], "FindDungeon_Finish")) give_item(c, "PlayerStole2", 1);
-        if (korok && !played) give_item(c, "Obj_KorokNuts", 1);  // (a Korok found far from here)
-        if (!strncmp(names[k], "Clear_Dungeon", 13)) give_item(c, "Obj_DungeonClearSeal", 1);  // (a shrine: its orb)
+        if (!strcmp(names[k], "FindDungeon_Finish")) oa_give_item(c, "PlayerStole2", 1);
+        if (korok && !played) oa_give_item(c, "Obj_KorokNuts", 1);  // (a Korok found far from here)
+        if (!strncmp(names[k], "Clear_Dungeon", 13)) oa_give_item(c, "Obj_DungeonClearSeal", 1);  // (a shrine: its orb)
         // (a Divine Beast: its champion's ability, as the game gives it after the beast; its heart container)
-        if (!strncmp(names[k], "IsGet_Obj_HeroSoul_", 19)) give_item(c, names[k] + 6, 1);
-        if (!strncmp(names[k], "Get_HeartUtuwa_", 15)) give_heart(c);
+        if (!strncmp(names[k], "IsGet_Obj_HeroSoul_", 19)) oa_give_item(c, names[k] + 6, 1);
+        if (!strncmp(names[k], "Get_HeartUtuwa_", 15)) oa_give_heart(c);
         LOG("[online] quest flag %s: set (another player did it)\n", names[k]);
     }
 }

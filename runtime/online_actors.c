@@ -83,10 +83,10 @@ static bool name_listed(NameList *l, const char *name, size_t cap) {
 }
 
 // what a host's enemy holds (its EquipItem1 / EquipItem2: a weapon, a shield), on weapons.txt
-bool weapon_name_listed(const char *name, size_t cap) { return name_listed(&g_weapon_names, name, cap); }
+bool oa_weapon_name_listed(const char *name, size_t cap) { return name_listed(&g_weapon_names, name, cap); }
 
 // loot: an item, a weapon or a rupee, each on its kind's list (anything else is on none)
-bool loot_name_listed(const char *name, size_t cap) {
+bool oa_loot_name_listed(const char *name, size_t cap) {
     return !strncmp(name, "Item_", 5)      ? name_listed(&g_item_names, name, cap)
          : !strncmp(name, "Weapon_", 7)    ? name_listed(&g_weapon_names, name, cap)
          : !strncmp(name, "PutRupee", 8)   ? name_listed(&g_rupee_names, name, cap)

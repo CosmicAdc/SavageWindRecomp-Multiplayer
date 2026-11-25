@@ -7,7 +7,7 @@
 // and sends the union, and each game sets the ones it lacks. A bool flag's place in GameDataMgr (test_warp_gdt_mgr):
 // its pending-write buffer (+0xbd8) +8 a count and +0x10 an array of proxies (0x18 each: +8 the flag's definition,
 // its name's crc32 at +0xc; +0x10 the value), sorted by that hash
-uint32_t crc32_str(const char *s) {
+uint32_t oa_crc32_str(const char *s) {
     uint32_t h = 0xFFFFFFFFu;
     for (; *s; s++) {
         h ^= (uint8_t)*s;
@@ -17,10 +17,10 @@ uint32_t crc32_str(const char *s) {
 }
 
 // the value of the bool flag with that hash (NULL: none)
-uint32_t *gdt_value(int off, uint32_t h);
-uint32_t *bool_flag(uint32_t h) { return gdt_value(0xbd8, h); }
+uint32_t *oa_gdt_value(int off, uint32_t h);
+uint32_t *oa_bool_flag(uint32_t h) { return oa_gdt_value(0xbd8, h); }
 // a GameData value by its name's hash: its value in the buffer at mgr+off (+0xbd8 the bool flags), NULL none
-uint32_t *gdt_value(int off, uint32_t h) {
+uint32_t *oa_gdt_value(int off, uint32_t h) {
     uint64_t mgr = test_warp_gdt_mgr();
     uint64_t pb = VALID(mgr) ? *(uint64_t *)(uintptr_t)(mgr + off) : 0;
     uint64_t buf = VALID(pb) ? *(uint64_t *)(uintptr_t)pb : 0;
@@ -41,50 +41,50 @@ uint32_t *gdt_value(int off, uint32_t h) {
     return VALID(pr) && *(uint32_t *)(uintptr_t)(pr + 0xc) == h ? (uint32_t *)(uintptr_t)(f + 0x10) : NULL;
 }
 
-bool start_event(Cpu *c, uint64_t actor, const char *flow, const char *entry) {
+bool oa_start_event(Cpu *c, uint64_t actor, const char *flow, const char *entry) {
     uint64_t mgr = *(uint64_t *)(uintptr_t)P_EVT_MGR;
     mgr = VALID(mgr) ? *(uint64_t *)(uintptr_t)mgr : 0;
     if (!VALID(mgr) || !VALID(actor)) return false;
     static uint8_t meta[0x200] __attribute__((aligned(16)));
     static struct { float m[12]; uint32_t flags, pad; uint64_t meta, zero, actor; } req __attribute__((aligned(16)));
     memset(meta, 0, sizeof meta);
-    call(c, FN_EVT_META_INIT, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
-    call(c, FN_EVT_META_NAME, (uint64_t)(uintptr_t)meta, (uint64_t)(uintptr_t)flow, (uint64_t)(uintptr_t)entry,
+    oa_call(c, FN_EVT_META_INIT, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
+    oa_call(c, FN_EVT_META_NAME, (uint64_t)(uintptr_t)meta, (uint64_t)(uintptr_t)flow, (uint64_t)(uintptr_t)entry,
          (uint64_t)(uintptr_t)"", 0, 0);
     memset(&req, 0, sizeof req);
     memcpy(req.m, (const float *)(uintptr_t)(actor + 0x398), sizeof req.m);
     req.flags = 0x101, req.meta = (uint64_t)(uintptr_t)meta, req.actor = actor;
-    bool ok = call(c, FN_EVT_CALL, mgr, (uint64_t)(uintptr_t)&req, 0, 0, 0, 0) & 1;
-    call(c, FN_EVT_META_FREE, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
+    bool ok = oa_call(c, FN_EVT_CALL, mgr, (uint64_t)(uintptr_t)&req, 0, 0, 0, 0) & 1;
+    oa_call(c, FN_EVT_META_FREE, (uint64_t)(uintptr_t)meta, 0, 0, 0, 0, 0);
     LOG("[online] event %s<%s> started: %d\n", flow, entry, ok);
     return ok;
 }
 
-void give_item(Cpu *c, const char *name, int count) {
+void oa_give_item(Cpu *c, const char *name, int count) {
     uint64_t ss[2] = {*(uint64_t *)(uintptr_t)P_SAFE_STRING_VT + 0x10, (uint64_t)(uintptr_t)name};
-    if (!(call(c, FN_POUCH_CAN_GET, (uint64_t)(uintptr_t)ss, (uint64_t)count, 0, 0, 0, 0) & 1)) {
+    if (!(oa_call(c, FN_POUCH_CAN_GET, (uint64_t)(uintptr_t)ss, (uint64_t)count, 0, 0, 0, 0) & 1)) {
         LOG("[online] %s doesn't fit in the pouch\n", name);
         return;
     }
-    call(c, FN_POUCH_GET, (uint64_t)(uintptr_t)ss, (uint64_t)count, 0, 0, 0, 0);
+    oa_call(c, FN_POUCH_GET, (uint64_t)(uintptr_t)ss, (uint64_t)count, 0, 0, 0, 0);
     LOG("[online] %s into the pouch\n", name);
 }
 
-void give_heart(Cpu *c) {
+void oa_give_heart(Cpu *c) {
     static const char name[] = "Obj_HeartUtuwa_A_01";
     uint64_t ss[2] = {*(uint64_t *)(uintptr_t)P_SAFE_STRING_VT + 0x10, (uint64_t)(uintptr_t)name};
-    call(c, FN_GET_SPECIAL, 0, (uint64_t)(uintptr_t)ss, 0, 0, 0, 0);
+    oa_call(c, FN_GET_SPECIAL, 0, (uint64_t)(uintptr_t)ss, 0, 0, 0, 0);
     LOG("[online] a heart container\n");
 }
 
-bool set_bool_flag(Cpu *c, uint32_t h) {
+bool oa_set_bool_flag(Cpu *c, uint32_t h) {
     uint64_t mgr = *(uint64_t *)(uintptr_t)P_GDT_MGR;
     mgr = VALID(mgr) ? *(uint64_t *)(uintptr_t)mgr : 0;
     uint64_t pb = VALID(mgr) ? *(uint64_t *)(uintptr_t)(mgr + 0xbd8) : 0;
     uint64_t buf = VALID(pb) ? *(uint64_t *)(uintptr_t)pb : 0;
     if (!VALID(buf)) return false;
-    uint32_t handle = (uint32_t)call(c, FN_GDT_HANDLE, buf, h, 0, 0, 0, 0);
+    uint32_t handle = (uint32_t)oa_call(c, FN_GDT_HANDLE, buf, h, 0, 0, 0, 0);
     handle |= (uint32_t)*(int32_t *)(uintptr_t)(mgr + 0xc28) << 24;
     if (handle == 0xffffffffu) return false;
-    return call(c, FN_GDT_SET_BOOL, mgr, 1, handle, 0, 0, 0) & 1;
+    return oa_call(c, FN_GDT_SET_BOOL, mgr, 1, handle, 0, 0, 0) & 1;
 }
