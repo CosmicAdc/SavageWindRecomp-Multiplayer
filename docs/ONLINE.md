@@ -715,7 +715,7 @@ A Blood Moon (protocol 32: QUEST carries whose it is): the host's game keeps eac
 all those ever sent), and the union it sends is of those and its own, so a flag every game has cleared leaves it. A
 game that sees 64 or more of these flags clear at once has had a Blood Moon: those the union still has then (the
 others' from before theirs) aren't set in it again, until the union drops them; one taken after is. So what was
-taken comes back in each game at its own Blood Moon. Tested with `bloodmoon` (developer mode: clears this game's
+taken comes back in each game at its own Blood Moon. Tested with `bloodmoonflags` (developer mode: clears this game's
 world flags, as one does): 70 items set on the host, cleared on the client, stayed clear there while the host still
 had them; cleared on the host too, clear in both; one set again on the host, set again on the client.
 
@@ -746,7 +746,7 @@ look for that child.
 
 Driving them (tools/swctl.py --port <p> ...): `teleport` / `goto <place>` (one map only: a shrine's or a Divine
 Beast's needs walking in), `look`, `press` / `hold` / `release` / `stick` for input, `set god_mode true`, `time`,
-`give`; and for online play `bloodmoon` (this game's world flags cleared, as a Blood Moon does), `actors <text>` (live actors: where, how far, their address), `flag` / `setflag` (read
+`give`; and for online play `bloodmoonflags` (this game's world flags cleared, as a Blood Moon does), `actors <text>` (live actors: where, how far, their address), `flag` / `setflag` (read
 a game data flag; set one, which the other game then takes like any flag this player gets: `setflag
 IsGet_Obj_HeroSoul_Rito` on one game gave the other Revali's Gale) and `event <flow> [entry]` (an event on Link; one
 out of its context can hang). Positions to stand at come from the map data: an object's front is P + d*(sin r,
