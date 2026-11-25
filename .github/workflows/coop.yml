@@ -51,3 +51,6 @@ jobs:
           clang -Wall -Iruntime tests/test_online_addr.c runtime/online_addr.c runtime/online_invite.c \
             -o /tmp/b/test_online_addr
           /tmp/b/test_online_addr
+          clang -Wall -Iruntime tests/test_online_discovery.c runtime/online_discovery.c -pthread \
+            -o /tmp/b/test_online_discovery
+          /tmp/b/test_online_discovery
