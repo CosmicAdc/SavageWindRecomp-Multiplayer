@@ -48,8 +48,15 @@ bot() {
     [ -f "$COMPARTIDO/listo" ] || { echo "[red-bots] falta $COMPARTIDO/listo" >&2; exit 1; }
     if [ -n "$RED" ]; then
         # shellcheck disable=SC2086  (the words of $RED are tc arguments)
-        tc qdisc add dev eth0 root netem $RED
-        echo "[red-bots] $nombre: netem $RED"
+        # Docker Desktop's WSL2 kernel has no netem ("Specified qdisc kind is unknown"): say so and go on without it
+        # (a Linux host, or a WSL kernel with sch_netem, applies it). RED_ESTRICTA=1 makes that an error instead.
+        if tc qdisc add dev eth0 root netem $RED; then
+            echo "[red-bots] $nombre: netem $RED"
+        elif [ "${RED_ESTRICTA:-0}" = 1 ]; then
+            echo "[red-bots] $nombre: netem no disponible y RED_ESTRICTA=1" >&2; exit 1
+        else
+            echo "[red-bots] $nombre: AVISO netem no disponible en este kernel: sin latencia ni pérdida simuladas" >&2
+        fi
     fi
     # (the server listens a moment after the healthcheck sees the file: online_bot exits 1 when it can't connect)
     intento=0
