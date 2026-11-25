@@ -1327,3 +1327,4 @@ T("Link", "")
 T("%s%u ms", "")
 
 T("%s  %.1f km", "")
+T("amiibo can't be used during an online session", "온라인 세션 중에는 amiibo를 사용할 수 없습니다")

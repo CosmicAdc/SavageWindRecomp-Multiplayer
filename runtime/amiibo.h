@@ -40,6 +40,10 @@ const Amiibo *amiibo_at(int i);
 int amiibo_on_reader(void);
 // Figure i's key for the settings: "<series>/<name>", or its name alone for a file in the amiibo folder
 bool amiibo_key(int i, char *out, size_t n);
+// With a session open the reader (services/nfp.c) gives no figure (online play: no amiibo during a session). True once
+// per session, the first time the overlay asks after the reader refused one: it shows the notice then
+bool nfp_take_blocked_notice(void);
+
 // The folder the dumps are read from (<data>/amiibo; made on first use)
 const char *amiibo_folder(void);
 // Whether the amiibo keys (key_retail.bin in that folder) are there: without them a figure gives no game data

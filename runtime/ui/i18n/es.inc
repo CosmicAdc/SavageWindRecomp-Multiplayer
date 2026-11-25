@@ -1326,3 +1326,4 @@ T("Downloading Intel XeSS", "Descargando Intel XeSS")
 T("Dynamic: renders the 3D scene smaller when frames are slow, sharper when they aren't; stays full size where that gains nothing.", "Dinámico: renderiza la escena 3D más pequeña cuando los fotogramas van lentos y más nítida cuando no; se queda a tamaño completo donde eso no gana nada.")
 
 T("%s  %.1f km", "")
+T("amiibo can't be used during an online session", "No se pueden usar amiibo durante una sesión en línea")

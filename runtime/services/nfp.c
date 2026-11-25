@@ -18,6 +18,7 @@
 #include "../settings.h"
 #include "../hle.h"
 #include "../ipc.h"
+#include "../online.h"
 
 enum { DEV_INITIALIZED, DEV_SEARCHING, DEV_FOUND, DEV_REMOVED, DEV_MOUNTED, DEV_UNAVAILABLE, DEV_FINALIZED };
 enum { E_DEVICE_NOT_FOUND = 64, E_WRONG_STATE = 73, E_TAG_REMOVED = 97, E_NOT_SET_UP = 120, E_AREA_NOT_INITIALIZED = 128,
@@ -38,12 +39,26 @@ static uint32_t g_area_id;
 static bool g_area_open, g_area_dirty;
 static AmiiboData g_data;  // what the mounted figure holds (amiibo_read_data)
 static bool g_data_ok;     // ... read with the amiibo keys
+// Online play: no figure while a session is open. g_refused: the reader refused one in this session; g_notified: the
+// overlay has shown the notice for it (both start over when the session ends)
+static _Atomic bool g_refused, g_notified;
 
 RT_ON_RESET(nfp_reset) {
+    g_refused = g_notified = false;
     g_state = DEV_INITIALIZED, g_fig = -1, g_initialized = false;
     memset(g_uid, 0, sizeof g_uid);
     g_activate = g_deactivate = NULL, g_activate_h = g_deactivate_h = g_avail_h = 0;
     g_area_size = -1, g_area_open = g_area_dirty = false, g_data_ok = false;
+}
+
+bool nfp_take_blocked_notice(void) {  // (the overlay's thread)
+    if (!online_session_open()) {
+        g_refused = g_notified = false;
+        return false;
+    }
+    if (!g_refused || g_notified) return false;
+    g_notified = true;
+    return true;
 }
 
 static void fire(KEvent *ev) {
@@ -88,6 +103,12 @@ static void nfp_user(Service *s, IpcReq *req, IpcResp *resp) {
     }
     case 3: {  // StartDetection: the chosen figure is on the reader (none chosen: nothing is found)
         int i = amiibo_on_reader();
+        if (i >= 0 && online_session_open()) {  // online play: no figure during a session
+            if (!g_refused) LOG("[nfp] session open: no figure on the reader\n");
+            g_refused = true, i = -1;
+        } else if (!online_session_open()) {
+            g_refused = g_notified = false;
+        }
         g_fig = i, g_state = i >= 0 ? DEV_FOUND : DEV_SEARCHING;
         if (i >= 0) {
             if (g_settings.amiibo_random_uid) {
@@ -114,6 +135,11 @@ static void nfp_user(Service *s, IpcReq *req, IpcResp *resp) {
         g_fig = -1, g_state = DEV_INITIALIZED, g_area_open = g_area_dirty = false;
         break;
     case 5:  // Mount: read the figure's game data
+        if (g_state == DEV_FOUND && online_session_open()) {  // (a session began with the figure already on the reader)
+            g_refused = true, g_fig = -1, g_state = DEV_REMOVED;
+            resp->result = NFP_ERROR(E_TAG_REMOVED);
+            break;
+        }
         if (g_state != DEV_FOUND) { resp->result = NFP_ERROR(g_state == DEV_REMOVED ? E_TAG_REMOVED : E_WRONG_STATE); break; }
         g_area_size = amiibo_area_load(amiibo_at(g_fig), &g_area_id, g_area, AREA_SIZE);
         g_data_ok = amiibo_read_data(amiibo_at(g_fig), &g_data);

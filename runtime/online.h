@@ -169,6 +169,8 @@ bool online_join(void);           // join g_online.host:g_online.port
 void online_leave(void);          // leave (and stop the server when hosting)
 int online_state(void);           // ONLINE_*
 bool online_is_host(void);
+// A session is open (connecting or connected; not off, not failed): what the amiibo reader (services/nfp.c) checks
+static inline bool online_session_open(void) { int s = online_state(); return s == ONLINE_CONNECTING || s == ONLINE_CONNECTED; }
 // what is going on, for the menu: an English text (tr() it) with at most one %s, *arg what goes there
 const char *online_status(char *arg, size_t cap);
 int online_local_id(void);        // the local player's slot, -1 when not connected

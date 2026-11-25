@@ -14,6 +14,7 @@
 extern "C" {
 #include "../framepace.h"
 }
+#include "../amiibo.h"
 #include "../game_sites.h"
 #include "../online.h"
 
@@ -199,6 +200,17 @@ extern "C" void online_overlay_draw(float scale, ImFont *font) {
             snprintf(t, sizeof t, tr(fmt[i]), n[i]);
             label(dl, font, fs, ImVec2(io.DisplaySize.x / 2, y), with_alpha(IM_COL32(236, 194, 84, 255), a), t);
             y += fs * 1.5f;
+        }
+    }
+    // amiibo are blocked while a session is open (services/nfp.c): a notice the first time the reader refuses one
+    {
+        static double until;
+        if (nfp_take_blocked_notice()) until = ImGui::GetTime() + 6;
+        double left = until - ImGui::GetTime();
+        if (left > 0) {
+            float a = left < 1 ? (float)left : 1.0f;
+            label(dl, font, fs, ImVec2(io.DisplaySize.x / 2, io.DisplaySize.y * 0.16f + fs * 4.5f),
+                  with_alpha(IM_COL32(236, 194, 84, 255), a), tr("amiibo can't be used during an online session"));
         }
     }
     if (st != ONLINE_CONNECTED) {  // connecting / failed: one line, bottom left
