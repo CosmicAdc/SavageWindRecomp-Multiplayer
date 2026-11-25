@@ -230,15 +230,15 @@ del bot con motivo de amenaza.
   cambia.
 - Riesgo: el bot tiene un búfer de 8192 bytes y no lee ENEMIES con más de ~26 enemigos (README, montaje común): las
   pruebas se hacen en un campamento pequeño.
-- **[PREGUNTA] Q-15-1** ¿Cuánto pesa una flecha frente a un golpe cuerpo a cuerpo? **Por defecto recomendado: lo
+- **[DUEÑO] (ADR-024) Q-15-1** ¿Cuánto pesa una flecha frente a un golpe cuerpo a cuerpo? **Por defecto recomendado: lo
   mismo, punto de daño por punto de daño.** Distinguirlos exigiría un campo nuevo en HIT y saber clasificar el daño
   que hace el dueño en su propio juego, cosa que hoy no se sabe sin ingeniería inversa.
-- **[PREGUNTA] Q-15-2** ¿Cuánta más amenaza hace falta para quitarle el enemigo a otro? **Por defecto: 1,5 veces la
+- **[DUEÑO] (ADR-024) Q-15-2** ¿Cuánta más amenaza hace falta para quitarle el enemigo a otro? **Por defecto: 1,5 veces la
   del otro.** Menos hace que vaya y venga entre dos que pegan parecido; más hace que tarde en volverse hacia el que
   dispara.
-- **[PREGUNTA] Q-15-3** ¿Cuánto tarda en olvidar? **Por defecto: la amenaza se reduce a la mitad cada 8 s sin
+- **[DUEÑO] (ADR-024) Q-15-3** ¿Cuánto tarda en olvidar? **Por defecto: la amenaza se reduce a la mitad cada 8 s sin
   golpes.**
-- **[PREGUNTA] Q-15-4** El jugador que más daño hace, ¿conserva el enemigo hasta 80 m aunque el otro esté al lado?
+- **[DUEÑO] (ADR-024) Q-15-4** El jugador que más daño hace, ¿conserva el enemigo hasta 80 m aunque el otro esté al lado?
   **Por defecto: sí, hasta 80 m** (hoy, el que se lo quitó a golpes lo pierde a 45 m). Si no, un arquero a más de
   45 m nunca lo retiene.
 

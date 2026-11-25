@@ -184,8 +184,8 @@ distancia indicada.
   cable (T409).
 - Riesgo: ImGui dibuja encima del HUD y puede tapar un icono del minimapa.
 - Riesgo: solo 1.9.0; otras versiones no se dibujan.
-- **Q-16-1** ¿Se distingue la altura (compañero muy arriba o muy abajo)? **Por defecto: no**, solo posición horizontal.
-- **Q-16-2** ¿Qué tamaño tiene la flecha? **Por defecto: 3 % del alto de pantalla (≈ 32 px a 1080p), y sigue el ajuste
+- **[DUEÑO] (ADR-024) Q-16-1** ¿Se distingue la altura (compañero muy arriba o muy abajo)? **Por defecto: no**, solo posición horizontal.
+- **[DUEÑO] (ADR-024) Q-16-2** ¿Qué tamaño tiene la flecha? **Por defecto: 3 % del alto de pantalla (≈ 32 px a 1080p), y sigue el ajuste
   "Overlay text size" de CU-10 (80-160 %).**
 - **Q-16-3** ¿Cómo se orienta la flecha si el minimapa lleva el norte arriba y no gira? **Por defecto: según lo que
   mida T445; si gira con la cámara, el rumbo se muestra relativo a la cámara; si lleva el norte arriba, en absoluto.**
@@ -193,9 +193,9 @@ distancia indicada.
 - **Q-16-5** Fuera del alcance, ¿la marca de borde muestra siempre la distancia? **Por defecto: sí, en metros
   redondeados ("350 m"), a la derecha de la marca, o a la izquierda si está en el semicírculo derecho; con más de
   10 000 m, "9999+ m".**
-- **Q-16-6** ¿La flecha se atenúa si el compañero está en pausa? **Por defecto: sí, como el marcador de CU-10 (la
+- **[DUEÑO] (ADR-024) Q-16-6** Respuesta: **igual que siempre, sin atenuar** (cambia el valor por defecto). ¿La flecha se atenúa si el compañero está en pausa? **Por defecto: sí, como el marcador de CU-10 (la
   mitad de opacidad).**
-- **Q-16-7** ¿Con varias personas se dibujan todas? **Por defecto: sí, una por compañero (hasta ONLINE_MAX − 1); si
+- **[DUEÑO] (ADR-024) Q-16-7** ¿Con varias personas se dibujan todas? **Por defecto: sí, una por compañero (hasta ONLINE_MAX − 1); si
   hay solape, se desplaza 1 radio de flecha la de índice mayor.**
 - **Q-16-8** ¿Qué hacer si T445 concluye que el alcance cambia con el zoom del minimapa y no se puede leer? **Por
   defecto: solo dibujar en el zoom por defecto y no dibujar fuera de él.**
