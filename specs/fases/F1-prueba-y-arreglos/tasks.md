@@ -26,7 +26,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
 
 ## A. Línea base (en serie)
 
-- [ ] T101 [pruebas] Preparar carpetas de prueba y marcar el punto de partida.
+- [x] T101 [pruebas] Preparar carpetas de prueba y marcar el punto de partida.
+  nota: `pruebas/guardado-solo` copiado a `guardado-A` y `guardado-B`; `ajustes-A.ini`, `ajustes-B.ini` y etiqueta `f0-cerrada` (`58fb6b3`) verificados.
   files: `$SW/pruebas/` (fuera del repositorio); etiqueta git local `f0-cerrada`
   verify: `ls "$SW/pruebas"` muestra `guardado-A guardado-B logs ajustes-A.ini ajustes-B.ini`; `git tag -l f0-cerrada` la lista
   depende de: F0 cerrada (T024)
@@ -56,7 +57,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no escribas rutas absolutas en el guion; no uses `timeout` de MSYS; no uses el puerto 52520.
   modelo sugerido: medio
 
-- [ ] T103 [pruebas] CU-01: hospedar y unirse.
+- [x] T103 [pruebas] CU-01: hospedar y unirse.
+  nota: PASA sin contraseña y con `password = prueba` (2 `joined (slot` en `A.log`, `hosting on port 52530`). Bitácora: `specs/bitacora/2026-11-24-F1-linea-base-pasada.md`.
   files: `specs/bitacora/<fecha>-F1-base-CU01.md`
   verify: `grep -c "joined (slot" "$SW/pruebas/logs/A.log"` da 2; en A aparece `[online] hosting on port 52530`; `grep -c "Disconnected\|Lost the connection" "$SW/pruebas/logs/B.log"` da 0 tras 2 min
   depende de: T102
@@ -71,7 +73,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no arregles nada; no dejes la contraseña de prueba en `online.ini`.
   modelo sugerido: bajo
 
-- [ ] T104 [pruebas] CU-02: ver al compañero.
+- [~] T104 [pruebas] CU-02: ver al compañero.
+  nota: corrida automatizada en `specs/bitacora/2026-11-24-F1-linea-base-pasada.md` (B vio `OnlinePlayer` de A; en la pasada de `recorrido.py` A devolvió 0, pero en la prueba con contraseña A sí registró `Client: OnlinePlayer`; paso 5 de enemigos falló por no detectar `Enemy_`). Pendiente de revisión y de `T107`.
   files: `specs/bitacora/<fecha>-F1-base-CU02.md`
   verify: tras `goto tower 7` en ambos, `$PY tools/swctl.py --port 7778 actors OnlinePlayer` devuelve un actor a menos de 20 m; tras mover a A con `stick l 0 1 150`, la posición de ese actor en B cambia
   depende de: T103
@@ -108,7 +111,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no dependas de paquetes fuera de la biblioteca estándar de Python; no leas memoria del juego con `mem`; no pongas rutas absolutas.
   modelo sugerido: medio
 
-- [ ] T106 [pruebas] CU-03: pasada desatendida de 30 minutos y medida de RAM.
+- [~] T106 [pruebas] CU-03: pasada desatendida de 30 minutos y medida de RAM.
+  nota: pasada ejecutada en `specs/bitacora/2026-11-24-F1-linea-base-pasada.md` (pasos 1, 4, 6, 7 PASA; pasos 2, 3, 5, 8, 9, 10 FALLA; RAM libre 7,17 GB → 0,14 GB mín, sin cuelgues).
   files: `specs/bitacora/<fecha>-F1-base-CU03.md`
   verify: salida completa de `$PY tools/coop/recorrido.py` guardada; tabla de pasos de `verificacion.md` §2 rellena; RAM libre antes y uso por proceso anotados
   depende de: T105
@@ -235,7 +239,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no muevas las llamadas de sitio dentro de `rt_online_frame`; no llames a `forget_all` desde el ayudante; no cambies `alive`.
   modelo sugerido: alto
 
-- [ ] T114 [oa] Lista de permitidos para nombres de actor que llegan por red.
+- [~] T114 [oa] Lista de permitidos para nombres de actor que llegan por red.
+  reclamada: integrada en `coop/main` + endurecimiento `T114b` (`coop/NOMBRES` `fe68382`, `online_mod/v43`, `make test-online-names`: 39 checks, 0 fallos); FALTA prueba en juego con `BOT_LOOT` y dos juegos.
   files: `runtime/online_actors.c`
   verify: con el juego A arrancado, `BOT_LOOT=Enemy_Bokoblin_Junior build/online_bot.exe 127.0.0.1 52530 Malo` ya **no** produce `loot N (Enemy_Bokoblin_Junior) made here` y sí una línea `[online] loot name refused`; soltar un arma en B sigue apareciendo en A; `make -j8` compila
   depende de: T113, T109
