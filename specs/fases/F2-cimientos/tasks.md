@@ -325,7 +325,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no arregles H-1 aquí; no cambies `runtime/online.c`; no publiques puertos fuera de la red de compose.
   modelo sugerido: medio
 
-- [ ] T220 [P] [i18n] Traducir los textos de Online que faltan.
+- [~] T220 [P] [i18n] Traducir los textos de Online que faltan.
+  reclamada: adelantada e integrada en `coop/main` (`coop/I18N` `179fc76` + `caaa473`): `tools/i18n_check.py` = `0 missing` en los 13 idiomas, `make -j8` compila; solo falta comprobación visual en juego de F1 → Online en español y validar junto a `T221`. No volver a tomar esta tarea.
   files: `runtime/ui/i18n/de.inc`, `es.inc`, `fr.inc`, `he.inc`, `it.inc`, `ja.inc`, `ko.inc`, `nl.inc`, `pt.inc`, `ru.inc`, `th.inc`, `zh-Hans.inc`, `zh-Hant.inc`
   verify: `$PY tools/i18n_check.py; echo $?` imprime `0 missing` en los 13 idiomas y termina con 0; `make -j8` compila; en juego, F1 → Online en español muestra todos los textos traducidos
   depende de: T214

@@ -143,7 +143,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no uses el guardado real.
   modelo sugerido: bajo (tarea humana)
 
-- [ ] T108 [bitácora] Cerrar la línea base: lista priorizada.
+- [~] T108 [bitácora] Cerrar la línea base: lista priorizada.
+  nota: borrador redactado en `specs/bitacora/2026-11-24-F1-linea-base.md` (incluye crash `0xc0000409` asignado a F2 `T212`, `PASO 2` intermitente y fallos de guion arreglados en `e805e02`); pendiente de aprobación del dueño.
   files: `specs/bitacora/<fecha>-F1-linea-base.md`
   verify: el fichero lista cada fallo con gravedad (cuelgue / incorrecto / cosmético), repro, frecuencia y fase destino; el dueño lo aprueba antes de empezar la parte B
   depende de: T106, T107
