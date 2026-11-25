@@ -99,3 +99,9 @@ menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un a
 - Observado: B recibe "the host's time: 11.00" en bucle con A sin foco (la hora de A no avanza: ¿pausa por foco?).
   Relacionado con HE-07 / T456.
 - El audio estaba a 0 por `dos_juegos.sh` (`SAVAGEWIND_AUDIO_GAIN=0`): el dueño lo notó.
+- **Reinicio del anfitrión (A), 1 ciclo con el dueño:** A.log `[reboot] requested`, `[online] reset`, `reboot: leaving
+  the session`, `server: Host left (slot 0)`, `Not connected`, `torn down in 1073 ms (52 reset hooks)`; B.log `removed
+  Host's Link`, `Disconnected by the server` (sin cierre). A vuelve a hospedar desde el menú (`Host joined (slot 0)`), B
+  se une (`Client joined (slot 1)`) y los dos se ven (`Host: OnlinePlayer` en B, `Client: OnlinePlayer` en A).
+  Coincide con lo previsto en la bitácora de T212 (el invitado ve "Disconnected by the server"; no hay mensaje de
+  "el servidor se va"). **T212: PE-1 cumplido** con el dueño.

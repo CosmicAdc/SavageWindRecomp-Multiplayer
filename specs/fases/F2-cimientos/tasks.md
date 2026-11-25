@@ -233,7 +233,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no borres actores desde la validación (solo olvidar, como hoy); no cambies los 180 fotogramas; no quites `link_live`.
   modelo sugerido: alto
 
-- [ ] T211 [oa] Inventario de variables estáticas que guardan estado del juego.
+- [x] T211 [oa] Inventario de variables estáticas que guardan estado del juego.
+  hecha: agente Opus oa-t211 (integrada) — 376 variables clasificadas (ADR-026), oa_statics.py; dudas resueltas por el orquestador en ENCARGO-T212
   files: `tools/coop/oa_statics.py` (nuevo), `tools/coop/oa_statics_permitidas.txt` (nuevo), `specs/decisiones/<n>-inventario-estaticas.md`
   verify: `$PY tools/coop/oa_statics.py --listar` imprime todas las variables `static` (de fichero y de función) de `runtime/oa_*.c` y `runtime/online.c` con fichero, línea, función y tipo; el documento de decisiones clasifica el 100 % de ellas; `$PY tools/coop/oa_statics.py` (modo comprobación) termina con **1** y lista las pendientes de limpiar (es lo esperado antes de T212)
   depende de: T210
@@ -248,7 +249,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no cambies código de `runtime/` en esta tarea; no clasifiques como "permitir" algo que guarde una dirección del juego (`uint64_t` que se usa como actor o unidad).
   modelo sugerido: alto
 
-- [ ] T212 [oa] `RT_ON_RESET` en todos los módulos (cambio de comportamiento en el reinicio).
+- [~] T212 [oa] `RT_ON_RESET` en todos los módulos (cambio de comportamiento en el reinicio).
+  reclamada: agente Opus oa-t212 (integrada `dc16647`) — oa_statics.py 0 pendientes; compila; pruebas en 0; **PE-1 con el dueño: invitado 2 ciclos y anfitrión 1 ciclo sin cierre, LEAVE y reingreso bien**; FALTA recorrido completo y firma
   files: `runtime/oa_*.c`, `runtime/online.c` (solo si el inventario lo pide), `tools/coop/oa_statics_permitidas.txt`
   verify: `$PY tools/coop/oa_statics.py` termina con 0; `make -j8` compila; en juego, con sesión activa: "Quit to start screen" → Continuar, tres veces en cada juego, sin cuelgue; el compañero ve LEAVE y la sesión queda cerrada en los dos (ADR-025); el log muestra una línea `[online] reset` por reinicio; recorrido completo pasa
   depende de: T211
