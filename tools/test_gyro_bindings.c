@@ -38,6 +38,7 @@ void motion_script(float a,float b,float c,float d){(void)a;(void)b;(void)c;(voi
 void watch_arm(void){abort();}
 bool menu_input_captured(void){return captured;}
 bool framepace_menu_ui(void){return paused;}
+bool framepace_dialogue_ui(void){return false;}  // (runtime/hle/bindings.c: no conversation window here)
 bool framepace_title_ui(void){return false;}
 // (the control endpoint and the DSU poll: off here; no controller, so no dual-stick)
 bool control_enabled(void){return false;}
