@@ -40,7 +40,8 @@ services:
       servidor: {condition: service_healthy}
     environment:
       PUERTO: "52530"
-      DURACION: "45"  # (this one leaving ends the run: abort-on-container-exit)
+      DURACION: "${DURACION:-45}"  # (this one leaving ends the run: abort-on-container-exit)
+      RED: "${RED-delay 80ms 20ms loss 2%}"  # (red-medidas.sh sets it per scenario; RED= empty: no netem)
 
   bot-b:
     <<: *prueba
@@ -49,7 +50,9 @@ services:
       servidor: {condition: service_healthy}
     environment:
       PUERTO: "52530"
-      DURACION: "45"
+      DURACION: "${DURACION:-45}"
+      RED: "${RED-delay 80ms 20ms loss 2%}"
+      BOT_NOREAD: "${BOT_NOREAD:-}"  # (red-medidas.sh: after s seconds it stops reading, connection open: H-1)
 
   # Goes silent after 5 s with its connection open; the server drops it after ~10 s (TIMEOUT_NS).
   bot-congelado:

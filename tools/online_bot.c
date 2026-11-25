@@ -7,6 +7,9 @@
 // BOT_NAN=1: its STATE carries a position that is not finite (pos[0] = NAN) from then on;
 // BOT_LOOT=<actor>: a LOOT_ADD of that actor's name, at its position;
 // BOT_SHIELD=1: an ESTATE with one enemy whose shield is 40 'A' with no terminator.
+// Network measurements (tools/docker/red-medidas.sh): every 5 s it prints "bot: stats ..." with the STATE messages it
+// received from the others; BOT_NOREAD=<s>: after s seconds it stops calling recv, its connection left open, and keeps
+// sending (a client that doesn't read: the server's sends to it block, H-1).
 //
 //   cc -O2 -Iruntime -o build/online_bot tools/online_bot.c [-lws2_32]
 //   build/online_bot [host] [port] [name] [radius] [head upper lower] [weapon shield bow sheath quiver]
@@ -16,14 +19,21 @@
 #include <ws2tcpip.h>
 typedef SOCKET sock_t;
 #define sleep_ms(ms) Sleep(ms)
+static double wall_s(void) { return (double)GetTickCount64() / 1000; }
 #else
 #include <netdb.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 typedef int sock_t;
 #define closesocket close
 #define sleep_ms(ms) usleep((ms) * 1000)
+static double wall_s(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
 #endif
 #include <math.h>
 #include <stdbool.h>
@@ -60,14 +70,30 @@ int main(int argc, char **argv) {
     msg(s, M_HELLO, &h, sizeof h);
     float centre[3] = {0, 0, 0};
     int have = 0, id = -1, said = 0;
-    uint8_t buf[8192];
+    uint8_t buf[32768];  // (the runtime's RecvBuf: an ENEMIES can be 9 965 bytes)
     int n = 0;
+    // received from the others: STATE messages and all messages, in the current 5 s window and in all
+    long st_win = 0, st_all = 0, msgs_win = 0, msgs_all = 0;
+    double t0 = wall_s(), win0 = t0;
     for (double t = 0;; t += 0.05) {
+        // BOT_NOREAD=<s>: after that many seconds it no longer reads, its connection left open (it keeps sending)
+        const char *nr = getenv("BOT_NOREAD");  // (compose passes it empty when unset)
+        bool noread = nr && *nr && t > atof(nr);
+        if (noread) {
+            static int said_noread;
+            if (!said_noread++) fprintf(stderr, "bot: not reading\n");
+        }
+        if (wall_s() - win0 >= 5) {
+            double now = wall_s();
+            fprintf(stderr, "bot: stats t=%.0f state=%ld in %.1fs (%.1f/s) total=%ld msgs=%ld\n", now - t0, st_win, now - win0,
+                    (double)st_win / (now - win0), st_all, msgs_all);
+            st_win = msgs_win = 0, win0 = now;
+        }
         fd_set rd;
         FD_ZERO(&rd);
         FD_SET(s, &rd);
         struct timeval tv = {0, 0};
-        while (select((int)s + 1, &rd, NULL, NULL, &tv) > 0) {
+        while (!noread && select((int)s + 1, &rd, NULL, NULL, &tv) > 0) {
             int k = recv(s, (char *)buf + n, (int)sizeof buf - n, 0);
             if (k <= 0) { fprintf(stderr, "bot: disconnected\n"); return 0; }
             n += k;
@@ -76,11 +102,13 @@ int main(int argc, char **argv) {
                 int l = buf[o] | buf[o + 1] << 8;
                 if (n - o - 2 < l) break;
                 uint8_t ty = buf[o + 2], *p = buf + o + 3;
+                msgs_win++, msgs_all++;
                 if (ty == M_WELCOME) id = p[0], fprintf(stderr, "bot: in, slot %d\n", id);
                 if (ty == M_REJECT) { fprintf(stderr, "bot: refused (%d)\n", p[0]); return 1; }
                 if (ty == M_JOIN) fprintf(stderr, "bot: %.24s is slot %d\n", (const char *)p + 1, p[0]);
                 if (ty == M_CHAT) fprintf(stderr, "bot: chat from %d: %s\n", p[0], (const char *)p + 1);
                 if (ty == M_STATE && p[0] != id) {
+                    st_win++, st_all++;
                     WireState ws;
                     memcpy(&ws, p + 1, sizeof ws);
                     if (!(ws.flags & 2)) {
