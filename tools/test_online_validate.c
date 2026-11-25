@@ -284,7 +284,7 @@ static void describe_state(Kind *k) {
     for (int i = 0; i < ONLINE_FX_EVENTS; i++) {
         entry(k, E_PLAIN, -1, i);
         add(k, WE(fxev, seq, i), WS(fxev[0].seq), T_ANY, 0, 0, "fxev[].seq");
-        add(k, WE(fxev, who, i), 1, T_U8, 4, -1, "fxev[].who");
+        add(k, WE(fxev, who, i), 1, T_U8, 5, -1, "fxev[].who");
         add(k, WE(fxev, name, i), WS(fxev[0].name), T_STR, 0, 0, "fxev[].name");
     }
     entry(k, E_PLAIN, -1, 0);

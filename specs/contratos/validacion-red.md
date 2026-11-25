@@ -172,7 +172,7 @@ que hace `cl_message`, después de terminar las cadenas (`online_terminate_state
 | `boss[k]` (hash, nombre, vida) | nombre malo; vida `< 0` | a cero (hash 0, `""`) |
 | `fx` | sin terminar | `""` |
 | `fx_anim[k]` + `fx_frame[k]` (k < 3) | animación `< -1` o `> 4095`; fotograma malo | animación `-1`, fotograma 0 |
-| `fxev[k]` (seq, who, nombre) | `who > 4`; nombre sin terminar | a cero (`seq` 0) |
+| `fxev[k]` (seq, who, nombre) | `who > 5`; nombre sin terminar | a cero (`seq` 0) |
 | `weather` | `> 8` y `≠ 255` | 255 (desconocido) |
 | `dye[k]` (k < 3) | `< -1` | `-1` (ninguno) |
 | `pvp_target` + `pvp_damage` | ranura `≥ 8`; daño `< 0` | 0 y 0; `pvp_seq` se conserva, así el golpe que nombra se pierde y no se aplica cuando vuelva |

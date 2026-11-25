@@ -33,7 +33,8 @@
                                       // ONLINE_GEAR_WORLD
 #define ONLINE_V_HAND_BONES 2         // OnlineEnemy.wbone / sbone: 0 the world, 1 Weapon_R, 2 Weapon_L
 #define ONLINE_V_OWNER_NONE 0xff      // OnlineEnemy.owner: a slot, or nobody's (online_actors.c OWNER_NONE)
-#define ONLINE_V_FXEV_WHO_MAX 4       // OnlineFxEvent.who: 0 his Link, 1 his weapon, 2 / 3 their sounds, 4 his ground's
+#define ONLINE_V_FXEV_WHO_MAX 5       // OnlineFxEvent.who: 0 his Link, 1 his weapon, 2 / 3 their sounds, 4 his ground's,
+                                      // 5 the fairy's that revives him
 #define ONLINE_V_FLAGS (ONLINE_F_PAUSED | ONLINE_F_LOADING)
 #define ONLINE_V_EFFECTS (ONLINE_E_KAGO | ONLINE_E_KAGO_COUNT | ONLINE_E_GALE | ONLINE_E_DEMO)
 

@@ -65,6 +65,28 @@ static struct { uint64_t name; float pos[3]; uint32_t props[16]; } volatile g_rf
 static uint32_t volatile g_rf_props[16];  // (its ELink property values at its last: what it chose to play by)
 static volatile int g_rf_next;
 static int g_rf_taken;
+// The fairy that revives the local Link (his own, from his pouch, or online play's, rt_online_has_fairy) is an actor of
+// the game's of its own, not his: what its emitters play (PE-T454-1: "Appear" and "ResurrectionFairy" from one,
+// "Fairy_Light" and "FairyTail" from another) the others' games never saw. While he is dead, and FAIRY_AFTER_NS after
+// he is up, what the emitters not watched play is noted (g_fy_ring, any thread) for the frame loop (fairy_update): an
+// emitter that plays an effect with "Fairy" in its name, its actor near him, is the fairy's (by the effect's name, not
+// by an address: it is made anew each time), and what it plays - also what it played up to FAIRY_HOLD_NS before:
+// "Appear" comes first - goes to the others as his effects, who 5; they play them on his puppet
+#define FAIRY_RING 128
+#define FAIRY_UIS 8
+#define FAIRY_HOLD_NS 500000000ull
+#define FAIRY_AFTER_NS 3000000000ull  // (the three seconds the frame loop waits once he is up: frame_wait)
+#define FAIRY_AGAIN_NS 1000000000ull  // (one of a name sent again within this: not sent)
+#define FAIRY_NEAR 8.0f               // (its actor within this of him, m: a fairy about the place isn't his)
+static volatile bool g_fy_on;
+static struct { uint64_t ui, name; } volatile g_fy_ring[FAIRY_RING];
+static volatile int g_fy_next;
+static int g_fy_taken;
+static struct { uint64_t ui, name, t; } g_fy_held[FAIRY_RING];  // (noted, not yet known to be the fairy's)
+static int g_fy_held_n;
+static uint64_t g_fy_ui[FAIRY_UIS], g_fy_not[FAIRY_UIS];  // (the fairy's emitters this time; another fairy's, far)
+static struct { char name[24]; uint64_t t; } g_fy_sent[ONLINE_FX_EVENTS];
+static uint64_t g_fy_dead_t;  // (when he was last seen dead; 0 never)
 
 void rt_online_xlink_emit(uint64_t ui, uint64_t loc) {
     if (!online_version_ok(g_game_version) || !VALID(ui)) return;
@@ -82,6 +104,13 @@ void rt_online_xlink_emit(uint64_t ui, uint64_t loc) {
     }
     int who = 0;
     while (who < FX_WATCH && g_fx_ui[who] != ui) who++;
+    if (who == FX_WATCH && g_fy_on && VALID(loc)) {  // (another emitter while he is dead: the fairy's? fairy_update)
+        uint64_t t = *(uint64_t *)(uintptr_t)(loc + 8), nm = VALID(t) ? *(uint64_t *)(uintptr_t)t : 0;
+        if (VALID(nm)) {
+            int k = __atomic_fetch_add(&g_fy_next, 1, __ATOMIC_RELAXED) & (FAIRY_RING - 1);
+            g_fy_ring[k].ui = ui, g_fy_ring[k].name = nm;
+        }
+    }
     static int all = -1;  // (SAVAGEWIND_ONLINE_FX_ALL=1: every actor's to the log, to find which one plays an effect)
     if (all < 0) all = getenv("SAVAGEWIND_ONLINE_FX_ALL") != NULL;
     if ((who == FX_WATCH && !all) || !VALID(loc)) return;
@@ -177,6 +206,97 @@ static bool continuous_sound(const char *n) {
     return false;
 }
 
+static bool fairy_has(const uint64_t *uis, uint64_t ui) {
+    for (int k = 0; k < FAIRY_UIS; k++)
+        if (uis[k] == ui) return true;
+    return false;
+}
+
+static void fairy_add(uint64_t *uis, uint64_t ui) {
+    if (!ui || fairy_has(uis, ui)) return;
+    int k = 0;
+    while (k < FAIRY_UIS - 1 && uis[k]) k++;
+    uis[k] = ui;
+}
+
+// an emitter that played a fairy's effect: its actor (one whose ELink or SLink it is), if found among the actors, near
+// him - the fairy's: its ELink's and SLink's sent from now on - or not; not found, taken as the fairy's
+static void fairy_found(uint64_t player, uint64_t ui, const char *n) {
+    int na = VALID(player) ? oa_all_actors(*(uint64_t *)(uintptr_t)(player + 0x68), oa_g_actors, MAX_ACTORS) : 0;
+    for (int k = 0; k < na; k++) {
+        uint64_t a = oa_g_actors[k], eu = oa_elink_ui(a), su = oa_slink_ui(a);
+        if (eu != ui && su != ui) continue;
+        char nm[48];
+        oa_actor_name_of(a, nm);
+        const float *m = (const float *)(uintptr_t)(a + 0x398), *pm = (const float *)(uintptr_t)(player + 0x398);
+        float dx = m[3] - pm[3], dy = m[7] - pm[7], dz = m[11] - pm[11], d = sqrtf(dx * dx + dy * dy + dz * dz);
+        bool near = d < FAIRY_NEAR;
+        LOG("[online] fairy: %s's %s (%llx), %.1f m from Link%s\n", nm, n, (unsigned long long)ui, d,
+            near ? ": the one that revives him, sent" : ": not his, not sent");
+        if (!near) { fairy_add(g_fy_not, ui); return; }
+        fairy_add(g_fy_ui, eu), fairy_add(g_fy_ui, su);
+        return;
+    }
+    LOG("[online] fairy: %s (%llx), its actor not found: taken as the one that revives him, sent\n", n,
+        (unsigned long long)ui);
+    fairy_add(g_fy_ui, ui);
+}
+
+// each frame (oa_fx_update): while he is dead and a while after, the fairy's effects to the others (who 5)
+static void fairy_update(uint64_t player) {
+    uint64_t now = plat_now_ns();
+    if (oa_g_local_dead) g_fy_dead_t = now;
+    bool on = g_fy_dead_t && now - g_fy_dead_t < FAIRY_AFTER_NS;
+    if (!on && g_fy_on) {  // (over: this fairy forgotten)
+        g_fy_held_n = 0;
+        memset(g_fy_ui, 0, sizeof g_fy_ui), memset(g_fy_not, 0, sizeof g_fy_not);
+    }
+    g_fy_on = on;
+    int end = __atomic_load_n(&g_fy_next, __ATOMIC_ACQUIRE);
+    if (!on) { g_fy_taken = end; return; }
+    if (end - g_fy_taken > FAIRY_RING) g_fy_taken = end - FAIRY_RING;
+    for (; g_fy_taken < end; g_fy_taken++) {
+        int k = g_fy_taken & (FAIRY_RING - 1);
+        uint64_t ui = g_fy_ring[k].ui, name = g_fy_ring[k].name;
+        if (!ui || !VALID(name)) continue;
+        if (g_fy_held_n == FAIRY_RING) {  // (full: the oldest goes)
+            g_fy_held_n--;
+            memmove(g_fy_held, g_fy_held + 1, sizeof g_fy_held[0] * g_fy_held_n);
+        }
+        g_fy_held[g_fy_held_n].ui = ui, g_fy_held[g_fy_held_n].name = name, g_fy_held[g_fy_held_n].t = now;
+        g_fy_held_n++;
+    }
+    for (int k = 0; k < g_fy_held_n; k++) {  // (which emitters are the fairy's)
+        const char *n = (const char *)(uintptr_t)g_fy_held[k].name;
+        uint64_t ui = g_fy_held[k].ui;
+        if (strstr(n, "Fairy") && !fairy_has(g_fy_ui, ui) && !fairy_has(g_fy_not, ui)) fairy_found(player, ui, n);
+    }
+    int keep = 0;
+    for (int k = 0; k < g_fy_held_n; k++) {  // (the fairy's sent, the oldest first; the rest kept a while)
+        const char *n = (const char *)(uintptr_t)g_fy_held[k].name;
+        if (!fairy_has(g_fy_ui, g_fy_held[k].ui)) {
+            if (now - g_fy_held[k].t < FAIRY_HOLD_NS && !fairy_has(g_fy_not, g_fy_held[k].ui)) g_fy_held[keep++] = g_fy_held[k];
+            continue;
+        }
+        if (strlen(n) >= sizeof g_fxev[0].name) continue;
+        int s = 0, old = 0;  // (one of a name again within FAIRY_AGAIN_NS: not sent, its effect still plays there)
+        while (s < ONLINE_FX_EVENTS && strcmp(g_fy_sent[s].name, n)) s++;
+        if (s < ONLINE_FX_EVENTS && now - g_fy_sent[s].t < FAIRY_AGAIN_NS) continue;
+        if (s == ONLINE_FX_EVENTS) {
+            for (int q = 1; q < ONLINE_FX_EVENTS; q++)
+                if (g_fy_sent[q].t < g_fy_sent[old].t) old = q;
+            s = old;
+        }
+        snprintf(g_fy_sent[s].name, sizeof g_fy_sent[s].name, "%s", n), g_fy_sent[s].t = now;
+        OnlineFxEvent *e = &g_fxev[g_fxev_seq % ONLINE_FX_EVENTS];
+        if (!++g_fxev_seq) g_fxev_seq = 1;
+        e->seq = g_fxev_seq, e->who = 5;
+        snprintf(e->name, sizeof e->name, "%s", n);
+        if (getenv("SAVAGEWIND_ONLINE_FX_LOG")) LOG("[online] fx fairy: %.60s\n", n);
+    }
+    g_fy_held_n = keep;
+}
+
 // oa_fx_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
 static int rf_tick;
 static float rf_was[2];  // (where he was the frame before: moving, more than 1 cm a frame)
@@ -184,6 +304,7 @@ static char rf_last[24];
 static uint64_t rf_last_t;
 
 void oa_fx_update(uint64_t player) {
+    fairy_update(player);
     // the ground's reactions to his steps (ReactionField plays them: his footprints, the dust, the water, the grass):
     // sent as his effects (who 4), the others play them on theirs where his puppet is
     if (VALID(player)) {
@@ -922,6 +1043,16 @@ RT_ON_RESET(oa_sample_reset) {
     for (int k = 0; k < 16; k++) g_rf_props[k] = 0;
     g_rf_next = 0;
     g_rf_taken = 0;
+    g_fy_on = false;
+    for (int k = 0; k < FAIRY_RING; k++) g_fy_ring[k].ui = 0, g_fy_ring[k].name = 0;  // (volatile ones: one by one)
+    g_fy_next = 0;
+    g_fy_taken = 0;
+    memset(g_fy_held, 0, sizeof g_fy_held);
+    g_fy_held_n = 0;
+    memset(g_fy_ui, 0, sizeof g_fy_ui);
+    memset(g_fy_not, 0, sizeof g_fy_not);
+    memset(g_fy_sent, 0, sizeof g_fy_sent);
+    g_fy_dead_t = 0;
     n = 0;
     memset(continuous_sound_seen, 0, sizeof continuous_sound_seen);
     next = 0;
