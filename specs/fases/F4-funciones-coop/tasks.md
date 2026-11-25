@@ -1023,7 +1023,8 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   hecho cuando: `verify` cumplido.
   modelo sugerido: medio
 
-- [ ] T465 [coop] Invitación a santuario (ADR-025 n.º 11-13).
+- [~] T465 [coop] Invitación a santuario (ADR-025 n.º 11-13).
+  en curso: T465a hecha (agente Sonnet ag-t465a, integrada) — `runtime/coop_shrine_invite.c` + prueba (all checks passed), en CI; diseño en la bitácora de T540 (T465b ajuste e i18n, T465c cableado; T465d resuelta por ADR-025 n.º 14: la puerta se abre sola; T465e cerrada: sin aviso a A)
   files: los que proponga T540 (previsiblemente `runtime/coop_*.c` nuevo para la lógica pura, `runtime/oa_*.c`, mensajes de aviso en `runtime/ui/`, textos en `runtime/ui/i18n/*.inc`)
   verify: prueba pura del estado de la invitación (entra → aviso → aceptar/rechazar/30 s); en juego: A entra a un santuario, a B le sale el aviso, B acepta, aparece en la puerta exterior, entra andando y los dos se ven dentro; con el aviso apagado en ajustes no sale; `i18n_check.py` en 0
   depende de: T540 (investigación), HE-02 (filtro de mapa en el cliente)
