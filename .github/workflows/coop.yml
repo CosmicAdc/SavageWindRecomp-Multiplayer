@@ -45,3 +45,5 @@ jobs:
           clang -Wall -Iruntime tests/test_coop_palette.c runtime/coop_palette.c runtime/colour_vision.c -lm \
             -o /tmp/b/test_coop_palette
           /tmp/b/test_coop_palette
+          clang -Wall -Iruntime tests/test_online_auth.c runtime/online_auth.c runtime/update_crypto.c \n            -o /tmp/b/test_online_auth
+          /tmp/b/test_online_auth
