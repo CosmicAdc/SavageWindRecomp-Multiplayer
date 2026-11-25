@@ -24,6 +24,7 @@
 #include "control_cells.h"
 #include "game_sites.h"
 #include "online.h"
+#include "online_gate.h"
 #include "rt.h"
 #include "settings.h"
 
@@ -222,9 +223,15 @@ static const char *actor_name(void) {
 
 static bool is_online_player(void) { return actor_name() && !strcmp(actor_name(), "OnlinePlayer"); }
 
+// (not on another version of the game: the addresses here are 1.9.0's, runtime/online_gate.h; said once in the log)
 static bool online_actors_on(void) {
     static int on = -1;
-    if (on < 0) on = actor_name() != NULL;
+    if (on < 0) {
+        bool version = online_version_ok(g_game_version);
+        on = version && actor_name() != NULL;
+        LOG("[online] game version %s: actors %s\n", g_game_version && *g_game_version ? g_game_version : "unknown",
+            on ? "on" : version ? "off" : "off (online play's actors need 1.9.0)");
+    }
     return on;
 }
 
@@ -812,12 +819,13 @@ static uint64_t volatile g_bomb_made[4];
 static volatile int g_bomb_next;
 
 void rt_online_bomb(uint64_t bomb) {
-    if (!VALID(bomb)) return;
+    if (!online_version_ok(g_game_version) || !VALID(bomb)) return;
     int k = __atomic_fetch_add(&g_bomb_next, 1, __ATOMIC_RELAXED);
     g_bomb_made[k & 3] = bomb;
 }
 
 void rt_online_arrow(uint64_t action) {
+    if (!online_version_ok(g_game_version)) return;
     uint64_t a = *(uint64_t *)(uintptr_t)(action + 8);
     if (!VALID(a)) return;
     int k = __atomic_fetch_add(&g_arrow_next, 1, __ATOMIC_RELAXED);
@@ -866,7 +874,7 @@ static volatile int g_rf_next;
 static int g_rf_taken;
 
 void rt_online_xlink_emit(uint64_t ui, uint64_t loc) {
-    if (!VALID(ui)) return;
+    if (!online_version_ok(g_game_version) || !VALID(ui)) return;
     if (ui == g_rf_ui && g_rf_ui && VALID(loc)) {  // (ReactionField's: what and where, its matrix as it plays it)
         uint64_t t = *(uint64_t *)(uintptr_t)(loc + 8), nm = VALID(t) ? *(uint64_t *)(uintptr_t)t : 0;
         if (VALID(nm)) {
@@ -933,12 +941,14 @@ static void anim_slots(uint64_t actor, int16_t idx[3], float frame[3]) {
 static struct { uint64_t actor; int16_t anim[3]; float frame[3]; } volatile g_blur[ONLINE_MAX];  // (each puppet's)
 
 uint32_t rt_blur_anim(uint64_t actor, uint32_t slot, uint32_t id) {
+    if (!online_version_ok(g_game_version)) return id;
     for (int i = 0; actor && i < ONLINE_MAX; i++)
         if (g_blur[i].actor == actor) return slot < 3 && g_blur[i].anim[slot] >= 0 ? (uint32_t)g_blur[i].anim[slot] << 16 : id;
     return id;
 }
 
 float rt_blur_frame(uint64_t actor, uint32_t slot, float frame) {
+    if (!online_version_ok(g_game_version)) return frame;
     for (int i = 0; actor && i < ONLINE_MAX; i++)
         if (g_blur[i].actor == actor) return slot < 3 && g_blur[i].anim[slot] >= 0 ? g_blur[i].frame[slot] : frame;
     return frame;
@@ -2801,6 +2811,7 @@ uint32_t rt_scene_state(uint32_t v) { return v == 1 && g_nopause_now ? 0 : v; }
 // Not in its first frames: the world's camera is turned on again a frame after the menu opens (the frame hook), so
 // until then the game's own picture, made as it opened, stays (made again from a frame without the world: a flash)
 int rt_online_menu_live(void) {
+    if (!online_version_ok(g_game_version)) return 0;
     static int still = -1;
     if (still < 0) still = getenv("SAVAGEWIND_ONLINE_MENU_STILL") != NULL;
     return g_nopause_now && g_nopause_frames > MENU_LIVE_AFTER && !still;
@@ -2810,6 +2821,7 @@ int rt_online_menu_live(void) {
 // reading of the menu's state, not g_nopause_now: that is set later in the frame, after the menu has opened.
 // SAVAGEWIND_ONLINE_MENU_STILL: the still picture)
 uint32_t rt_menu_draw_pause(void) {
+    if (!online_version_ok(g_game_version)) return 1;
     static int still = -1;
     if (still < 0) still = getenv("SAVAGEWIND_ONLINE_MENU_STILL") != NULL;
     if (still || online_state() != ONLINE_CONNECTED || !g_site.pause_state) return 1;
@@ -2823,6 +2835,7 @@ uint32_t rt_menu_draw_pause(void) {
     return rule && others ? 0 : 1;
 }
 uint32_t rt_online_has_fairy(uint32_t had) {
+    if (!online_version_ok(g_game_version)) return had;
     if (had || online_state() != ONLINE_CONNECTED) return had;
     int rule = g_revive_rule;
     if (rule < 0) rule = g_online.revive;
@@ -5580,6 +5593,11 @@ static struct { volatile int state; char name[64]; int found, set; uint32_t word
 
 static void flag_query(Cpu *c) {
     if (__atomic_load_n(&g_flagq.state, __ATOMIC_ACQUIRE) != 1) return;
+    if (!online_version_ok(g_game_version)) {  // (its setter is at a 1.9.0 address: answered, with nothing)
+        g_flagq.found = 0, g_flagq.word = 0;
+        __atomic_store_n(&g_flagq.state, 2, __ATOMIC_RELEASE);
+        return;
+    }
     uint32_t h = crc32_str(g_flagq.name);
     uint32_t *v = bool_flag(h);
     if (v && g_flagq.set && !(*v & 1) && !set_bool_flag(c, h)) *v |= 1;
@@ -5628,7 +5646,9 @@ static struct { volatile int state; char flow[64], entry[64]; int ok; } g_eventq
 static void event_query(Cpu *c, uint64_t pinfo) {
     if (__atomic_load_n(&g_eventq.state, __ATOMIC_ACQUIRE) != 1) return;
     uint64_t player = pinfo ? *(uint64_t *)(uintptr_t)(pinfo + 0x60) : 0;
-    g_eventq.ok = VALID(player) && start_event(c, player, g_eventq.flow, g_eventq.entry);
+    // (the event manager and its calls are at 1.9.0 addresses: on another version, answered as not started)
+    g_eventq.ok = online_version_ok(g_game_version) && VALID(player) &&
+                  start_event(c, player, g_eventq.flow, g_eventq.entry);
     __atomic_store_n(&g_eventq.state, 2, __ATOMIC_RELEASE);
 }
 
