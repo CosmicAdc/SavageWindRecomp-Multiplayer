@@ -34,7 +34,7 @@ jobs:
         run: |
           set -e
           mkdir -p /tmp/b
-          for m in ratelimit invite netstat; do
+          for m in ratelimit invite netstat version; do
             clang -Wall -Iruntime tests/test_online_$m.c runtime/online_$m.c -lm -o /tmp/b/test_online_$m
             /tmp/b/test_online_$m
           done
