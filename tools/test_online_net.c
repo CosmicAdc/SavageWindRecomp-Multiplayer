@@ -373,11 +373,11 @@ static void prepare(bool hosting) {
     CHECK(send_join(1, "Bot"));
 }
 
-// the message `type` of `minlen` bytes (first byte the slot 1, then `fill`): one byte short changes nothing, whole does
-static void short_vs_whole(const char *what, uint8_t type, bool hosting, int minlen, uint8_t fill) {
+// the message `type` of `minlen` bytes (first byte `first`, then `fill`): one byte short changes nothing, whole does
+static void short_vs_whole_first(const char *what, uint8_t type, bool hosting, int minlen, uint8_t fill, uint8_t first) {
     prepare(hosting);
     memset(cbuf, fill, sizeof cbuf);
-    cbuf[0] = 1;
+    cbuf[0] = first;
     take_snap();
     bool ok = cl_message(type, cbuf, minlen - 1);
     checks++;
@@ -385,6 +385,11 @@ static void short_vs_whole(const char *what, uint8_t type, bool hosting, int min
     ok = cl_message(type, cbuf, minlen);
     checks++;
     if (!ok || snap_same()) failures++, printf("FAIL %s: a payload of %d bytes changed nothing\n", what, minlen);
+}
+
+// (first byte the slot 1: what the server puts in front of most messages)
+static void short_vs_whole(const char *what, uint8_t type, bool hosting, int minlen, uint8_t fill) {
+    short_vs_whole_first(what, type, hosting, minlen, fill, 1);
 }
 
 static void test_short_payload_ignored(void) {
@@ -397,7 +402,9 @@ static void test_short_payload_ignored(void) {
     short_vs_whole("PONG", M_PONG, false, 8, 0);
     short_vs_whole("QUESTS", M_QUESTS, false, ONLINE_QUEST_BYTES, 0);
     short_vs_whole("HIT", M_HIT, false, 9, 0);
-    short_vs_whole("PICK", M_PICK, false, 52, 0);
+    // (PICK has no slot in front: its first byte is the weapon's name's, so a slot 1 there would be a name "\x01",
+    // which the validation layer refuses; "W" is a name, the rest zeros: its end and a position at the origin)
+    short_vs_whole_first("PICK", M_PICK, false, 52, 0, 'W');
     short_vs_whole("LOOT_ADD", M_LOOT_ADD, true, 1 + (int)sizeof(OnlineLoot), 0);
     short_vs_whole("LOOT_TAKE", M_LOOT_TAKE, true, 5, 0);
     short_vs_whole("QUEST", M_QUEST, true, 1 + ONLINE_QUEST_BYTES, 0);
