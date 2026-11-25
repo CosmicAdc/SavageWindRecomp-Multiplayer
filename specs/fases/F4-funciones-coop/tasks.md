@@ -894,3 +894,104 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   hecho cuando: la bitácora tiene la respuesta.
   no hagas: no escribas código de dibujo; no toques `tools/patches.py` ni `tools/game_sites.py`; no pegues desensamblado ni nada de proyectos de descompilación; no crees marcas ni pines reales del juego.
   modelo sugerido: alto
+
+## Tareas añadidas por ADR-025 (respuestas del dueño, ronda 6) y por los hallazgos de F1 (sesión del 2026-11-25)
+
+- [ ] T448 [reglas] Modo dios y "daño recibido" también para el daño en línea (ADR-025 n.º 8; HE-10; arregla N1).
+  files: `runtime/oa_rules.c`, `runtime/oa_enemies.c`, `runtime/assists.c` (solo si hace falta exportar la regla)
+  verify: `make -j8` compila; en juego, B con `god_mode`: diez golpes de A en PvP y diez de un enemigo cuyo dueño es A, sin perder vida; con "daño recibido" a la mitad, el daño en línea es la mitad (log de vida antes/después)
+  depende de: T434 si ya está hecha (si no, solo enemigos y bombas, y T434 lo hereda)
+  quién: agente
+  contexto: `assists.c:rt_link_life` es lo único que mira `god_mode` y `damage_taken`. `oa_pvp_update`, `oa_strike` y `oa_own_strikes_in_menu` restan vida escribiendo en `player + ENEMY_LIFE` (mapa 08, fila "Modo dios y daño recibido"). En la sesión del 2026-11-25 hubo 8 muertes con `god_mode` activo (N1).
+  pasos:
+    1. Una función `oa_apply_damage(player, dmg)` que aplique la misma regla que `rt_link_life` y escriba la vida resultante.
+    2. Que los tres sitios pasen por ella.
+  hecho cuando: `verify` cumplido.
+  no hagas: no cambies cómo se elige el blanco ni el daño declarado (T434); no toques `rt_link_life`.
+  modelo sugerido: medio
+
+- [ ] T449 [investigación] Dormir y esperar con el anfitrión como dueño de la hora (ADR-025 n.º 3 y 4; HE-07).
+  files: `specs/bitacora/F4-T449-dormir-y-hora.md`
+  verify: la bitácora responde las preguntas del paso 1 con `fichero:línea` y una propuesta de diseño y tareas; `git diff --check`
+  depende de: —
+  quién: agente investiga el código + orquestador prueba en el juego
+  contexto: Decisión del dueño: solo el anfitrión cambia la hora. El invitado **sí** puede usar la cama o la hoguera: se duerme y espera a que el anfitrión elija la hora; entonces la hora salta para los dos. Con el anfitrión en una escena, cargando o en el título, el invitado sigue con su reloj. Hoy el invitado aplica la hora del anfitrión con `test_warp_set_hour` si difiere en más de 0,05 h, y si el invitado duerme el salto se deshace en unos 2 s (mapa 08).
+  pasos:
+    1. Responder: ¿cómo se detecta que el jugador local está durmiendo o esperando (posada, cama, hoguera)? ¿Se puede mantener al invitado en ese estado (o repetirlo) hasta que llegue la hora nueva? ¿Qué pasa si el anfitrión no duerme (cancelar)? ¿Cómo se deja de difundir `g_local_hour` cuando el anfitrión no tiene mundo?
+    2. Proponer diseño y tareas (y si hace falta un sitio o parche nuevo, dejarlo escrito para el dueño).
+  hecho cuando: la bitácora tiene la respuesta.
+  no hagas: no escribas código; no toques `tools/patches.py` ni `tools/game_sites.py`; nada de proyectos de descompilación.
+  modelo sugerido: alto
+
+- [ ] T450 [investigación] Luna de Sangre del anfitrión: la escena también en el invitado (ADR-025 n.º 5; HE-08).
+  files: `specs/bitacora/F4-T450-luna-de-sangre.md`
+  verify: la bitácora responde el paso 1 con `fichero:línea` y propone diseño y tareas; `git diff --check`
+  depende de: —
+  quién: agente investiga + orquestador prueba (`SAVAGEWIND_ONLINE_BM_TEST`)
+  contexto: Decisión del dueño: cuando el anfitrión tiene la Luna de Sangre, **los dos ven la escena**. Hoy `oa_bloody_moon_follow` copia el temporizador y `g_world` no se vacía. Riesgo: escenas lanzadas fuera de contexto pueden colgarse (mapa 07 §5 n.º 31).
+  pasos:
+    1. Responder: ¿qué dispara la Luna de Sangre del juego (temporizador, medianoche, flag)? ¿Se puede provocar en el invitado con su propio mecanismo (adelantar su temporizador a la medianoche del anfitrión) en vez de lanzar la escena a mano? ¿Qué pasa si el invitado está en un menú, una escena, cargando, en un santuario o muerto? ¿Qué hay que vaciar de la sesión (`g_world`, botín)?
+    2. Proponer diseño y tareas.
+  hecho cuando: la bitácora tiene la respuesta.
+  no hagas: no escribas código; no toques parches ni sitios.
+  modelo sugerido: alto
+
+- [ ] T451 [investigación] Eventide y Prueba de la Espada: entrar los dos juntos (ADR-025 n.º 7; HE-16).
+  files: `specs/bitacora/F4-T451-retos-juntos.md`
+  verify: la bitácora responde el paso 1 y propone diseño y tareas, o dice "no viable" con el motivo; `git diff --check`
+  depende de: —
+  quién: agente investiga + orquestador prueba
+  contexto: Decisión del dueño: cuando uno entra en la Isla de Eventide o en la Prueba de la Espada, **los dos entran** y ambos pierden el inventario durante el reto. Hoy no hay nada específico: el reto es solo de quien entra y el compañero conserva su inventario.
+  pasos:
+    1. Responder: ¿cómo se dispara la entrada (escena, flag, carga de mapa)? ¿Cómo se guarda y devuelve el inventario? ¿Qué tipo de mapa tiene la Prueba de la Espada? ¿Qué pasa si uno sale, muere o se desconecta antes? ¿Qué pasa si el otro no puede entrar (en un santuario, en una escena)?
+    2. Proponer diseño y tareas.
+  hecho cuando: la bitácora tiene la respuesta.
+  no hagas: no escribas código; no toques parches ni sitios.
+  modelo sugerido: alto
+
+- [ ] T452 [reglas] amiibo bloqueados durante la sesión (ADR-025 n.º 9).
+  files: `services/nfp.c`, `runtime/online.h` (solo una consulta de "hay sesión"), textos en `runtime/ui/i18n/*.inc`
+  verify: `make -j8` compila; `python3 tools/i18n_check.py` en 0; en juego con sesión: usar la runa amiibo no lee ninguna figura y sale el aviso una vez; sin sesión funciona como siempre
+  depende de: —
+  quién: agente
+  contexto: Decisión del dueño: no se permiten amiibo mientras hay sesión abierta. `services/nfp.c` es un lector local.
+  pasos:
+    1. Con sesión abierta, el lector responde "sin figura" y registra un aviso la primera vez (texto traducible).
+  hecho cuando: `verify` cumplido.
+  no hagas: no cambies el comportamiento sin sesión.
+  modelo sugerido: bajo
+
+- [ ] T453 [enemigos] El invitado rehace en bucle marionetas de enemigos lejanos (HE-23).
+  files: `runtime/oa_enemies.c` (y lo que pida el diagnóstico)
+  verify: en la pasada de dos juegos, B.log no tiene líneas `made again (N m away)` repetidas para el mismo enemigo; paso 4 del recorrido pasa
+  depende de: T214 (o antes si el diagnóstico lo pide)
+  quién: agente
+  contexto: Bitácora `2026-11-25-F2-T208-diagnostico.md`: el invitado crea, pierde y vuelve a crear las marionetas de los enemigos del anfitrión a kilómetros (89 líneas "made again (6562 m away)"). Existía antes de T208.
+  pasos:
+    1. No crear (ni rehacer) marionetas de enemigo fuera del radio de interés del invitado; si el juego la borra por distancia, no rehacerla hasta que vuelva a estar dentro.
+  hecho cuando: `verify` cumplido.
+  no hagas: no cambies el reparto de dueños (T444).
+  modelo sugerido: alto
+
+- [ ] T454 [efectos] El compañero no ve la animación del hada que revive (N2).
+  files: `specs/bitacora/F4-T454-hada.md` (investigación), después lo que proponga
+  verify: en juego, A muere con un hada en el inventario y B ve la animación de la revivida (no solo la caída)
+  depende de: —
+  quién: agente investiga + orquestador prueba
+  contexto: Sesión del 2026-11-25: B murió dos veces y le revivió un hada; A solo vio caer a B. El hada es un actor y un efecto locales que hoy no viajan.
+  pasos:
+    1. Investigar qué actor o efecto es el hada y cómo se podría reproducir en la marioneta (como los efectos de `fx`).
+  hecho cuando: el compañero ve la revivida.
+  no hagas: no cambies el formato de red sin pasar por T409.
+  modelo sugerido: alto
+
+- [ ] T455 [herramientas] La orden de control `bloodmoon` está duplicada (HE-09).
+  files: `runtime/oa_control.c`, `docs/CONTROL.md`
+  verify: el log ya no dice `duplicate command: bloodmoon`; `swctl bloodmoonflags` responde
+  depende de: —
+  quién: agente
+  contexto: `control_game.c` registra `bloodmoon` y `oa_control.c` registra otra con el mismo nombre, que se rechaza.
+  pasos:
+    1. Renombrar la de `oa_control.c` a `bloodmoonflags` y documentarla.
+  hecho cuando: `verify` cumplido.
+  modelo sugerido: bajo
