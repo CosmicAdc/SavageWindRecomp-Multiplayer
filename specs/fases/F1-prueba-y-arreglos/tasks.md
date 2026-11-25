@@ -42,7 +42,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no enlaces (symlink) la carpeta real; no subas la etiqueta.
   modelo sugerido: bajo
 
-- [ ] T102 [pruebas] Guion que arranca los dos juegos como dice `docs/ONLINE.md`.
+- [x] T102 [pruebas] Guion que arranca los dos juegos como dice `docs/ONLINE.md`.
+  nota: implementado en `coop/COOP` (`5496c73`) y corregido en `e805e02` (modo `ventana` sin `SAVAGEWIND_INPUT`).
   files: `tools/coop/dos_juegos.sh`
   verify: `bash tools/coop/dos_juegos.sh arrancar` y después `$PY tools/swctl.py --port 7777 --wait 180 state` y `--port 7778 --wait 180 state` responden; `bash tools/coop/dos_juegos.sh parar` deja `tasklist | grep -c savagewind` en 0
   depende de: T101
@@ -96,7 +97,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no interpretes "el actor existe" como "se ve bien": eso lo confirma el dueño en T107.
   modelo sugerido: bajo
 
-- [ ] T105 [pruebas] Guion del recorrido de 30 minutos.
+- [x] T105 [pruebas] Guion del recorrido de 30 minutos.
+  nota: implementado en `coop/COOP` (`cc8055a`), probado en `specs/bitacora/2026-11-24-F1-linea-base-pasada.md` y corregido en `e805e02` (ruta POSIX para MSYS2 `bash`, espera de `teleport status` y carga en `_en_mundo`).
   files: `tools/coop/recorrido.py`
   verify: `$PY tools/coop/recorrido.py --ayuda` lista los pasos; `$PY tools/coop/recorrido.py --pasos 1-3` termina con código 0 con los dos juegos arrancados e imprime una línea `PASO n: PASA|FALLA` por paso
   depende de: T104
@@ -127,7 +129,8 @@ tarea". Cada tarea se puede ejecutar sin más contexto que este fichero.
   no hagas: no compiles durante la pasada; no arregles nada todavía.
   modelo sugerido: bajo
 
-- [ ] T107 [pruebas] Sesión con ventana, vista por el dueño.
+- [~] T107 [pruebas] Sesión con ventana, vista por el dueño.
+  nota: primera prueba con ventana hecha (`specs/bitacora/2026-11-24-F1-prueba-ventana-dueno.md`): conexión, presencia, equipo y golpes funcionaron; cierre inesperado `0xc0000409` en `Client` al volver a acercarse al Host tras salir a la pantalla de título sin guardar y recargar en el mismo proceso. Pendiente completar lista de `verificacion.md` §3.
   files: `specs/bitacora/<fecha>-F1-base-ventana.md`
   verify: entrada con FPS, ajustes y la lista de `verificacion.md` §3 marcada por el dueño
   depende de: T106
