@@ -105,3 +105,6 @@ menos agentes abiertos. Regla práctica: pasada con dos juegos = como mucho un a
   se une (`Client joined (slot 1)`) y los dos se ven (`Host: OnlinePlayer` en B, `Client: OnlinePlayer` en A).
   Coincide con lo previsto en la bitácora de T212 (el invitado ve "Disconnected by the server"; no hay mensaje de
   "el servidor se va"). **T212: PE-1 cumplido** con el dueño.
+- **N6 (dueño):** el ataque giratorio con espada no golpea al otro jugador; los golpes normales sí. Causa probable:
+  `oa_pvp_update` evalúa una vez al empezar la estela y solo en un cono frontal. Tarea **T466** (F4).
+- **PE-T454-1 (hada) con el dueño:** el hada se ve en B y no en A; es un actor aparte (bitácora F4-T454).

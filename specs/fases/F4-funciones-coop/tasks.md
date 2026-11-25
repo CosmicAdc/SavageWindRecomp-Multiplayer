@@ -1036,3 +1036,16 @@ Están en `specs/decisiones/ADR-007-respuestas-del-dueno-ronda-1.md`, `ADR-008-r
   hecho cuando: `verify` cumplido.
   no hagas: no cargues el mapa del santuario a mano (el dueño eligió entrar andando); no fuerces la entrada.
   modelo sugerido: alto
+
+- [ ] T466 [reglas] El ataque giratorio no golpea al otro jugador (N6, sesión con el dueño del 2026-11-25).
+  files: `runtime/oa_rules.c` (`oa_pvp_update`), `runtime/coop_pvp.c` si la regla pasa a la lógica pura
+  verify: `make -j8`; en juego, con PvP activo: el ataque giratorio (cargado) golpea al compañero a cualquier lado a menos del alcance, una vez por giro; un golpe normal sigue sin golpear por detrás; log `[online] our blow on ...`
+  depende de: T434 (golpes validados por el anfitrión) si ya está hecha; si no, se hace sobre el código actual y T434 lo hereda
+  quién: agente + orquestador prueba con el dueño
+  contexto: El dueño vio que el ataque giratorio con espada no afecta al otro jugador (los golpes normales sí). `oa_pvp_update` (`runtime/oa_rules.c:~165-187`) evalúa el golpe **una vez**, al empezar la estela (`oa_g_fx_trail_t`), y descarta a quien esté detrás o al lado (`(dx*fx+dz*fz)/(d*fl) < 0.3`, cono frontal). El giro barre 360° [H: la causa más probable].
+  pasos:
+    1. Confirmar en el juego con `SAVAGEWIND_ONLINE_FX_LOG=1` qué AS/estela tiene el giro (nombre del AS de Link: `Attack...Rotate`/`Kaiten`... medir, no suponer).
+    2. Si el AS es de giro: sin la condición del cono, y evaluar durante la estela (no solo al empezar), un golpe por giro.
+  hecho cuando: `verify` cumplido.
+  no hagas: no cambies el daño ni el alcance de los golpes normales; no cambies el formato de red.
+  modelo sugerido: medio
