@@ -572,13 +572,13 @@ oa_world.c:oa_breaks_update_told_2           partida   log hecho
 online.c:g_local_hour                        partida   hora local (-1 al empezar). Hilos: juego escribe (online_set_local_hour), red-s lee (srv_loop)
 online.c:g_online                            permitir  ajustes del jugador (fichero de ajustes; hle.h: los ajustes se quedan). Hilos: menú, red-c, juego (oa_rules)
 online.c:net_init:done                       permitir  inicio de la pila de red, una vez por proceso. Hilos: menú (y main.c por línea de órdenes)
-online.c:srv_loop:next_time                  partida   próxima difusión de la hora. Hilo: red-s
+online.c:next_time                           partida   próxima difusión de la hora. Hilo: red-s
 online.c:g_srv                               partida   estado del servidor (sockets, clientes). Hilos: red-s, menú (online_host, stop_all)
 online.c:g_srv_thread                        partida   hilo del servidor (se une en stop_all). Hilo: menú
 online.c:g_srv_running                       partida   servidor en marcha. Hilos: menú, juego (online_is_host)
 online.c:g                                   partida   sesión del cliente (jugadores, colas, chat, cámara); NO su .lock (mutex). Hilos: juego, red-c, menú, control, render
-online.c:motion_anim:cur                     partida   animación de movimiento. Hilo: red-c (sample_local)
-online.c:motion_anim:cand                    partida   candidata. Hilo: red-c
+online.c:cur                                 partida   animación de movimiento. Hilo: red-c (sample_local)
+online.c:cand                                partida   candidata. Hilo: red-c
 online.c:g_skel                              partida   esqueleto local codificado. Hilos: juego escribe, red-c lee
 online.c:g_skel_len                          partida   va con g_skel. Hilos: juego, red-c
 online.c:g_skel_t                            partida   va con g_skel. Hilos: juego, red-c
@@ -586,22 +586,22 @@ online.c:g_pose_lock                         permitir  mutex. Hilos: juego, red-
 online.c:g_local_en                          partida   enemigos locales para enviar. Hilos: juego escribe, red-c lee
 online.c:g_pose                              partida   pose local para enviar. Hilos: juego escribe, red-c lee (sample_local)
 online.c:g_pose_t                            partida   su hora. Hilos: juego, red-c
-online.c:sample_local:last                   partida   última posición. Hilo: red-c (sample_local lee la memoria del invitado: HE-01 b)
-online.c:sample_local:yaw                    partida   rumbo. Hilo: red-c
-online.c:sample_local:have                   partida   hay posición anterior. Hilo: red-c
-online.c:sample_local:anim                   partida   animación. Hilo: red-c
+online.c:sample_local_last                   partida   última posición. Hilo: red-c (sample_local lee la memoria del invitado: HE-01 b)
+online.c:yaw                                 partida   rumbo. Hilo: red-c
+online.c:have                                partida   hay posición anterior. Hilo: red-c
+online.c:anim                                partida   animación. Hilo: red-c
 online.c:g_equip                             partida   equipo local para enviar. Hilos: juego escribe, red-c lee
 online.c:g_equip_t                           partida   su hora. Hilos: juego, red-c
 online.c:g_drop_name                         permitir  tabla constante. Hilo: red-c
 online.c:g_drop_n                            partida   mensajes descartados por tipo. Hilo: red-c (cl_message)
 online.c:g_state_cleared_n                   partida   entradas de STATE anuladas por la validación (T222, después de T211). Hilo: red-c (cl_message)
 online.c:cl_thread:lb                        permitir  búfer de envío: se escribe antes de cada envío. Hilo: red-c
-online.c:cl_thread:next_loots                partida   próximo envío de LOOTS. Hilo: red-c
+online.c:next_loots                          partida   próximo envío de LOOTS. Hilo: red-c
 online.c:cl_thread:sb                        permitir  búfer de envío. Hilo: red-c
-online.c:cl_thread:next_enemies              partida   próximo envío de ENEMIES. Hilo: red-c
+online.c:next_enemies                        partida   próximo envío de ENEMIES. Hilo: red-c
 online.c:cl_thread:eb                        permitir  búfer de envío. Hilo: red-c
-online.c:cl_thread:last                      partida   último equipo enviado. Hilo: red-c
-online.c:cl_thread:next_equip                partida   próximo envío de EQUIP. Hilo: red-c
+online.c:cl_thread_last                      partida   último equipo enviado. Hilo: red-c
+online.c:next_equip                          partida   próximo envío de EQUIP. Hilo: red-c
 # online_actors.c
 online_actors.c:g_weapon_names               permitir  tabla cargada de weapons.txt (lista de nombres de red permitidos)
 online_actors.c:g_item_names                 permitir  tabla cargada de items.txt

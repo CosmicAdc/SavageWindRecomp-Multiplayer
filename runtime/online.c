@@ -35,6 +35,7 @@ typedef int sock_t;
 #include "online_wire.h"
 #include "online_validate.h"
 #include "game_sites.h"
+#include "hle.h"  // (RT_ON_RESET)
 #include "platform.h"
 #include "rt.h"
 
@@ -295,6 +296,9 @@ static bool srv_open(Server *sv, int port) {
     return true;
 }
 
+// srv_loop's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint64_t next_time;
+
 // accept, read and pass on until sv->stop
 static void srv_loop(Server *sv) {
     while (!sv->stop) {
@@ -328,7 +332,6 @@ static void srv_loop(Server *sv) {
             }
         }
         uint64_t now = plat_now_ns();
-        static uint64_t next_time;
         if (now >= next_time) {  // (the host's own game is the one this server runs in: its hour for everyone)
             next_time = now + TIME_EVERY_NS;
             float hour = g_local_hour;
@@ -465,6 +468,9 @@ static void add_notice(const char *fmt, const char *name) {  // (lock held)
     g.notice_t[g.nnotice++] = plat_now_ns();
 }
 
+// motion_anim's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint8_t cur, cand;
+
 // What Link is doing, from how he moves (20 samples a second): on the ground by his speed, in the air by how fast he
 // rises or falls, gliding when he falls slowly while going fast. A change needs two samples in a row.
 static uint8_t motion_anim(float dh, float dy) {
@@ -478,7 +484,6 @@ static uint8_t motion_anim(float dh, float dy) {
     else if (vh < 2.8f) a = ONLINE_A_WALK;
     else if (vh < 6.5f) a = ONLINE_A_RUN;
     else a = ONLINE_A_DASH;
-    static uint8_t cur, cand;
     if (a == cand) cur = a;
     cand = a;
     return cur;
@@ -776,11 +781,14 @@ void online_set_local_pose(const OnlinePose *p) {
     pthread_mutex_unlock(&g_pose_lock);
 }
 
+// sample_local's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static float sample_local_last[3], yaw;
+static bool have;
+static uint8_t anim;
+
 // Link right now: false while there is no Link (loading, the title screen), with pos and yaw 0 (the STATE then sent with
 // ONLINE_F_LOADING passes online_validate_state: what was read there, not finite or beyond any world, would drop it)
 static bool sample_local(WireState *w) {
-    static float last[3], yaw;
-    static bool have;
     w->flags = 0;
     w->anim = ONLINE_A_WAIT;
     if (g_site.pause_state && *(uint32_t *)(uintptr_t)g_site.pause_state) w->flags |= ONLINE_F_PAUSED;
@@ -790,13 +798,12 @@ static bool sample_local(WireState *w) {
     for (int k = 0; k < 3; k++)
         if (!isfinite(w->pos[k]) || fabsf(w->pos[k]) > 100000) goto none;
     if (w->pos[0] == 0 && w->pos[1] == 0 && w->pos[2] == 0) goto none;  // (no Link placed yet)
-    static uint8_t anim;
     if (have) {  // heading: where he has been going (kept while he stands)
-        float dx = w->pos[0] - last[0], dy = w->pos[1] - last[1], dz = w->pos[2] - last[2];
+        float dx = w->pos[0] - sample_local_last[0], dy = w->pos[1] - sample_local_last[1], dz = w->pos[2] - sample_local_last[2];
         if (dx * dx + dz * dz > 0.02f * 0.02f) yaw = atan2f(dx, dz);
         if (dx * dx + dy * dy + dz * dz < 50 * 50) anim = motion_anim(sqrtf(dx * dx + dz * dz), dy);
     }
-    memcpy(last, w->pos, sizeof last);
+    memcpy(sample_local_last, w->pos, sizeof sample_local_last);
     have = true;
     w->yaw = yaw;
     w->anim = anim;
@@ -1205,6 +1212,12 @@ static sock_t cl_connect(const char *host, int port) {
     return s;
 }
 
+// cl_thread's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static uint64_t next_loots;
+static uint64_t next_enemies;
+static WireEquip cl_thread_last;
+static uint64_t next_equip;
+
 static void *cl_thread(void *arg) {
     (void)arg;
     char host[64];
@@ -1278,7 +1291,6 @@ static void *cl_thread(void *arg) {
         }
         {   // loot: ours for the host's game; the host's list for the others (when it changed, and every 2 s)
             static uint8_t lb[1 + ONLINE_LOOT * sizeof(OnlineLoot)];
-            static uint64_t next_loots;
             OnlineLoot la[16];
             uint32_t lt[16];
             int nla, nlt, nl = -1;
@@ -1309,7 +1321,6 @@ static void *cl_thread(void *arg) {
             pthread_mutex_unlock(&g.lock);
             if (ne > 0 && !g.hosting) alive = alive && send_msg(s, M_ESTATE, sb + 1, 1 + ne * (int)sizeof(OnlineEnemy), NULL, 0);
         }
-        static uint64_t next_enemies;
         if (g.hosting && now >= next_enemies) {  // (the host: his enemies, while his frame loop gives them)
             next_enemies = now + ENEMIES_EVERY_NS;
             static uint8_t eb[13 + ONLINE_ENEMIES * sizeof(OnlineEnemy)];
@@ -1342,15 +1353,13 @@ static void *cl_thread(void *arg) {
             send_msg(s, M_PING, &now, 8, NULL, 0);
         }
         {   // what he wears: when it changes, and every 5 s (for whoever came in meanwhile)
-            static WireEquip last;
-            static uint64_t next_equip;
             WireEquip e;
-            if (sample_equip(&e) && (memcmp(&e, &last, sizeof e) || now >= next_equip)) {
+            if (sample_equip(&e) && (memcmp(&e, &cl_thread_last, sizeof e) || now >= next_equip)) {
                 next_equip = now + 5000000000ull;
-                if (memcmp(&e, &last, sizeof e))
+                if (memcmp(&e, &cl_thread_last, sizeof e))
                     LOG("[online] wearing %s|%s|%s carrying %s|%s|%s|%s|%s|%s\n", e.armor[0], e.armor[1], e.armor[2], e.gear[0],
                         e.gear[1], e.gear[2], e.gear[3], e.gear[4], e.gear[5]);
-                last = e;
+                cl_thread_last = e;
                 send_msg(s, M_EQUIP, &e, sizeof e, NULL, 0);
             }
         }
@@ -1615,4 +1624,67 @@ void online_settings_save(void) {
             g_online.name, g_online.host, g_online.port, g_online.password, g_online.show_names, g_online.show_markers,
             g_online.pvp, g_online.collide, g_online.revive, g_online.nopause);
     fclose(f);
+}
+
+static void nap_ms(int ms) {
+#ifdef _WIN32
+    Sleep((DWORD)ms);
+#else
+    usleep((useconds_t)ms * 1000);
+#endif
+}
+
+// A reboot (back to the start screen, or for the language or mods: runtime/main.c teardown) closes the session, as
+// Leave in the menu does (ADR-025 n.º 2): the others see this game leave, and the next boot starts as in a fresh
+// process (a session again only if the player hosts or joins again). The network threads end first: sample_local
+// reads the game's memory, which the teardown wipes next, and they use what is cleared below. Hosting, our own
+// server lives on a moment after our client is gone, until it has told the others LEAVE (stopped at once it would
+// only close their connections), at most a second
+RT_ON_RESET(online_reset) {
+    if (g.thread_on || g_srv_running) {
+        LOG("[online] reboot: leaving the session\n");  // (not "[online] reset": oa_frame's, one a reboot)
+        g.stop = true;
+        if (g.thread_on) pthread_join(g.thread, NULL), g.thread_on = false;  // (our connection closed)
+        int me = g.id;
+        if (g_srv_running && me >= 0 && me < ONLINE_MAX)  // (our slot dropped: LEAVE sent to the others)
+            for (uint64_t until = plat_now_ns() + 1000000000ull;
+                 __atomic_load_n(&g_srv.c[me].used, __ATOMIC_ACQUIRE) && plat_now_ns() < until;)
+                nap_ms(5);
+        online_leave();  // (the server stopped and joined, the session's state cleared: stop_all; "Not connected")
+    }
+    // no network thread now: what stop_all leaves, and the rest of this file's state, as in a fresh process (not the
+    // locks, nor g_online: the player's settings stay)
+    pthread_mutex_lock(&g.lock);
+    g.state = ONLINE_OFF;
+    g.status_fmt = NULL;
+    memset(g.status_arg, 0, sizeof g.status_arg);
+    g.id = -1;
+    memset(g.vp, 0, sizeof g.vp);
+    g.ysign = 0;
+    g.cam_t = 0;
+    memset(g_skel, 0, sizeof g_skel);
+    g_skel_len = 0;
+    g_skel_t = 0;
+    pthread_mutex_unlock(&g.lock);
+    pthread_mutex_lock(&g_pose_lock);
+    memset(&g_local_en, 0, sizeof g_local_en);
+    memset(&g_pose, 0, sizeof g_pose);
+    g_pose_t = 0;
+    memset(&g_equip, 0, sizeof g_equip);
+    g_equip_t = 0;
+    pthread_mutex_unlock(&g_pose_lock);
+    g_local_hour = -1;
+    next_time = 0;
+    memset(&g_srv, 0, sizeof g_srv);
+    memset(&g_srv_thread, 0, sizeof g_srv_thread);
+    g_srv_running = false;
+    cur = cand = 0;
+    memset(sample_local_last, 0, sizeof sample_local_last);
+    yaw = 0;
+    have = false;
+    anim = 0;
+    memset(g_drop_n, 0, sizeof g_drop_n);
+    g_state_cleared_n = 0;
+    next_loots = next_enemies = next_equip = 0;
+    memset(&cl_thread_last, 0, sizeof cl_thread_last);
 }
