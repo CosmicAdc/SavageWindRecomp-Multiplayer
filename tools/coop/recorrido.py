@@ -161,7 +161,7 @@ class Ctx:
 
     def ir(self, x, *destino):
         tp = self.mover(x, *destino)
-        return self.esperar_quieto(x, tp=tp)
+        return self._quieto_reintentando(x, tp, destino)
 
     def llegar(self, xs, destino, margen_xz=3.0, margen_y=10.0):
         """goto a unas coordenadas en los juegos `xs` a la vez; espera a que cada uno quede quieto y comprueba que
@@ -170,7 +170,7 @@ class Ctx:
         tp = {x: self.mover(x, "goto", *destino) for x in xs}
         res = {}
         for x in xs:
-            p = self._quieto_reintentando(x, tp[x], destino)
+            p = self._quieto_reintentando(x, tp[x], ("teleport", *destino))
             dxz = math.hypot(p[0] - destino[0], p[2] - destino[2])
             dy = destino[1] - p[1]
             if dxz > margen_xz or abs(dy) > margen_y:
@@ -179,18 +179,19 @@ class Ctx:
             res[x] = p
         return res
 
-    def _quieto_reintentando(self, x, tp, destino, reintentos=2):
+    def _quieto_reintentando(self, x, tp, orden, reintentos=2, **espera):
         """esperar_quieto; si el teletransporte falla (HE-13: "Position verification failed" o "Position not found"),
-        lo repite hasta `reintentos` veces con `teleport` a las coordenadas, que en la sesion del 2026-11-25 desbloqueo
-        a Link. Cada reintento se anota en la salida para no esconder el fallo de la herramienta."""
+        repite `orden` (un goto o teleport completo; para coordenadas, `teleport`, que en la sesion del 2026-11-25
+        desbloqueo a Link) hasta `reintentos` veces. Cada reintento se anota en la salida para no esconder el fallo de
+        la herramienta."""
         for intento in range(reintentos + 1):
             try:
-                return self.esperar_quieto(x, tp=tp)
+                return self.esperar_quieto(x, tp=tp, **espera)
             except TeleportFallido as e:
                 if intento == reintentos:
                     raise
-                print(f"  aviso: {e}; reintento {intento + 1} con teleport", flush=True)
-                tp = self.mover(x, "teleport", *destino)
+                print(f"  aviso: {e}; reintento {intento + 1}: {' '.join(map(str, orden))}", flush=True)
+                tp = self.mover(x, *orden)
 
     def esperar_actor(self, x, texto, cantidad_min=1, maximo=60):
         ini = time.monotonic()
@@ -309,7 +310,7 @@ def paso4(c):
     for x in ("A", "B"):
         c.ok(x, "teleport", *CAMPAMENTO)
     for x in ("A", "B"):
-        c.esperar_quieto(x, tp=True)
+        c._quieto_reintentando(x, True, ("teleport", *CAMPAMENTO))
     time.sleep(60)
     c.comprobar_ambos()
     n = c.cuenta("A", LOG_TRASPASO) + c.cuenta("B", LOG_TRASPASO) - antes
@@ -359,7 +360,7 @@ def paso8(c):
     antes = c.cuenta("A", LOG_CARGA) + c.cuenta("B", LOG_CARGA)
     tp = {x: c.mover(x, "goto", "hateno") for x in ("A", "B")}
     for x in ("A", "B"):
-        c.esperar_quieto(x, minimo=15, maximo=150, tp=tp[x])
+        c._quieto_reintentando(x, tp[x], ("goto", "hateno"), minimo=15, maximo=150)
     for x in ("A", "B"):
         if not c.esperar_actor(x, "OnlinePlayer", 1, 90):
             raise Falla(f"{x} no ve a OnlinePlayer tras la carga")
