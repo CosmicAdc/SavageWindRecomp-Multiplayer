@@ -35,7 +35,7 @@ servidor() {
     rm -f "$COMPARTIDO/listo"
     cd /src
     make -j"$JOBS" B=/tmp/b GEN=/nonexistent
-    clang -O2 -o /tmp/online_bot tools/online_bot.c -lm
+    clang -O2 -Iruntime -o /tmp/online_bot tools/online_bot.c -lm
     cp /tmp/b/savagewind "$COMPARTIDO/savagewind"
     cp /tmp/online_bot "$COMPARTIDO/online_bot"
     touch "$COMPARTIDO/listo"
