@@ -61,7 +61,7 @@ static void cmd_leave(int argc, char **argv, ControlReply *r) {  // (`leave`: th
     online_leave();
     control_text(r, "Left the online session");
 }
-static void cmd_bloodmoon(int argc, char **argv, ControlReply *r) {
+static void cmd_bloodmoonflags(int argc, char **argv, ControlReply *r) {  // (`bloodmoonflags`; `bloodmoon` is control_game.c's)
     (void)argc, (void)argv;
     __atomic_store_n(&oa_g_fake_blood_moon, 1, __ATOMIC_RELEASE);
     control_text(r, "The world's shared flags (items, chests) are cleared here on the next check");
@@ -161,7 +161,8 @@ void online_actors_control_init(void) {
         {"event", "<flow> [entry]", "Start an event on Link (entry: the flow's name if left out)", cmd_event, 0},
         {"setflag", "<bool flag name>", "Set a game data bool flag (as the game's setter does), then show it", cmd_setflag, 0},
         {"leave", "", "Leave (or end) the online session, as its button does", cmd_leave, 0},
-        {"bloodmoon", "", "Clear the world's shared flags (items, chests) here, as a Blood Moon does", cmd_bloodmoon, 0},
+        {"bloodmoonflags", "", "Clear the world's shared flags (items, chests) here, as a Blood Moon does", cmd_bloodmoonflags,
+         0},
     };
     control_register(cmds, (int)(sizeof cmds / sizeof *cmds));
 }
