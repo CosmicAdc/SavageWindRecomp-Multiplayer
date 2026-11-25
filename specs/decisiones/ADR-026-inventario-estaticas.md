@@ -381,14 +381,14 @@ oa_loot.c:g_nloot_list                       partida   su longitud
 oa_loot.c:g_next_gid                         partida   siguiente id de botín (1 al empezar)
 oa_loot.c:g_drop_seen                        partida   lo que se vio caer (ids, hora, posición)
 oa_loot.c:g_drop_hush                        partida   zonas silenciadas un rato
-oa_loot.c:oa_loot_update:tick                partida   contador
-oa_loot.c:oa_loot_update:dt                  partida   contador
-oa_loot.c:oa_loot_update:was                 partida   posición anterior del Link
-oa_loot.c:oa_loot_update:base                partida   primera mirada hecha
+oa_loot.c:oa_loot_update_tick                partida   contador
+oa_loot.c:dt                                 partida   contador
+oa_loot.c:was                                partida   posición anterior del Link
+oa_loot.c:base                               partida   primera mirada hecha
 oa_loot.c:oa_loot_update:list                permitir  búfer de trabajo: se copia o lo llena online_loots antes de cada lectura
 oa_loot.c:g_ground                           puntero   lo que hay en el suelo (actor, Watch)
-oa_loot.c:oa_ground_update:tick              partida   contador
-oa_loot.c:oa_ground_update:wlog              partida   contador de log (WEAPONS_LOG)
+oa_loot.c:oa_ground_update_tick              partida   contador
+oa_loot.c:wlog                               partida   contador de log (WEAPONS_LOG)
 oa_loot.c:oa_ground_update:at                permitir  búfer de trabajo: posiciones de esta llamada, escritas antes de leerlas
 # oa_puppet.c
 oa_puppet.c:g_pup                            puntero   Links de los otros (Link, piezas, efectos)

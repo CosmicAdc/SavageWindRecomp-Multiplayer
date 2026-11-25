@@ -1,6 +1,7 @@
 // Online play's actors, oa_loot: the loot: what falls, the host's list of it, what each player carries; the items on
 // the ground. What the modules share: runtime/online_actors_internal.h
 #include "online_actors_internal.h"
+#include "hle.h"  // (RT_ON_RESET)
 
 // ---- Loot (protocol 15): what our enemies drop when they die here (the items that come near where one died in the
 // seconds after, its weapon and shield) goes on everyone's list, kept by the host's game (each by an id of its own,
@@ -135,9 +136,14 @@ static void loot_host_add(const OnlineLoot *l) {
 }
 
 static bool loot_actor(uint64_t a);
+// oa_loot_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_loot_update_tick;
+static int dt;
+static float was[3];
+static bool base;  // (the first look, and after a load or a teleport: what is there now isn't new)
+
 void oa_loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool host) {
-    static int tick;
-    if (tick++ % 3) return;
+    if (oa_loot_update_tick++ % 3) return;
     uint64_t carried[LINK_CARRIED];
     oa_link_carried(player, carried);
     memcpy(oa_g_carried_now, carried, sizeof oa_g_carried_now);
@@ -200,9 +206,6 @@ void oa_loot_update(Cpu *c, uint64_t player, const float link[3], int me, bool h
             if (g_death[d].frames) g_death[d].frames = g_death[d].frames > 3 ? g_death[d].frames - 3 : 0;
     }
     {   // what falls to the ground near us (every 9 frames: what he throws comes for the others soon after it lies)
-        static int dt;
-        static float was[3];
-        static bool base;  // (the first look, and after a load or a teleport: what is there now isn't new)
         if (dt++ % 3 == 0) {
             float jx = link[0] - was[0], jz = link[2] - was[2];
             if (jx * jx + jz * jz > 30.0f * 30.0f) base = false, memset(g_drop_seen, 0, sizeof g_drop_seen);
@@ -441,9 +444,12 @@ static bool loot_actor(uint64_t a) {
     return false;
 }
 
+// oa_ground_update's state, at file level so that a reboot clears it (RT_ON_RESET at the end of the file)
+static int oa_ground_update_tick;
+static int wlog;  // (SAVAGEWIND_ONLINE_WEAPONS_LOG=1: every 5 s, the Weapon_* actors within 10 m of Link)
+
 void oa_ground_update(Cpu *c, uint64_t player, const float link[3]) {
-    static int tick;
-    if (tick++ % 6) return;
+    if (oa_ground_update_tick++ % 6) return;
     // the others' picks: gone here too
     char pn[16][40];
     float pp[16][3];
@@ -465,7 +471,6 @@ void oa_ground_update(Cpu *c, uint64_t player, const float link[3]) {
             break;
         }
     // ours, watched: picked up (gone, this Link next to where it lay; or in his hand now, the same actor)
-    static int wlog;  // (SAVAGEWIND_ONLINE_WEAPONS_LOG=1: every 5 s, the Weapon_* actors within 10 m of Link)
     if (getenv("SAVAGEWIND_ONLINE_WEAPONS_LOG") && wlog++ % 50 == 0)
         for (int k = 0; k < na; k++) {
             char n[48];
@@ -543,4 +548,23 @@ void oa_ground_update(Cpu *c, uint64_t player, const float link[3]) {
                 break;
             }
     }
+}
+
+// A reboot (runtime/main.c teardown): our loot, what this Link carried and what lay on the ground were actors of the
+// last boot, gone with its memory - forgotten, never deleted (nothing here calls the game); the host's list, the
+// deaths and drops watched and the counters start again as in a fresh process (the loot's ids from 1)
+RT_ON_RESET(oa_loot_reset) {
+    memset(g_death, 0, sizeof g_death);
+    memset(g_mine, 0, sizeof g_mine);
+    memset(oa_g_carried_now, 0, sizeof oa_g_carried_now);
+    memset(g_loot_list, 0, sizeof g_loot_list);
+    g_nloot_list = 0;
+    g_next_gid = 1;
+    memset(g_drop_seen, 0, sizeof g_drop_seen);
+    memset(g_drop_hush, 0, sizeof g_drop_hush);
+    oa_loot_update_tick = dt = 0;
+    memset(was, 0, sizeof was);
+    base = false;
+    memset(g_ground, 0, sizeof g_ground);
+    oa_ground_update_tick = wlog = 0;
 }
